@@ -1,0 +1,26 @@
+# Dependencies
+node_modules/
+
+# Claude Code local settings (not part of the project)
+.claude/
+
+# Environment secrets
+.env
+.env.local
+
+# Database
+backend/prisma/dev.db
+backend/prisma/dev.db-journal
+
+# Build output
+frontend/dist/
+frontend/build/
+
+# Logs
+*.log
+npm-debug.log*
+
+# OS/editor
+.DS_Store
+Thumbs.db
+.vscode/

@@ -1,0 +1,91 @@
+// Prisma schema for the tournament platform (Week 2).
+// Provider: SQLite for development (file:./dev.db). Models are PostgreSQL-compatible.
+
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "sqlite"
+  url      = env("DATABASE_URL")
+}
+
+model Team {
+  id          Int      @id @default(autoincrement())
+  name        String
+  discipline  String // "CS2" | "Dota 2" | "Valorant"
+  logo        String?
+  winrate     String?
+  streak      String?
+  tournaments Int      @default(0)
+  best        String?
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @default(now()) @updatedAt
+
+  players         Player[]
+  tournamentTeams TournamentTeam[]
+  ratingHistory   RatingHistory[]
+}
+
+model Player {
+  id           Int     @id @default(autoincrement())
+  teamId       Int
+  nick         String
+  role         String
+  rank         String // stored as text: "2510" for CS2/Dota, "Immortal" for Valorant
+  isSubstitute Boolean @default(false)
+
+  team Team @relation(fields: [teamId], references: [id], onDelete: Cascade)
+}
+
+model Tournament {
+  id          Int      @id @default(autoincrement())
+  name        String
+  discipline  String
+  bracketType String // "single" | "double"
+  matchFormat Int // 1 | 3 | 5 (best-of)
+  status      String   @default("draft")
+  date        String?
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @default(now()) @updatedAt
+
+  teams   TournamentTeam[]
+  matches Match[]
+}
+
+model TournamentTeam {
+  id           Int @id @default(autoincrement())
+  tournamentId Int
+  teamId       Int
+  seed         Int
+
+  tournament Tournament @relation(fields: [tournamentId], references: [id], onDelete: Cascade)
+  team       Team       @relation(fields: [teamId], references: [id], onDelete: Cascade)
+
+  @@unique([tournamentId, teamId])
+}
+
+model Match {
+  id           Int    @id @default(autoincrement())
+  tournamentId Int
+  round        Int
+  position     Int
+  teamAId      Int?
+  teamBId      Int?
+  scoreA       Int?
+  scoreB       Int?
+  status       String @default("pending")
+
+  tournament Tournament @relation(fields: [tournamentId], references: [id], onDelete: Cascade)
+}
+
+model RatingHistory {
+  id           Int      @id @default(autoincrement())
+  teamId       Int
+  matchId      Int?
+  ratingBefore Int
+  ratingAfter  Int
+  createdAt    DateTime @default(now())
+
+  team Team @relation(fields: [teamId], references: [id], onDelete: Cascade)
+}
