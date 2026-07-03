@@ -1,5 +1,5 @@
-import { useState } from "react";
-import { useNavigate } from "react-router-dom";
+import { useState, useEffect } from "react";
+import { useNavigate, useParams } from "react-router-dom";
 import {
   ROLES_BY_GAME,
   DISCIPLINE_LIST,
@@ -7,13 +7,20 @@ import {
   VALORANT_RANKS,
   avgRating,
 } from "../lib/demo";
-import { createTeam } from "../lib/api";
+import { createTeam, updateTeam, getTeam } from "../lib/api";
 
 // Значення рейтингу за замовчуванням для нової дисципліни.
 const DEFAULT_RANK = { CS2: 1800, "Dota 2": 3000, Valorant: "Diamond" };
 
+// Приводить збережений у БД rank (завжди рядок) до вигляду, який очікує UI:
+// число для CS2/Dota, рядок звання для Valorant.
+function fromDbRank(discipline, rank) {
+  return DISCIPLINES[discipline].kind === "rank" ? rank : Number(rank);
+}
+
 export default function Team() {
   const nav = useNavigate();
+  const { id } = useParams();
   const [discipline, setDiscipline] = useState("CS2");
   const [name, setName] = useState("Night Wolves");
   const roles = ROLES_BY_GAME[discipline];
@@ -27,6 +34,26 @@ export default function Team() {
     { nick: "ghost", role: "Lurker", rank: 2240 },
   ]);
   const [subs, setSubs] = useState([{ nick: "spare1", role: "Support", rank: 1800 }]);
+
+  // Якщо в URL є id — вантажимо реальну команду з бекенду замість дефолтів.
+  useEffect(() => {
+    if (!id) return;
+    getTeam(id).then((t) => {
+      if (!t) return;
+      setName(t.name);
+      setDiscipline(t.discipline);
+      setPlayers(
+        t.players
+          .filter((p) => !p.isSubstitute)
+          .map((p) => ({ nick: p.nick, role: p.role, rank: fromDbRank(t.discipline, p.rank) }))
+      );
+      setSubs(
+        t.players
+          .filter((p) => p.isSubstitute)
+          .map((p) => ({ nick: p.nick, role: p.role, rank: fromDbRank(t.discipline, p.rank) }))
+      );
+    });
+  }, [id]);
 
   // Зміна гри → переназначаємо ролі та рейтинги під нову дисципліну.
   function changeDiscipline(d) {
@@ -70,7 +97,11 @@ export default function Team() {
         })),
       ],
     };
-    createTeam(payload);
+    if (id) {
+      updateTeam(id, payload);
+    } else {
+      createTeam(payload);
+    }
     nav("/profile");
   }
 

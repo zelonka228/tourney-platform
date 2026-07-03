@@ -57,7 +57,7 @@ export default function Profile() {
         <button className="btn sm" onClick={() => setSel(null)}>
           ← Усі команди
         </button>
-        <Link to="/team">Редагувати склад →</Link>
+        <Link to={`/team/${team.id}`}>Редагувати склад →</Link>
       </div>
       <h1>{team.name}</h1>
 

@@ -12,7 +12,7 @@ datasource db {
 
 model Team {
   id          Int      @id @default(autoincrement())
-  name        String
+  name        String   @unique
   discipline  String // "CS2" | "Dota 2" | "Valorant"
   logo        String?
   winrate     String?

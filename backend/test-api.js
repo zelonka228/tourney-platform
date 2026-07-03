@@ -77,6 +77,12 @@ async function main() {
   const notThere = await call("GET", "/api/teams/999999");
   ok(notThere.status === 404, "GET /api/teams/:id (missing) → 404");
 
+  const dupeTeam = await call("POST", "/api/teams", {
+    name: "QA Squad v2",
+    discipline: "CS2",
+  });
+  ok(dupeTeam.status === 409, "POST /api/teams with duplicate name → 409");
+
   // --- Tournaments: happy path ---
   const tour = await call("POST", "/api/tournaments", {
     name: "QA Cup",
