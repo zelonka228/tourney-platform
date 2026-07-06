@@ -1,6 +1,9 @@
 # Dependencies
 node_modules/
 
+# Husky internal shim (auto-regenerated locally by `npm install`)
+.husky/_/
+
 # Claude Code local settings (not part of the project)
 .claude/
 
