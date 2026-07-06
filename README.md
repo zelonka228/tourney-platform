@@ -19,8 +19,23 @@
 
 ---
 
+## Команда розробки
+
+<div align="center">
+
+| | Верещагін Сергій | Герасимов Володимир |
+|---|:---:|:---:|
+| **Роль** | Backend / алгоритми | Frontend / UX |
+| **GitHub** | [![GitHub](https://img.shields.io/badge/GitHub-zelonka228-181717?style=flat-square&logo=github&logoColor=white)](https://github.com/zelonka228) | [![GitHub](https://img.shields.io/badge/GitHub-MUMITROLIK-181717?style=flat-square&logo=github&logoColor=white)](https://github.com/MUMITROLIK) |
+| **Discord** | ![Discord](https://img.shields.io/badge/Discord-zelonka228-5865F2?style=flat-square&logo=discord&logoColor=white) | ![Discord](https://img.shields.io/badge/Discord-11xomyk11-5865F2?style=flat-square&logo=discord&logoColor=white) |
+
+</div>
+
+---
+
 ## Зміст
 
+- [Команда розробки](#команда-розробки)
 - [Про проєкт](#про-проєкт)
 - [Функціонал](#функціонал)
 - [Архітектура](#архітектура)
@@ -30,7 +45,6 @@
 - [Швидкий старт](#швидкий-старт)
 - [Статус за тижнями](#статус-за-тижнями)
 - [Документація](#документація)
-- [Команда розробки](#команда-розробки)
 
 ---
 
@@ -253,21 +267,5 @@ npm test
 - [docs/02-week2-spec.md](docs/02-week2-spec.md) — контракт схеми БД та REST API.
 
 Академічні деліверабли практики (звіт, календарний графік, щоденники) до репозиторію не входять — ведуться окремо.
-
-**[⬆ До змісту](#зміст)**
-
----
-
-## Команда розробки
-
-<div align="center">
-
-| | Верещагін Сергій | Герасимов Володимир |
-|---|:---:|:---:|
-| **Роль** | Backend / алгоритми | Frontend / UX |
-| **GitHub** | [![GitHub](https://img.shields.io/badge/GitHub-zelonka228-181717?style=flat-square&logo=github&logoColor=white)](https://github.com/zelonka228) | [![GitHub](https://img.shields.io/badge/GitHub-MUMITROLIK-181717?style=flat-square&logo=github&logoColor=white)](https://github.com/MUMITROLIK) |
-| **Discord** | ![Discord](https://img.shields.io/badge/Discord-zelonka228-5865F2?style=flat-square&logo=discord&logoColor=white) | ![Discord](https://img.shields.io/badge/Discord-11xomyk11-5865F2?style=flat-square&logo=discord&logoColor=white) |
-
-</div>
 
 **[⬆ До змісту](#зміст)**
