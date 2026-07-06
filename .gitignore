@@ -4,6 +4,11 @@ node_modules/
 # Claude Code local settings (not part of the project)
 .claude/
 
+# Academic/office documents (звіти, щоденники, календарні графіки) —
+# особисті деліверабли практики, не частина коду проєкту.
+документи/
+*.docx
+
 # Environment secrets
 .env
 .env.local
