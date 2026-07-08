@@ -1,10 +1,34 @@
 import { useEffect, useState } from "react";
 import { useNavigate } from "react-router-dom";
-import { bracketPlan, BEST_OF, winTarget, DISCIPLINE_LIST } from "../lib/demo";
+import { bracketPlan, BEST_OF, winTarget, DISCIPLINE_LIST, avgRating } from "../lib/demo";
 import { getTeams, createTournament } from "../lib/api";
 
 const SINGLE_LABEL = "На вибування (виліт за 1 поразку)";
 const DOUBLE_LABEL = "Подвійне вибування (виліт за 2 поразки)";
+
+function shuffled(arr) {
+  const a = [...arr];
+  for (let i = a.length - 1; i > 0; i--) {
+    const j = Math.floor(Math.random() * (i + 1));
+    [a[i], a[j]] = [a[j], a[i]];
+  }
+  return a;
+}
+
+// Порядок teamIds = порядок посіву (перший — seed 1). "За рейтингом" сортує
+// найсильніших першими, "Випадковий" перемішує, "Ручний" лишає порядок кліків.
+function seedTeamIds(selectedIds, allTeams, seedType) {
+  if (seedType === "Випадковий") return shuffled(selectedIds);
+  if (seedType === "За рейтингом") {
+    const byId = new Map(allTeams.map((t) => [t.id, t]));
+    const ratingOf = (id) => {
+      const t = byId.get(id);
+      return avgRating(t.discipline, t.players.map((p) => p.rank)).value ?? -Infinity;
+    };
+    return [...selectedIds].sort((a, b) => ratingOf(b) - ratingOf(a));
+  }
+  return selectedIds;
+}
 
 export default function Create() {
   const nav = useNavigate();
@@ -48,7 +72,7 @@ export default function Create() {
         discipline,
         bracketType: isDouble ? "double" : "single",
         matchFormat: bo,
-        teamIds: selectedIds,
+        teamIds: seedTeamIds(selectedIds, allTeams, seedType),
         date,
       });
       if (!created?.id) throw new Error("Не вдалося створити турнір.");

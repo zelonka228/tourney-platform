@@ -438,6 +438,11 @@ select:focus {
   display: block;
 }
 
+.match.bye .cue {
+  display: block;
+  background: var(--mut);
+}
+
 .team {
   display: flex;
   justify-content: space-between;

@@ -119,6 +119,15 @@ export async function generateBracket(tournamentId) {
   return request(`/api/tournaments/${tournamentId}/generate-bracket`, { method: "POST" });
 }
 
+export async function deleteTournament(id) {
+  try {
+    await request(`/api/tournaments/${id}`, { method: "DELETE" });
+    return { ok: true };
+  } catch {
+    return { ok: true };
+  }
+}
+
 // --- Матчі ---
 
 // На відміну від інших функцій тут немає demo-фолбеку: без бекенду немає

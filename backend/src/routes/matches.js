@@ -10,9 +10,10 @@ const router = Router();
 
 // PUT /api/matches/:id/score → submit a match result.
 // Validates the score against the tournament's matchFormat, marks the match
-// done, and pushes the winner into the next round's match slot. If there is
-// no next round (this was the final), marks the tournament completed and
-// updates the champion's stats + a RatingHistory snapshot for both finalists.
+// done, pushes the winner into the next round's match slot, and snapshots
+// both teams' current rating into RatingHistory. If there is no next round
+// (this was the final), also marks the tournament completed and updates the
+// champion's stats.
 router.put(
   "/:id/score",
   asyncHandler(async (req, res) => {
@@ -46,6 +47,21 @@ router.put(
       data: { scoreA: a, scoreB: b, status: "done" },
     });
 
+    // Snapshot both teams' current rating into history for every played match
+    // (byes don't go through this endpoint, so they're excluded naturally).
+    // There is no win/loss point adjustment (that would reintroduce the fake
+    // universal ELO the rating model deliberately avoids) — ratingBefore and
+    // ratingAfter are equal; this just timestamps what the rating was then.
+    for (const teamId of [match.teamAId, match.teamBId]) {
+      const team = await prisma.team.findUnique({ where: { id: teamId }, include: { players: true } });
+      const r = avgRating(team.discipline, team.players.map((p) => p.rank));
+      if (r.value != null) {
+        await prisma.ratingHistory.create({
+          data: { teamId, matchId: id, ratingBefore: r.value, ratingAfter: r.value },
+        });
+      }
+    }
+
     let champion = null;
     const advanced = await advanceWinner(prisma, match, winnerId);
 
@@ -64,20 +80,6 @@ router.put(
         where: { id: winnerId },
         data: { tournaments: { increment: 1 }, best: nextBest },
       });
-
-      // Snapshot both finalists' current rating into history. There is no
-      // win/loss point adjustment (that would reintroduce the fake universal
-      // ELO the rating model deliberately avoids) — ratingBefore/ratingAfter
-      // are equal here; this just timestamps what the rating was at that match.
-      for (const teamId of [match.teamAId, match.teamBId]) {
-        const team = await prisma.team.findUnique({ where: { id: teamId }, include: { players: true } });
-        const r = avgRating(team.discipline, team.players.map((p) => p.rank));
-        if (r.value != null) {
-          await prisma.ratingHistory.create({
-            data: { teamId, matchId: id, ratingBefore: r.value, ratingAfter: r.value },
-          });
-        }
-      }
     }
 
     const io = req.app.get("io");

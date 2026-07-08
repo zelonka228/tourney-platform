@@ -1,8 +1,14 @@
 import { useEffect, useMemo, useState } from "react";
-import { Link, useParams } from "react-router-dom";
+import { Link, useNavigate, useParams } from "react-router-dom";
 import { io } from "socket.io-client";
 import { validScorelines } from "../lib/demo";
-import { getTournament, getTournaments, submitMatchScore, generateBracket } from "../lib/api";
+import {
+  getTournament,
+  getTournaments,
+  submitMatchScore,
+  generateBracket,
+  deleteTournament,
+} from "../lib/api";
 
 const SOCKET_URL = import.meta.env.VITE_API_URL ?? "http://localhost:4000";
 
@@ -45,6 +51,7 @@ function TournamentPicker() {
 
 export default function Tournament() {
   const { id } = useParams();
+  const nav = useNavigate();
   const [tournament, setTournament] = useState(null);
   const [notFound, setNotFound] = useState(false);
   const [tab, setTab] = useState("grid");
@@ -148,6 +155,12 @@ export default function Tournament() {
     }
   }
 
+  async function handleDelete() {
+    if (!window.confirm(`Видалити турнір «${tournament.name}»? Це незворотно.`)) return;
+    await deleteTournament(id);
+    nav("/tournament");
+  }
+
   async function handleGenerate() {
     setGenerating(true);
     try {
@@ -175,7 +188,12 @@ export default function Tournament() {
 
   return (
     <div className="page">
-      <h1>{tournament.name}</h1>
+      <div className="row" style={{ alignItems: "center", justifyContent: "space-between" }}>
+        <h1 style={{ margin: 0 }}>{tournament.name}</h1>
+        <button className="btn sm" onClick={handleDelete}>
+          Видалити турнір
+        </button>
+      </div>
       <p className="muted" style={{ marginTop: -8, marginBottom: 14 }}>
         {tournament.discipline} · BO{bo}
         {tournament.status === "completed" ? " · завершено" : ""}
@@ -241,7 +259,11 @@ export default function Tournament() {
                           : null;
                       const todo = a && b && m.status === "pending";
                       const pending = (!a || !b) && !isBye;
-                      const cls = "match" + (todo ? " todo" : "") + (pending ? " pending" : "");
+                      const cls =
+                        "match" +
+                        (todo ? " todo" : "") +
+                        (pending ? " pending" : "") +
+                        (isBye ? " bye" : "");
                       const emptyLabel = "—";
                       return (
                         <div className={cls} key={m.id} onClick={() => openEdit(m)}>
@@ -266,6 +288,7 @@ export default function Tournament() {
                             <span className="score">{m.status === "done" ? m.scoreB : ""}</span>
                           </div>
                           {todo && <div className="cue">ввести рахунок</div>}
+                          {isBye && <div className="cue">бай</div>}
                         </div>
                       );
                     })}
