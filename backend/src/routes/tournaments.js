@@ -1,7 +1,9 @@
-// Tournaments API — list/get/create/update/delete + team registration.
+// Tournaments API — list/get/create/update/delete + team registration + bracket.
 import { Router } from "express";
 import prisma from "../db.js";
 import { DISCIPLINES } from "../rating.js";
+import { buildBracketRows } from "../bracket.js";
+import { resolveByes } from "../advance.js";
 import { asyncHandler, requireFields, requireEnum, HttpError } from "../http.js";
 
 const router = Router();
@@ -10,11 +12,16 @@ const DISCIPLINE_VALUES = Object.keys(DISCIPLINES); // ["CS2", "Dota 2", "Valora
 const BRACKET_TYPES = ["single", "double"];
 const MATCH_FORMATS = [1, 3, 5];
 
+// Every response nests the actual Team (name, logo, ...) under each
+// TournamentTeam row — the frontend needs names to render the bracket, not
+// just raw teamId foreign keys.
+const TEAMS_WITH_TEAM = { include: { team: true } };
+
 // GET /api/tournaments → all tournaments with teams
 router.get(
   "/",
   asyncHandler(async (_req, res) => {
-    const tournaments = await prisma.tournament.findMany({ include: { teams: true } });
+    const tournaments = await prisma.tournament.findMany({ include: { teams: TEAMS_WITH_TEAM } });
     res.json(tournaments);
   })
 );
@@ -26,14 +33,15 @@ router.get(
     const id = Number(req.params.id);
     const tournament = await prisma.tournament.findUnique({
       where: { id },
-      include: { teams: true, matches: true },
+      include: { teams: TEAMS_WITH_TEAM, matches: true },
     });
     if (!tournament) throw new HttpError(404, "Турнір не знайдено.");
     res.json(tournament);
   })
 );
 
-// POST /api/tournaments → create; optional teamIds create seeded TournamentTeam rows
+// POST /api/tournaments → create; optional teamIds seed TournamentTeam rows AND
+// (single elimination only) immediately generate the Match bracket in the same call.
 router.post(
   "/",
   asyncHandler(async (req, res) => {
@@ -44,16 +52,72 @@ router.post(
     requireEnum("bracketType", bracketType, BRACKET_TYPES);
     requireEnum("matchFormat", Number(matchFormat), MATCH_FORMATS);
 
+    const hasTeams = Array.isArray(teamIds) && teamIds.length > 0;
+    if (hasTeams && bracketType === "double") {
+      throw new HttpError(400, "Подвійне вибування ще не підтримується.");
+    }
+
     const data = { name, discipline, bracketType, matchFormat: Number(matchFormat) };
 
-    if (Array.isArray(teamIds) && teamIds.length > 0) {
+    if (hasTeams) {
       data.teams = {
         create: teamIds.map((teamId, i) => ({ teamId: Number(teamId), seed: i + 1 })),
       };
+      data.matches = {
+        create: buildBracketRows(teamIds.map(Number)),
+      };
     }
 
-    const tournament = await prisma.tournament.create({ data, include: { teams: true } });
-    res.status(201).json(tournament);
+    const tournament = await prisma.tournament.create({
+      data,
+      include: { teams: TEAMS_WITH_TEAM, matches: true },
+    });
+
+    let result = tournament;
+    if (hasTeams) {
+      await resolveByes(prisma, tournament.id);
+      result = await prisma.tournament.findUnique({
+        where: { id: tournament.id },
+        include: { teams: TEAMS_WITH_TEAM, matches: true },
+      });
+    }
+
+    res.status(201).json(result);
+  })
+);
+
+// POST /api/tournaments/:id/generate-bracket → generate Match rows from teams
+// already registered via /register (for when teamIds weren't supplied at creation).
+router.post(
+  "/:id/generate-bracket",
+  asyncHandler(async (req, res) => {
+    const id = Number(req.params.id);
+    const tournament = await prisma.tournament.findUnique({
+      where: { id },
+      include: { teams: { orderBy: { seed: "asc" }, include: { team: true } }, matches: true },
+    });
+    if (!tournament) throw new HttpError(404, "Турнір не знайдено.");
+    if (tournament.bracketType === "double") {
+      throw new HttpError(400, "Подвійне вибування ще не підтримується.");
+    }
+    if (tournament.matches.length > 0) {
+      throw new HttpError(409, "Сітку для цього турніру вже згенеровано.");
+    }
+    if (tournament.teams.length < 2) {
+      throw new HttpError(400, "Потрібно щонайменше 2 зареєстровані команди.");
+    }
+
+    const rows = buildBracketRows(tournament.teams.map((t) => t.teamId));
+    await prisma.match.createMany({
+      data: rows.map((r) => ({ ...r, tournamentId: id })),
+    });
+    await resolveByes(prisma, id);
+
+    const updated = await prisma.tournament.findUnique({
+      where: { id },
+      include: { teams: TEAMS_WITH_TEAM, matches: true },
+    });
+    res.status(201).json(updated);
   })
 );
 
@@ -83,7 +147,7 @@ router.put(
     const tournament = await prisma.tournament.update({
       where: { id },
       data,
-      include: { teams: true },
+      include: { teams: TEAMS_WITH_TEAM },
     });
     res.json(tournament);
   })

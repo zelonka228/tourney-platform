@@ -1,24 +1,10 @@
-import { useMemo, useState } from "react";
-import { TEAMS, BEST_OF, winTarget, validScorelines } from "../lib/demo";
+import { useEffect, useMemo, useState } from "react";
+import { Link, useParams } from "react-router-dom";
+import { io } from "socket.io-client";
+import { validScorelines } from "../lib/demo";
+import { getTournament, getTournaments, submitMatchScore, generateBracket } from "../lib/api";
 
-const nextPow2 = (n) => 2 ** Math.ceil(Math.log2(Math.max(2, n)));
-
-// Стандартний порядок посіву: повертає номери посівів за позиціями в сітці.
-// Напр. size=8 → [1,8,4,5,2,7,3,6]. Так найсильніші посіви грають проти найслабших
-// (а коли команд менше за розмір сітки — саме вони отримують «бай»).
-function seedOrder(size) {
-  let seeds = [1, 2];
-  while (seeds.length < size) {
-    const sum = seeds.length * 2 + 1;
-    const next = [];
-    for (const s of seeds) {
-      next.push(s);
-      next.push(sum - s);
-    }
-    seeds = next;
-  }
-  return seeds;
-}
+const SOCKET_URL = import.meta.env.VITE_API_URL ?? "http://localhost:4000";
 
 function roundLabel(matchesInRound) {
   if (matchesInRound === 1) return "Фінал";
@@ -28,113 +14,172 @@ function roundLabel(matchesInRound) {
   return `1/${matchesInRound} фіналу`;
 }
 
+// Список турнірів — коли зайшли на /tournament без id.
+function TournamentPicker() {
+  const [list, setList] = useState(null);
+  useEffect(() => {
+    getTournaments().then(setList);
+  }, []);
+  return (
+    <div className="page">
+      <h1>Турнір</h1>
+      {list === null && <p className="muted">Завантаження…</p>}
+      {list?.length === 0 && (
+        <p className="sub">
+          Ще немає жодного турніру. <Link to="/create">Створити турнір →</Link>
+        </p>
+      )}
+      {list?.map((t) => (
+        <div className="box nav-card" key={t.id} style={{ marginBottom: 8 }}>
+          <Link to={`/tournament/${t.id}`}>
+            <h3>{t.name} →</h3>
+          </Link>
+          <p className="muted">
+            {t.discipline} · BO{t.matchFormat} · {t.status}
+          </p>
+        </div>
+      ))}
+    </div>
+  );
+}
+
 export default function Tournament() {
+  const { id } = useParams();
+  const [tournament, setTournament] = useState(null);
+  const [notFound, setNotFound] = useState(false);
   const [tab, setTab] = useState("grid");
-  // Учасники — користувач може редагувати їх сам.
-  const [participants, setParticipants] = useState(TEAMS.map((t) => t.name));
-  // Формат матчу (best-of); за замовчуванням BO3.
-  const [bo, setBo] = useState(3);
-  // Рахунки матчів: ключ `${round}-${match}` -> { sa, sb }.
-  // Перший раунд заповнений за замовчуванням (валідні рахунки BO3), щоб сітка була «жива».
-  const [scores, setScores] = useState({
-    "0-0": { sa: 2, sb: 1 },
-    "0-1": { sa: 0, sb: 2 },
-    "0-2": { sa: 2, sb: 0 },
-    "0-3": { sa: 1, sb: 2 },
-  });
-  const [edit, setEdit] = useState(null); // { r, m, a, b }
+  const [edit, setEdit] = useState(null); // { matchId, a, b }
+  const [scoreError, setScoreError] = useState(null);
+  const [generating, setGenerating] = useState(false);
 
-  const size = nextPow2(participants.length);
-  const totalRounds = Math.log2(size);
-  const order = useMemo(() => seedOrder(size), [size]);
+  useEffect(() => {
+    if (!id) return;
+    setTournament(null);
+    setNotFound(false);
+    getTournament(id).then((t) => {
+      if (!t) setNotFound(true);
+      else setTournament(t);
+    });
+  }, [id]);
 
-  // Команда у конкретному слоті матчу (рекурсивно з попередніх раундів).
-  // У першому раунді слоти заповнюються за посівом; зайві позиції — «бай» (null).
-  function teamAt(r, m, slot) {
-    if (r === 0) {
-      const seed = order[m * 2 + slot];
-      return seed <= participants.length ? participants[seed - 1] : null;
-    }
-    return winnerOf(r - 1, m * 2 + slot);
+  // Live-оновлення: приєднуємось до кімнати турніру, мерджимо чужі результати
+  // матчів у локальний стан без перезавантаження сторінки.
+  useEffect(() => {
+    if (!id) return;
+    const socket = io(SOCKET_URL);
+    socket.emit("tournament:join", id);
+    socket.on("match:updated", (payload) => {
+      if (String(payload.tournamentId) !== String(id)) return;
+      mergeMatches(payload.match, payload.advanced);
+    });
+    return () => {
+      socket.emit("tournament:leave", id);
+      socket.disconnect();
+    };
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [id]);
+
+  function mergeMatches(...updatedMatches) {
+    setTournament((prev) => {
+      if (!prev) return prev;
+      const byId = new Map(prev.matches.map((m) => [m.id, m]));
+      for (const m of updatedMatches) if (m) byId.set(m.id, m);
+      return { ...prev, matches: [...byId.values()] };
+    });
   }
-  // Переможець матчу. «Бай» (автопрохід) можливий лише в першому раунді —
-  // у наступних раундах порожній слот означає «суперник ще не визначений», а не бай.
-  function winnerOf(r, m) {
-    const a = teamAt(r, m, 0);
-    const b = teamAt(r, m, 1);
-    if (r === 0) {
-      if (a && !b) return a;
-      if (b && !a) return b;
-    }
-    if (a && b) {
-      const sc = scores[`${r}-${m}`];
-      if (sc && sc.sa !== sc.sb) return sc.sa > sc.sb ? a : b;
+
+  const teamName = (teamId) =>
+    tournament?.teams.find((tt) => tt.teamId === teamId)?.team?.name ?? null;
+
+  const matches = tournament?.matches ?? [];
+  const totalRounds = matches.length ? Math.max(...matches.map((m) => m.round)) + 1 : 0;
+  const bo = tournament?.matchFormat ?? 3;
+
+  const finalMatch = matches.find((m) => m.round === totalRounds - 1);
+  const champion = useMemo(() => {
+    if (!finalMatch) return null;
+    if (finalMatch.status === "bye") return teamName(finalMatch.teamAId ?? finalMatch.teamBId);
+    if (finalMatch.status === "done") {
+      const winnerId = finalMatch.scoreA > finalMatch.scoreB ? finalMatch.teamAId : finalMatch.teamBId;
+      return teamName(winnerId);
     }
     return null;
-  }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [finalMatch, tournament]);
 
-  const champion = winnerOf(totalRounds - 1, 0);
-
-  // Список усіх завершених матчів (для вкладки «Результати»).
   const results = useMemo(() => {
-    const out = [];
-    for (let r = 0; r < totalRounds; r++) {
-      const cnt = size / 2 ** (r + 1);
-      for (let m = 0; m < cnt; m++) {
-        const a = teamAt(r, m, 0),
-          b = teamAt(r, m, 1),
-          sc = scores[`${r}-${m}`];
-        if (a && b && sc && sc.sa !== sc.sb)
-          out.push({ round: roundLabel(cnt), a, b, sa: sc.sa, sb: sc.sb, w: winnerOf(r, m) });
-      }
+    return matches
+      .filter((m) => m.status === "done" || m.status === "bye")
+      .map((m) => {
+        const cnt = matches.filter((x) => x.round === m.round).length;
+        const winnerId =
+          m.status === "bye"
+            ? (m.teamAId ?? m.teamBId)
+            : m.scoreA > m.scoreB
+              ? m.teamAId
+              : m.teamBId;
+        return {
+          round: roundLabel(cnt),
+          a: teamName(m.teamAId),
+          b: teamName(m.teamBId),
+          bye: m.status === "bye",
+          sa: m.scoreA,
+          sb: m.scoreB,
+          w: teamName(winnerId),
+        };
+      });
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [matches, tournament]);
+
+  function openEdit(m) {
+    if (m.teamAId && m.teamBId && m.status === "pending") {
+      setEdit({ matchId: m.id, a: teamName(m.teamAId), b: teamName(m.teamBId) });
+      setScoreError(null);
     }
-    return out;
-  }, [scores, participants]); // eslint-disable-line
+  }
 
-  function openEdit(r, m) {
-    const a = teamAt(r, m, 0),
-      b = teamAt(r, m, 1);
-    if (!a || !b) return; // бай або ще не визначено суперника
-    setEdit({ r, m, a, b });
+  async function saveScore(sa, sb) {
+    try {
+      const res = await submitMatchScore(edit.matchId, sa, sb);
+      mergeMatches(res.match, res.advanced);
+      setEdit(null);
+    } catch (e) {
+      setScoreError(e.message || "Не вдалося зберегти рахунок.");
+    }
   }
-  function saveScore(sa, sb) {
-    setScores((prev) => ({ ...prev, [`${edit.r}-${edit.m}`]: { sa, sb } }));
-    setEdit(null);
-  }
-  function resetTournament() {
-    setScores({});
-    setEdit(null);
-  }
-  function changeBo(v) {
-    setBo(v);
-    resetTournament();
-  } // зміна формату очищає рахунки
 
-  // --- редагування учасників ---
-  const renameP = (i, v) => setParticipants((p) => p.map((x, idx) => (idx === i ? v : x)));
-  const removeP = (i) => {
-    setParticipants((p) => p.filter((_, idx) => idx !== i));
-    resetTournament();
-  };
-  const addP = () => {
-    setParticipants((p) => [...p, `Команда ${p.length + 1}`]);
-    resetTournament();
-  };
+  async function handleGenerate() {
+    setGenerating(true);
+    try {
+      const updated = await generateBracket(id);
+      setTournament(updated);
+    } catch (e) {
+      setScoreError(e.message || "Не вдалося згенерувати сітку.");
+    } finally {
+      setGenerating(false);
+    }
+  }
+
+  if (!id) return <TournamentPicker />;
+  if (notFound) {
+    return (
+      <div className="page">
+        <h1>Турнір</h1>
+        <p className="sub">
+          Турнір не знайдено. <Link to="/tournament">Усі турніри →</Link>
+        </p>
+      </div>
+    );
+  }
+  if (!tournament) return <div className="page">Завантаження…</div>;
 
   return (
     <div className="page">
-      <h1>LAN Cup</h1>
-
-      <div className="field" style={{ maxWidth: 240, marginBottom: 12 }}>
-        <label>Формат матчу</label>
-        <select value={bo} onChange={(e) => changeBo(+e.target.value)}>
-          {BEST_OF.map((n) => (
-            <option key={n} value={n}>
-              BO{n} (до {winTarget(n)} перемог)
-            </option>
-          ))}
-        </select>
-      </div>
+      <h1>{tournament.name}</h1>
+      <p className="muted" style={{ marginTop: -8, marginBottom: 14 }}>
+        {tournament.discipline} · BO{bo}
+        {tournament.status === "completed" ? " · завершено" : ""}
+      </p>
 
       <div className="tabs">
         <button className={tab === "grid" ? "active" : ""} onClick={() => setTab("grid")}>
@@ -150,71 +195,93 @@ export default function Tournament() {
 
       {tab === "grid" && (
         <>
-          {champion ? (
+          {matches.length === 0 && (
+            <div className="box" style={{ maxWidth: 460 }}>
+              <p className="sub">Сітку для цього турніру ще не згенеровано.</p>
+              <button className="btn solid" onClick={handleGenerate} disabled={generating}>
+                {generating ? "Генерація…" : "Згенерувати сітку"}
+              </button>
+              {scoreError && <p className="hint">{scoreError}</p>}
+            </div>
+          )}
+
+          {matches.length > 0 && champion ? (
             <div className="champ">
               <span className="lbl">Чемпіон</span>
               <span className="nm">{champion}</span>
-              <button className="btn sm" style={{ marginLeft: "auto" }} onClick={resetTournament}>
-                Почати заново
-              </button>
             </div>
           ) : (
-            <p className="sub" style={{ marginBottom: 14 }}>
-              Натисніть матч з рамкою <b>«ввести рахунок»</b> — переможець пройде далі.
-            </p>
+            matches.length > 0 && (
+              <p className="sub" style={{ marginBottom: 14 }}>
+                Натисніть матч з рамкою <b>«ввести рахунок»</b> — переможець пройде далі.
+              </p>
+            )
           )}
 
-          <div className="bracket">
-            {Array.from({ length: totalRounds }, (_, r) => {
-              const cnt = size / 2 ** (r + 1);
-              return (
-                <div className="round" key={r}>
-                  <div className="rname">{roundLabel(cnt)}</div>
-                  {Array.from({ length: cnt }, (_, m) => {
-                    const a = teamAt(r, m, 0),
-                      b = teamAt(r, m, 1),
-                      w = winnerOf(r, m);
-                    const sc = scores[`${r}-${m}`];
-                    const decided = !!w;
-                    const isBye = r === 0 && ((a && !b) || (b && !a)); // бай лише в 1-му раунді
-                    const todo = a && b && !decided; // можна заповнити просто зараз
-                    const pending = (!a || !b) && !isBye; // чекає на суперників
-                    const cls = "match" + (todo ? " todo" : "") + (pending ? " pending" : "");
-                    const emptyLabel = "—";
-                    return (
-                      <div className={cls} key={m} onClick={() => openEdit(r, m)}>
-                        <div
-                          className={
-                            "team" + (w && w === a ? " win" : "") + (!a && isBye ? " bye" : "")
-                          }
-                        >
-                          <span className="nm">{a ?? emptyLabel}</span>
-                          <span className="score">{sc ? sc.sa : ""}</span>
+          {matches.length > 0 && (
+            <div className="bracket">
+              {Array.from({ length: totalRounds }, (_, r) => {
+                const roundMatches = matches
+                  .filter((m) => m.round === r)
+                  .sort((x, y) => x.position - y.position);
+                return (
+                  <div className="round" key={r}>
+                    <div className="rname">{roundLabel(roundMatches.length)}</div>
+                    {roundMatches.map((m) => {
+                      const a = teamName(m.teamAId);
+                      const b = teamName(m.teamBId);
+                      const isBye = m.status === "bye";
+                      const decided = m.status === "done" || isBye;
+                      const winnerId = isBye
+                        ? (m.teamAId ?? m.teamBId)
+                        : m.status === "done"
+                          ? m.scoreA > m.scoreB
+                            ? m.teamAId
+                            : m.teamBId
+                          : null;
+                      const todo = a && b && m.status === "pending";
+                      const pending = (!a || !b) && !isBye;
+                      const cls = "match" + (todo ? " todo" : "") + (pending ? " pending" : "");
+                      const emptyLabel = "—";
+                      return (
+                        <div className={cls} key={m.id} onClick={() => openEdit(m)}>
+                          <div
+                            className={
+                              "team" +
+                              (decided && winnerId === m.teamAId ? " win" : "") +
+                              (!a && isBye ? " bye" : "")
+                            }
+                          >
+                            <span className="nm">{a ?? emptyLabel}</span>
+                            <span className="score">{m.status === "done" ? m.scoreA : ""}</span>
+                          </div>
+                          <div
+                            className={
+                              "team" +
+                              (decided && winnerId === m.teamBId ? " win" : "") +
+                              (!b && isBye ? " bye" : "")
+                            }
+                          >
+                            <span className="nm">{b ?? emptyLabel}</span>
+                            <span className="score">{m.status === "done" ? m.scoreB : ""}</span>
+                          </div>
+                          {todo && <div className="cue">ввести рахунок</div>}
                         </div>
-                        <div
-                          className={
-                            "team" + (w && w === b ? " win" : "") + (!b && isBye ? " bye" : "")
-                          }
-                        >
-                          <span className="nm">{b ?? emptyLabel}</span>
-                          <span className="score">{sc ? sc.sb : ""}</span>
-                        </div>
-                        <div className="cue">ввести рахунок</div>
-                      </div>
-                    );
-                  })}
-                </div>
-              );
-            })}
-            <div className="round">
-              <div className="rname">Чемпіон</div>
-              <div className="match" style={{ borderStyle: champion ? "solid" : "dashed" }}>
-                <div className="team">
-                  <span className="nm">{champion ?? "—"}</span>
+                      );
+                    })}
+                  </div>
+                );
+              })}
+              <div className="round">
+                <div className="rname">Чемпіон</div>
+                <div className="match" style={{ borderStyle: champion ? "solid" : "dashed" }}>
+                  <div className="team">
+                    <span className="nm">{champion ?? "—"}</span>
+                  </div>
                 </div>
               </div>
             </div>
-          </div>
+          )}
 
           {edit && (
             <div className="box" style={{ maxWidth: 460, marginTop: 14 }}>
@@ -229,6 +296,11 @@ export default function Tournament() {
                   </button>
                 ))}
               </div>
+              {scoreError && (
+                <p className="hint" style={{ color: "var(--danger, #c0392b)" }}>
+                  {scoreError}
+                </p>
+              )}
               <div style={{ marginTop: 12 }}>
                 <button className="btn sm" onClick={() => setEdit(null)}>
                   Скасувати
@@ -261,11 +333,9 @@ export default function Tournament() {
               <tr key={i}>
                 <td>{m.round}</td>
                 <td>
-                  {m.a} — {m.b}
+                  {m.a ?? "—"} — {m.b ?? "—"}
                 </td>
-                <td>
-                  {m.sa}:{m.sb}
-                </td>
+                <td>{m.bye ? "бай" : `${m.sa}:${m.sb}`}</td>
                 <td>{m.w}</td>
               </tr>
             ))}
@@ -276,27 +346,17 @@ export default function Tournament() {
       {tab === "teams" && (
         <div className="box" style={{ maxWidth: 520 }}>
           <h2 style={{ marginTop: 0 }}>Учасники</h2>
-          {participants.map((name, i) => (
-            <div className="plRow" key={i} style={{ gridTemplateColumns: "30px 1fr 34px" }}>
-              <span className="pn">{i + 1}</span>
-              <input value={name} onChange={(e) => renameP(i, e.target.value)} />
-              <button
-                className="xbtn"
-                onClick={() => removeP(i)}
-                disabled={participants.length <= 2}
-              >
-                ×
-              </button>
-            </div>
-          ))}
-          <button className="btn sm" style={{ marginTop: 6 }} onClick={addP}>
-            + Додати команду
-          </button>
+          {tournament.teams
+            .slice()
+            .sort((x, y) => x.seed - y.seed)
+            .map((tt) => (
+              <div className="plRow" key={tt.id} style={{ gridTemplateColumns: "30px 1fr" }}>
+                <span className="pn">{tt.seed}</span>
+                <span>{tt.team?.name}</span>
+              </div>
+            ))}
           <div className="hint" style={{ marginTop: 12 }}>
-            {participants.length} команд → сітка на {size}.{" "}
-            {size - participants.length > 0
-              ? `${size - participants.length} «бай» (автопрохід без матчу).`
-              : "Степінь двійки — баї не потрібні."}
+            {tournament.teams.length} команд у турнірі.
           </div>
         </div>
       )}

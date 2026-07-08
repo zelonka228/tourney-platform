@@ -8,6 +8,7 @@ import { Server } from "socket.io";
 
 import teamsRouter from "./routes/teams.js";
 import tournamentsRouter from "./routes/tournaments.js";
+import matchesRouter from "./routes/matches.js";
 import { notFound, errorHandler } from "./http.js";
 
 const app = express();
@@ -18,19 +19,26 @@ app.use(express.json());
 app.get("/api/health", (_req, res) => res.json({ ok: true }));
 app.use("/api/teams", teamsRouter);
 app.use("/api/tournaments", tournamentsRouter);
+app.use("/api/matches", matchesRouter);
 
 // Unmatched routes → 404, then the central error handler (must be last).
 app.use(notFound);
 app.use(errorHandler);
 
 // --- Real-time: live match result updates ---
+// Clients join a room per tournament so score updates only reach viewers of
+// that tournament, not every connected client. Routes emit via req.app.get("io").
 const httpServer = createServer(app);
 const io = new Server(httpServer, { cors: { origin: "*" } });
+app.set("io", io);
 
 io.on("connection", (socket) => {
   console.log("client connected:", socket.id);
-  socket.on("match:update", (payload) => {
-    io.emit("match:updated", payload);
+  socket.on("tournament:join", (tournamentId) => {
+    socket.join(`tournament:${tournamentId}`);
+  });
+  socket.on("tournament:leave", (tournamentId) => {
+    socket.leave(`tournament:${tournamentId}`);
   });
   socket.on("disconnect", () => console.log("client disconnected:", socket.id));
 });

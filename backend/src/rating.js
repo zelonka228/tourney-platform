@@ -19,19 +19,23 @@ export const VALORANT_RANKS = [
   "Radiant",
 ];
 
+// `value` is always numeric: the average itself for CS2/Dota (kind: "number"),
+// or the rank's index in VALORANT_RANKS for Valorant (kind: "rank") — the same
+// numeric surrogate the frontend uses, needed anywhere a plain number is
+// required (e.g. RatingHistory.ratingBefore/ratingAfter, both non-null Int).
 export function avgRating(discipline, ranks) {
   const def = DISCIPLINES[discipline];
-  if (!def || ranks.length === 0) return { label: "—", unit: def?.unit ?? "" };
+  if (!def || ranks.length === 0) return { label: "—", unit: def?.unit ?? "", value: null };
   if (def.kind === "rank") {
     const idx = ranks.map((r) => VALORANT_RANKS.indexOf(r)).filter((i) => i >= 0);
-    if (idx.length === 0) return { label: "—", unit: def.unit };
+    if (idx.length === 0) return { label: "—", unit: def.unit, value: null };
     const a = Math.round(idx.reduce((s, x) => s + x, 0) / idx.length);
-    return { label: VALORANT_RANKS[a], unit: def.unit };
+    return { label: VALORANT_RANKS[a], unit: def.unit, value: a };
   }
   const nums = ranks.map(Number).filter((n) => !Number.isNaN(n));
-  if (nums.length === 0) return { label: "—", unit: def.unit };
+  if (nums.length === 0) return { label: "—", unit: def.unit, value: null };
   const a = Math.round(nums.reduce((s, x) => s + x, 0) / nums.length);
-  return { label: String(a), unit: def.unit };
+  return { label: String(a), unit: def.unit, value: a };
 }
 
 export function bracketPlan(n) {

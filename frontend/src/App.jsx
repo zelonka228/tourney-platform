@@ -36,7 +36,7 @@ export default function App() {
         <Routes>
           <Route path="/" element={<Landing />} />
           <Route path="/create" element={<Create />} />
-          <Route path="/tournament" element={<Tournament />} />
+          <Route path="/tournament/:id?" element={<Tournament />} />
           <Route path="/team/:id?" element={<Team />} />
           <Route path="/profile" element={<Profile />} />
           <Route path="/hall" element={<Hall />} />

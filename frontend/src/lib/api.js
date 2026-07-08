@@ -115,6 +115,21 @@ export async function registerTeam(tournamentId, teamId) {
   }
 }
 
+export async function generateBracket(tournamentId) {
+  return request(`/api/tournaments/${tournamentId}/generate-bracket`, { method: "POST" });
+}
+
+// --- Матчі ---
+
+// На відміну від інших функцій тут немає demo-фолбеку: без бекенду немає
+// що зберігати, і виклик має впасти явно, щоб UI показав помилку.
+export async function submitMatchScore(matchId, scoreA, scoreB) {
+  return request(`/api/matches/${matchId}/score`, {
+    method: "PUT",
+    body: JSON.stringify({ scoreA, scoreB }),
+  });
+}
+
 // --- Рейтинг ---
 
 export async function getTeamRating(id) {

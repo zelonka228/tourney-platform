@@ -113,6 +113,100 @@ async function main() {
   });
   ok(badFormat.status === 400, "POST /api/tournaments with bad matchFormat → 400");
 
+  // --- Bracket generation + scoring: 4 teams, power of 2, no byes ---
+  const bracketTeamIds = [teamId];
+  for (let i = 0; i < 3; i++) {
+    const t = await call("POST", "/api/teams", { name: `Bracket Team ${i}`, discipline: "CS2" });
+    bracketTeamIds.push(t.data.id);
+  }
+
+  const b4 = await call("POST", "/api/tournaments", {
+    name: "Bracket4",
+    discipline: "CS2",
+    bracketType: "single",
+    matchFormat: 1,
+    teamIds: bracketTeamIds,
+  });
+  ok(
+    b4.status === 201 && b4.data?.matches?.length === 3,
+    "POST /api/tournaments with 4 teamIds → 3 matches (no byes)"
+  );
+  const b4Id = b4.data?.id;
+  const round0 = b4.data.matches.filter((m) => m.round === 0).sort((a, c) => a.position - c.position);
+  const final4 = b4.data.matches.find((m) => m.round === 1);
+
+  const scoreM0 = await call("PUT", `/api/matches/${round0[0].id}/score`, { scoreA: 1, scoreB: 0 });
+  ok(scoreM0.status === 200 && scoreM0.data?.match?.status === "done", "PUT /api/matches/:id/score → 200 done");
+  ok(scoreM0.data?.advanced != null, "score of round0 match0 → advances winner to final");
+
+  const badScore = await call("PUT", `/api/matches/${round0[1].id}/score`, { scoreA: 3, scoreB: 1 });
+  ok(badScore.status === 400, "PUT /api/matches/:id/score with score invalid for BO1 → 400");
+
+  const scoreM1 = await call("PUT", `/api/matches/${round0[1].id}/score`, { scoreA: 1, scoreB: 0 });
+  ok(scoreM1.status === 200, "PUT /api/matches/:id/score round0 match1 → 200");
+
+  const reScore = await call("PUT", `/api/matches/${round0[1].id}/score`, { scoreA: 1, scoreB: 0 });
+  ok(reScore.status === 409, "re-submitting a finished match's score → 409");
+
+  const scoreFinal = await call("PUT", `/api/matches/${final4.id}/score`, { scoreA: 1, scoreB: 0 });
+  ok(
+    scoreFinal.status === 200 && scoreFinal.data?.champion != null,
+    "PUT /api/matches/:id/score on final → 200 with champion"
+  );
+
+  const champTeam = await call("GET", `/api/teams/${bracketTeamIds[0]}`);
+  ok(
+    champTeam.data?.tournaments === 1 && champTeam.data?.best === "1 місце ×1",
+    "champion team gets tournaments incremented and best set"
+  );
+
+  const undecided = await call("PUT", `/api/matches/${final4.id}/score`, { scoreA: 1, scoreB: 0 });
+  ok(undecided.status === 409, "submitting score to an already-completed final → 409");
+
+  await call("DELETE", `/api/tournaments/${b4Id}`);
+  for (const id of bracketTeamIds.slice(1)) await call("DELETE", `/api/teams/${id}`);
+
+  // --- Bracket generation: 3 teams → one bye that auto-advances ---
+  const byeTeamIds = [];
+  for (let i = 0; i < 3; i++) {
+    const t = await call("POST", "/api/teams", { name: `Bye Team ${i}`, discipline: "CS2" });
+    byeTeamIds.push(t.data.id);
+  }
+  const b3 = await call("POST", "/api/tournaments", {
+    name: "Bracket3",
+    discipline: "CS2",
+    bracketType: "single",
+    matchFormat: 1,
+    teamIds: byeTeamIds,
+  });
+  ok(b3.status === 201 && b3.data?.matches?.length === 3, "3 teams → 3 matches (1 bye + 1 real + final)");
+  const byeMatch = b3.data.matches.find(
+    (m) => m.round === 0 && (m.teamAId == null) !== (m.teamBId == null)
+  );
+  ok(byeMatch?.status === "bye", "bye match auto-resolved to status 'bye'");
+  const b3Final = b3.data.matches.find((m) => m.round === 1);
+  ok(
+    b3Final?.teamAId === byeTeamIds[0] || b3Final?.teamBId === byeTeamIds[0],
+    "bye team auto-advanced into the final slot"
+  );
+  const noOpponent = await call("PUT", `/api/matches/${byeMatch.id}/score`, { scoreA: 1, scoreB: 0 });
+  ok(noOpponent.status === 400, "submitting a score to a bye match → 400");
+
+  await call("DELETE", `/api/tournaments/${b3.data.id}`);
+  for (const id of byeTeamIds) await call("DELETE", `/api/teams/${id}`);
+
+  // --- Double elimination not yet supported ---
+  const doubleTeam = await call("POST", "/api/teams", { name: "Double Team", discipline: "CS2" });
+  const doubleAttempt = await call("POST", "/api/tournaments", {
+    name: "DoubleCup",
+    discipline: "CS2",
+    bracketType: "double",
+    matchFormat: 1,
+    teamIds: [doubleTeam.data.id],
+  });
+  ok(doubleAttempt.status === 400, "POST /api/tournaments double-elim with teamIds → 400");
+  await call("DELETE", `/api/teams/${doubleTeam.data.id}`);
+
   // --- Cleanup ---
   const delTour = await call("DELETE", `/api/tournaments/${tourId}`);
   ok(delTour.status === 204, "DELETE /api/tournaments/:id → 204");

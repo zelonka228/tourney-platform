@@ -33,15 +33,11 @@ router.get(
       team.discipline,
       team.players.map((p) => p.rank)
     );
-    // avgRating returns { label, unit }. Spec wants a `value` field; derive a
-    // numeric value from the label when it is numeric (null for ranked units).
-    const value =
-      rating.value ?? (Number.isNaN(Number(rating.label)) ? null : Number(rating.label));
     res.json({
       discipline: team.discipline,
       unit: rating.unit,
       label: rating.label,
-      value,
+      value: rating.value,
     });
   })
 );
