@@ -4,12 +4,24 @@ import { PrismaClient } from "@prisma/client";
 
 const prisma = new PrismaClient();
 
+// Пробні лого команд — inline SVG data URI (квадрат з ініціалами), той самий
+// формат data URL, що продукує завантаження лого через Team.jsx (canvas →
+// base64), тож рендериться однаково в Profile.jsx/Team.jsx без жодних змін.
+function svgLogo(bg, text) {
+  const svg =
+    `<svg xmlns="http://www.w3.org/2000/svg" width="256" height="256">` +
+    `<rect width="256" height="256" fill="${bg}"/>` +
+    `<text x="128" y="128" font-family="Arial, sans-serif" font-size="96" font-weight="700" ` +
+    `fill="#fff" text-anchor="middle" dominant-baseline="central">${text}</text></svg>`;
+  return `data:image/svg+xml;utf8,${encodeURIComponent(svg)}`;
+}
+
 // Mirror of the frontend TEAMS array (frontend/src/lib/demo.js).
 const TEAMS = [
   {
     name: "Night Wolves",
     discipline: "CS2",
-    logo: null,
+    logo: svgLogo("#1f2430", "NW"),
     winrate: "71%",
     streak: "5 W",
     tournaments: 12,
@@ -25,7 +37,7 @@ const TEAMS = [
   {
     name: "Iron Hawks",
     discipline: "CS2",
-    logo: null,
+    logo: svgLogo("#4a5568", "IH"),
     winrate: "61%",
     streak: "2 L",
     tournaments: 14,
@@ -41,7 +53,7 @@ const TEAMS = [
   {
     name: "Void Runners",
     discipline: "Dota 2",
-    logo: null,
+    logo: svgLogo("#7c3aed", "VR"),
     winrate: "66%",
     streak: "3 W",
     tournaments: 9,
@@ -57,7 +69,7 @@ const TEAMS = [
   {
     name: "Storm Breakers",
     discipline: "Dota 2",
-    logo: null,
+    logo: svgLogo("#0f766e", "SB"),
     winrate: "39%",
     streak: "1 L",
     tournaments: 3,
@@ -73,7 +85,7 @@ const TEAMS = [
   {
     name: "Red Phoenix",
     discipline: "Valorant",
-    logo: null,
+    logo: svgLogo("#dc2626", "RP"),
     winrate: "57%",
     streak: "2 W",
     tournaments: 8,
@@ -89,7 +101,7 @@ const TEAMS = [
   {
     name: "Cyber Lynx",
     discipline: "Valorant",
-    logo: null,
+    logo: svgLogo("#0891b2", "CL"),
     winrate: "52%",
     streak: "1 W",
     tournaments: 6,
@@ -105,7 +117,7 @@ const TEAMS = [
   {
     name: "Frost Giants",
     discipline: "CS2",
-    logo: null,
+    logo: svgLogo("#60a5fa", "FG"),
     winrate: "48%",
     streak: "1 W",
     tournaments: 5,
@@ -121,7 +133,7 @@ const TEAMS = [
   {
     name: "Shadow Pact",
     discipline: "Valorant",
-    logo: null,
+    logo: svgLogo("#1e1b4b", "SP"),
     winrate: "44%",
     streak: "2 L",
     tournaments: 4,
