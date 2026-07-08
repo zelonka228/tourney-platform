@@ -18,11 +18,52 @@ function fromDbRank(discipline, rank) {
   return DISCIPLINES[discipline].kind === "rank" ? rank : Number(rank);
 }
 
+const LOGO_SIZE = 256; // px, квадрат
+const LOGO_MAX_BYTES = 300 * 1024; // грубий ліміт на base64-рядок у БД
+
+// Читає файл зображення, вписує його в квадрат LOGO_SIZE×LOGO_SIZE (crop по
+// центру, як object-fit: cover) і повертає JPEG data URL — щоб не роздувати
+// БД оригіналами в кілька мегапікселів і не тримати сирі File-об'єкти в стейті.
+function readLogoFile(file) {
+  return new Promise((resolve, reject) => {
+    if (!file.type.startsWith("image/")) {
+      reject(new Error("Оберіть файл зображення."));
+      return;
+    }
+    const img = new Image();
+    const url = URL.createObjectURL(file);
+    img.onload = () => {
+      const canvas = document.createElement("canvas");
+      canvas.width = LOGO_SIZE;
+      canvas.height = LOGO_SIZE;
+      const ctx = canvas.getContext("2d");
+      const scale = Math.max(LOGO_SIZE / img.width, LOGO_SIZE / img.height);
+      const w = img.width * scale;
+      const h = img.height * scale;
+      ctx.drawImage(img, (LOGO_SIZE - w) / 2, (LOGO_SIZE - h) / 2, w, h);
+      URL.revokeObjectURL(url);
+      const dataUrl = canvas.toDataURL("image/jpeg", 0.85);
+      if (dataUrl.length > LOGO_MAX_BYTES) {
+        reject(new Error("Зображення завелике навіть після стиснення — оберіть інше."));
+        return;
+      }
+      resolve(dataUrl);
+    };
+    img.onerror = () => {
+      URL.revokeObjectURL(url);
+      reject(new Error("Не вдалося прочитати зображення."));
+    };
+    img.src = url;
+  });
+}
+
 export default function Team() {
   const nav = useNavigate();
   const { id } = useParams();
   const [discipline, setDiscipline] = useState("CS2");
   const [name, setName] = useState("Night Wolves");
+  const [logo, setLogo] = useState(null);
+  const [logoError, setLogoError] = useState(null);
   const roles = ROLES_BY_GAME[discipline];
   const def = DISCIPLINES[discipline];
 
@@ -42,6 +83,7 @@ export default function Team() {
       if (!t) return;
       setName(t.name);
       setDiscipline(t.discipline);
+      setLogo(t.logo ?? null);
       setPlayers(
         t.players
           .filter((p) => !p.isSubstitute)
@@ -76,12 +118,25 @@ export default function Team() {
     players.map((p) => p.rank)
   );
 
+  async function handleLogoChange(e) {
+    const file = e.target.files?.[0];
+    e.target.value = ""; // дозволяє повторно обрати той самий файл
+    if (!file) return;
+    setLogoError(null);
+    try {
+      setLogo(await readLogoFile(file));
+    } catch (err) {
+      setLogoError(err.message);
+    }
+  }
+
   // Збереження команди: збираємо основу + запасних і викликаємо API.
   // Fire-and-forget — не блокуємо навігацію.
   function save() {
     const payload = {
       name,
       discipline,
+      logo,
       players: [
         ...players.map((p) => ({
           nick: p.nick,
@@ -175,12 +230,55 @@ export default function Team() {
       <div className="row" style={{ alignItems: "flex-start" }}>
         <div className="box" style={{ width: 240 }}>
           <label>Лого команди</label>
-          <div className="ph" style={{ height: 120, borderRadius: 6 }}>
-            завантажити
-          </div>
-          <button className="btn sm" style={{ marginTop: 10, width: "100%" }}>
-            Вибрати файл
-          </button>
+          {logo ? (
+            <img
+              src={logo}
+              alt="Лого команди"
+              style={{ width: "100%", height: 120, borderRadius: 6, objectFit: "cover" }}
+            />
+          ) : (
+            <div className="ph" style={{ height: 120, borderRadius: 6 }}>
+              завантажити
+            </div>
+          )}
+          <input
+            type="file"
+            accept="image/*"
+            id="logo-input"
+            style={{
+              position: "absolute",
+              width: 1,
+              height: 1,
+              padding: 0,
+              margin: -1,
+              overflow: "hidden",
+              clip: "rect(0,0,0,0)",
+              whiteSpace: "nowrap",
+              border: 0,
+            }}
+            onChange={handleLogoChange}
+          />
+          <label
+            htmlFor="logo-input"
+            className="btn sm"
+            style={{ marginTop: 10, width: "100%", textAlign: "center" }}
+          >
+            {logo ? "Змінити файл" : "Вибрати файл"}
+          </label>
+          {logo && (
+            <button
+              className="btn sm"
+              style={{ marginTop: 6, width: "100%" }}
+              onClick={() => setLogo(null)}
+            >
+              Видалити лого
+            </button>
+          )}
+          {logoError && (
+            <div className="hint" style={{ color: "var(--danger, #c0392b)", marginTop: 6 }}>
+              {logoError}
+            </div>
+          )}
         </div>
 
         <div className="box" style={{ flex: 1, minWidth: 320 }}>
