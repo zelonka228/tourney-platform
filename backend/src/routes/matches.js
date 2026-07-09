@@ -65,7 +65,10 @@ router.put(
     // ratingAfter are equal; this just timestamps what the rating was then.
     for (const teamId of [match.teamAId, match.teamBId]) {
       const team = await prisma.team.findUnique({ where: { id: teamId }, include: { players: true } });
-      const r = avgRating(team.discipline, team.players.map((p) => p.rank));
+      const r = avgRating(
+        team.discipline,
+        team.players.filter((p) => !p.isSubstitute).map((p) => p.rank)
+      );
       if (r.value != null) {
         await prisma.ratingHistory.create({
           data: { teamId, matchId: id, ratingBefore: r.value, ratingAfter: r.value },

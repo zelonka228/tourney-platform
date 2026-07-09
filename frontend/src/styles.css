@@ -722,10 +722,7 @@ footer {
   }
 
   .plRow {
-    grid-template-columns: 24px 1fr 1fr;
-  }
-
-  .plRow .pn {
-    grid-column: 1;
+    grid-template-columns: 18px 1fr 72px 70px 24px;
+    gap: 5px;
   }
 }

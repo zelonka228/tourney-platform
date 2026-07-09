@@ -1,5 +1,5 @@
 import { useState, useEffect } from "react";
-import { useNavigate, useParams } from "react-router-dom";
+import { useNavigate, useParams, Link } from "react-router-dom";
 import {
   ROLES_BY_GAME,
   DISCIPLINE_LIST,
@@ -79,6 +79,7 @@ export default function Team() {
   const [logo, setLogo] = useState(null);
   const [logoError, setLogoError] = useState(null);
   const [saveError, setSaveError] = useState(null);
+  const [notFound, setNotFound] = useState(false);
   const roles = ROLES_BY_GAME[discipline];
   const def = DISCIPLINES[discipline];
 
@@ -90,6 +91,7 @@ export default function Team() {
   // бо маршрут той самий) — явно скидаємо форму, інакше save() без id
   // створить дубль зі старими даними попередньої команди.
   useEffect(() => {
+    setNotFound(false);
     if (!id) {
       setName(DEFAULT_NAME);
       setDiscipline(DEFAULT_DISCIPLINE);
@@ -99,7 +101,10 @@ export default function Team() {
       return;
     }
     getTeam(id).then((t) => {
-      if (!t) return;
+      if (!t) {
+        setNotFound(true);
+        return;
+      }
       setName(t.name);
       setDiscipline(t.discipline);
       setLogo(t.logo ?? null);
@@ -249,6 +254,17 @@ export default function Team() {
       </button>
     </>
   );
+
+  if (notFound) {
+    return (
+      <div className="page">
+        <h1>Команда</h1>
+        <p className="sub">
+          Команду не знайдено. <Link to="/profile">Усі команди →</Link>
+        </p>
+      </div>
+    );
+  }
 
   return (
     <div className="page">

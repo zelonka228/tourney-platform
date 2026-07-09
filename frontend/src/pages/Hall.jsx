@@ -16,9 +16,10 @@ export default function Hall() {
     .map((t) => {
       const r = avgRating(
         t.discipline,
-        t.players.map((p) => p.rank)
+        t.players.filter((p) => !p.isSubstitute).map((p) => p.rank)
       );
       return {
+        id: t.id,
         name: t.name,
         discipline: t.discipline,
         rating: r.label,
@@ -58,7 +59,7 @@ export default function Hall() {
         </thead>
         <tbody>
           {rows.map((t, i) => (
-            <tr key={t.name}>
+            <tr key={t.id ?? t.name}>
               <td className="rk">{i + 1}</td>
               <td>{t.name}</td>
               <td className="muted">{t.discipline}</td>

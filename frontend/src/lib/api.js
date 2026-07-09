@@ -175,7 +175,7 @@ export async function getTeamRating(id) {
     if (!team) return null;
     const r = avgRating(
       team.discipline,
-      team.players.map((p) => p.rank)
+      team.players.filter((p) => !p.isSubstitute).map((p) => p.rank)
     );
     const def = DISCIPLINES[team.discipline];
     return { discipline: team.discipline, unit: def?.unit ?? "", label: r.label, value: r.value };

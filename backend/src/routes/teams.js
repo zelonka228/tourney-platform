@@ -58,9 +58,11 @@ router.get(
     });
     if (!team) throw new HttpError(404, "Команду не знайдено.");
 
+    // Substitutes shouldn't pull the team's rating up/down — average the
+    // starting lineup only, consistent with the frontend's calculation.
     const rating = avgRating(
       team.discipline,
-      team.players.map((p) => p.rank)
+      team.players.filter((p) => !p.isSubstitute).map((p) => p.rank)
     );
     res.json({
       discipline: team.discipline,

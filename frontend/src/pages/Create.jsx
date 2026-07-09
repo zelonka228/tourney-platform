@@ -23,7 +23,10 @@ function seedTeamIds(selectedIds, allTeams, seedType) {
     const byId = new Map(allTeams.map((t) => [t.id, t]));
     const ratingOf = (id) => {
       const t = byId.get(id);
-      return avgRating(t.discipline, t.players.map((p) => p.rank)).value ?? -Infinity;
+      return (
+        avgRating(t.discipline, t.players.filter((p) => !p.isSubstitute).map((p) => p.rank))
+          .value ?? -Infinity
+      );
     };
     return [...selectedIds].sort((a, b) => ratingOf(b) - ratingOf(a));
   }

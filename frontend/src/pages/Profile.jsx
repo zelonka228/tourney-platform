@@ -19,12 +19,14 @@ export default function Profile() {
         <p className="sub">Натисніть на команду, щоб переглянути її профіль.</p>
         <div className="cards">
           {TEAMS.map((t, i) => {
+            // Рейтинг — середнє лише основного складу, як і на /team; підстави
+            // (isSubstitute) не мають тягнути середнє вниз/вгору.
             const r = avgRating(
               t.discipline,
-              t.players.map((p) => p.rank)
+              t.players.filter((p) => !p.isSubstitute).map((p) => p.rank)
             );
             return (
-              <div className="box nav-card team-card" key={t.name} onClick={() => setSel(i)}>
+              <div className="box nav-card team-card" key={t.id ?? t.name} onClick={() => setSel(i)}>
                 <div className="ph tlogo">{t.logo ? <img src={t.logo} alt="" /> : "лого"}</div>
                 <div>
                   <h3>{t.name} →</h3>
@@ -43,9 +45,11 @@ export default function Profile() {
   // --- Профіль обраної команди ---
   const team = TEAMS[sel];
   const unit = DISCIPLINES[team.discipline].unit;
+  const mainPlayers = team.players.filter((p) => !p.isSubstitute);
+  const subPlayers = team.players.filter((p) => p.isSubstitute);
   const rating = avgRating(
     team.discipline,
-    team.players.map((p) => p.rank)
+    mainPlayers.map((p) => p.rank)
   );
 
   return (
@@ -74,11 +78,11 @@ export default function Profile() {
           </div>
           <div className="statgrid">
             <div className="s">
-              <div className="v">{team.winrate}</div>
+              <div className="v">{team.winrate ?? "—"}</div>
               <div className="l">Winrate</div>
             </div>
             <div className="s">
-              <div className="v">{team.streak}</div>
+              <div className="v">{team.streak ?? "—"}</div>
               <div className="l">Стрик</div>
             </div>
             <div className="s">
@@ -86,7 +90,7 @@ export default function Profile() {
               <div className="l">Турнірів</div>
             </div>
             <div className="s">
-              <div className="v">{team.best}</div>
+              <div className="v">{team.best ?? "—"}</div>
               <div className="l">Найкращий результат</div>
             </div>
           </div>
@@ -102,8 +106,8 @@ export default function Profile() {
             >
               Склад · {unit}
             </div>
-            {team.players.map((p) => (
-              <div className="r" key={p.nick}>
+            {mainPlayers.map((p, i) => (
+              <div className="r" key={p.id ?? `${p.nick}-${i}`}>
                 <div className="ph pa" />
                 <div>
                   {p.nick}
@@ -112,6 +116,31 @@ export default function Profile() {
                 <span className="kd">{p.rank}</span>
               </div>
             ))}
+            {subPlayers.length > 0 && (
+              <>
+                <div
+                  className="muted"
+                  style={{
+                    fontSize: 12,
+                    textTransform: "uppercase",
+                    letterSpacing: ".5px",
+                    margin: "12px 0 4px",
+                  }}
+                >
+                  Запасні
+                </div>
+                {subPlayers.map((p, i) => (
+                  <div className="r" key={p.id ?? `${p.nick}-${i}`}>
+                    <div className="ph pa" />
+                    <div>
+                      {p.nick}
+                      <div className="role">{p.role}</div>
+                    </div>
+                    <span className="kd">{p.rank}</span>
+                  </div>
+                ))}
+              </>
+            )}
           </div>
           <div className="cardfoot">
             <button
@@ -130,7 +159,7 @@ export default function Profile() {
           <div className="box">
             <h2 style={{ marginTop: 0 }}>Рейтинг команди</h2>
             <p style={{ margin: "0 0 6px" }}>
-              Середній {rating.unit}: <b>{rating.label}</b> ({team.players.length} гравців)
+              Середній {rating.unit}: <b>{rating.label}</b> ({mainPlayers.length} гравців)
             </p>
             <p className="muted" style={{ margin: 0, fontSize: 13 }}>
               Рейтинг рахується в одиниці дисципліни: CS2 — FACEIT ELO, Dota 2 — MMR, Valorant —
