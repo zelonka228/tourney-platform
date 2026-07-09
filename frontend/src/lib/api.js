@@ -14,13 +14,33 @@ function demoTeams() {
   return TEAMS.map((t, i) => ({ id: t.id ?? i + 1, ...t }));
 }
 
-// Обгортка над fetch: кидає помилку на не-OK відповіді, щоб спрацював фолбек.
+// Помилка з реальною відповіддю бекенду (не-OK статус). Відрізняється від
+// мережевої помилки (fetch кинув сам, бекенд недоступний) — лише остання
+// має спрацьовувати фолбек на demo-дані/тиху відмову нижче.
+export class ApiError extends Error {
+  constructor(status, message) {
+    super(message);
+    this.status = status;
+  }
+}
+
+// Обгортка над fetch: на мережевій помилці кидає її як є (фолбек нижче її
+// зловить), а на не-OK відповіді кидає ApiError з повідомленням бекенду.
 async function request(path, options) {
   const res = await fetch(`${BASE_URL}${path}`, {
     headers: { "Content-Type": "application/json" },
     ...options,
   });
-  if (!res.ok) throw new Error(`HTTP ${res.status}`);
+  if (!res.ok) {
+    let message = `HTTP ${res.status}`;
+    try {
+      const body = await res.json();
+      if (body?.error) message = body.error;
+    } catch {
+      // Тіло не JSON — лишаємо дефолтне повідомлення.
+    }
+    throw new ApiError(res.status, message);
+  }
   if (res.status === 204) return null;
   return res.json();
 }
@@ -49,8 +69,9 @@ export async function createTeam(data) {
       method: "POST",
       body: JSON.stringify(data),
     });
-  } catch {
-    // Фолбек: повертаємо введені дані з тимчасовим id.
+  } catch (err) {
+    if (err instanceof ApiError) throw err;
+    // Фолбек лише на мережеву помилку: повертаємо введені дані з тимчасовим id.
     return { id: demoTeams().length + 1, ...data };
   }
 }
@@ -61,7 +82,8 @@ export async function updateTeam(id, data) {
       method: "PUT",
       body: JSON.stringify(data),
     });
-  } catch {
+  } catch (err) {
+    if (err instanceof ApiError) throw err;
     return { id, ...data };
   }
 }
@@ -70,7 +92,8 @@ export async function deleteTeam(id) {
   try {
     await request(`/api/teams/${id}`, { method: "DELETE" });
     return { ok: true };
-  } catch {
+  } catch (err) {
+    if (err instanceof ApiError) throw err;
     return { ok: true };
   }
 }
@@ -99,7 +122,8 @@ export async function createTournament(data) {
       method: "POST",
       body: JSON.stringify(data),
     });
-  } catch {
+  } catch (err) {
+    if (err instanceof ApiError) throw err;
     return { id: 1, teams: [], matches: [], ...data };
   }
 }
@@ -110,7 +134,8 @@ export async function registerTeam(tournamentId, teamId) {
       method: "POST",
       body: JSON.stringify({ teamId }),
     });
-  } catch {
+  } catch (err) {
+    if (err instanceof ApiError) throw err;
     return { teamId };
   }
 }
@@ -123,7 +148,8 @@ export async function deleteTournament(id) {
   try {
     await request(`/api/tournaments/${id}`, { method: "DELETE" });
     return { ok: true };
-  } catch {
+  } catch (err) {
+    if (err instanceof ApiError) throw err;
     return { ok: true };
   }
 }

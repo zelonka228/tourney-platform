@@ -12,6 +12,20 @@ import { createTeam, updateTeam, getTeam } from "../lib/api";
 // Значення рейтингу за замовчуванням для нової дисципліни.
 const DEFAULT_RANK = { CS2: 1800, "Dota 2": 3000, Valorant: "Diamond" };
 
+// Дефолти для сторінки "нова команда" — теж використовуються, щоб скинути
+// форму, коли користувач переходить з /team/:id на /team без перезавантаження
+// компонента (react-router не розмонтовує його, бо маршрут той самий).
+const DEFAULT_NAME = "Night Wolves";
+const DEFAULT_DISCIPLINE = "CS2";
+const defaultPlayers = () => [
+  { nick: "s1mple_ua", role: "AWPer", rank: 2510 },
+  { nick: "blaze", role: "Entry", rank: 2180 },
+  { nick: "anchor", role: "Support", rank: 1990 },
+  { nick: "maestro", role: "IGL", rank: 2070 },
+  { nick: "ghost", role: "Lurker", rank: 2240 },
+];
+const defaultSubs = () => [{ nick: "spare1", role: "Support", rank: 1800 }];
+
 // Приводить збережений у БД rank (завжди рядок) до вигляду, який очікує UI:
 // число для CS2/Dota, рядок звання для Valorant.
 function fromDbRank(discipline, rank) {
@@ -60,25 +74,30 @@ function readLogoFile(file) {
 export default function Team() {
   const nav = useNavigate();
   const { id } = useParams();
-  const [discipline, setDiscipline] = useState("CS2");
-  const [name, setName] = useState("Night Wolves");
+  const [discipline, setDiscipline] = useState(DEFAULT_DISCIPLINE);
+  const [name, setName] = useState(DEFAULT_NAME);
   const [logo, setLogo] = useState(null);
   const [logoError, setLogoError] = useState(null);
+  const [saveError, setSaveError] = useState(null);
   const roles = ROLES_BY_GAME[discipline];
   const def = DISCIPLINES[discipline];
 
-  const [players, setPlayers] = useState([
-    { nick: "s1mple_ua", role: "AWPer", rank: 2510 },
-    { nick: "blaze", role: "Entry", rank: 2180 },
-    { nick: "anchor", role: "Support", rank: 1990 },
-    { nick: "maestro", role: "IGL", rank: 2070 },
-    { nick: "ghost", role: "Lurker", rank: 2240 },
-  ]);
-  const [subs, setSubs] = useState([{ nick: "spare1", role: "Support", rank: 1800 }]);
+  const [players, setPlayers] = useState(defaultPlayers);
+  const [subs, setSubs] = useState(defaultSubs);
 
   // Якщо в URL є id — вантажимо реальну команду з бекенду замість дефолтів.
+  // Якщо id зник (перехід /team/:id → /team без перезавантаження компонента,
+  // бо маршрут той самий) — явно скидаємо форму, інакше save() без id
+  // створить дубль зі старими даними попередньої команди.
   useEffect(() => {
-    if (!id) return;
+    if (!id) {
+      setName(DEFAULT_NAME);
+      setDiscipline(DEFAULT_DISCIPLINE);
+      setLogo(null);
+      setPlayers(defaultPlayers());
+      setSubs(defaultSubs());
+      return;
+    }
     getTeam(id).then((t) => {
       if (!t) return;
       setName(t.name);
@@ -131,8 +150,11 @@ export default function Team() {
   }
 
   // Збереження команди: збираємо основу + запасних і викликаємо API.
-  // Fire-and-forget — не блокуємо навігацію.
-  function save() {
+  // Навігація лише після підтвердженого успіху — на реальній помилці
+  // бекенду (напр. порожня назва) показуємо повідомлення замість тихого
+  // переходу на /profile, ніби все зберіглось.
+  async function save() {
+    setSaveError(null);
     const payload = {
       name,
       discipline,
@@ -152,12 +174,16 @@ export default function Team() {
         })),
       ],
     };
-    if (id) {
-      updateTeam(id, payload);
-    } else {
-      createTeam(payload);
+    try {
+      if (id) {
+        await updateTeam(id, payload);
+      } else {
+        await createTeam(payload);
+      }
+      nav("/profile");
+    } catch (err) {
+      setSaveError(err.message ?? "Не вдалося зберегти команду.");
     }
-    nav("/profile");
   }
 
   // Поле рейтингу: число (CS2/Dota) або select звань (Valorant).
@@ -313,6 +339,11 @@ export default function Team() {
             <button className="btn solid" onClick={save}>
               Зберегти команду
             </button>
+            {saveError && (
+              <div className="hint" style={{ color: "var(--danger, #c0392b)", marginTop: 6 }}>
+                {saveError}
+              </div>
+            )}
           </div>
         </div>
       </div>

@@ -32,7 +32,11 @@ export function avgRating(discipline, ranks) {
     const a = Math.round(idx.reduce((s, x) => s + x, 0) / idx.length);
     return { label: VALORANT_RANKS[a], unit: def.unit, value: a };
   }
-  const nums = ranks.map(Number).filter((n) => !Number.isNaN(n));
+  // Number("") === 0, not NaN — treat blank/whitespace-only ranks as missing
+  // instead of silently averaging them in as a rating of 0.
+  const nums = ranks
+    .map((r) => (typeof r === "string" && r.trim() === "" ? NaN : Number(r)))
+    .filter((n) => !Number.isNaN(n));
   if (nums.length === 0) return { label: "—", unit: def.unit, value: null };
   const a = Math.round(nums.reduce((s, x) => s + x, 0) / nums.length);
   return { label: String(a), unit: def.unit, value: a };

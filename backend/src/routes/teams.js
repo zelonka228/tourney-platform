@@ -8,6 +8,25 @@ const router = Router();
 
 const DISCIPLINE_VALUES = Object.keys(DISCIPLINES); // ["CS2", "Dota 2", "Valorant"]
 
+// Player.nick/role/rank are non-null columns — validate before handing the
+// array to Prisma's nested create, otherwise a blank player throws a
+// PrismaClientValidationError that errorHandler doesn't map, surfacing as a
+// bare 500 instead of a clean 400.
+function validatePlayers(players) {
+  players.forEach((p, i) => {
+    const missing = ["nick", "role", "rank"].filter((f) => {
+      const v = p?.[f];
+      return v === undefined || v === null || String(v).trim() === "";
+    });
+    if (missing.length > 0) {
+      throw new HttpError(
+        400,
+        `Гравець #${i + 1}: відсутні обов'язкові поля: ${missing.join(", ")}.`
+      );
+    }
+  });
+}
+
 // GET /api/teams → all teams with players
 router.get(
   "/",
@@ -65,6 +84,7 @@ router.post(
 
     requireFields(req.body, ["name", "discipline"]);
     requireEnum("discipline", discipline, DISCIPLINE_VALUES);
+    validatePlayers(players);
 
     const team = await prisma.team.create({
       data: {
@@ -114,6 +134,7 @@ router.put(
     };
 
     if (Array.isArray(players)) {
+      validatePlayers(players);
       await prisma.player.deleteMany({ where: { teamId: id } });
       data.players = {
         create: players.map((p) => ({
