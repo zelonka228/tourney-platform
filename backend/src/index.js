@@ -13,7 +13,10 @@ import { notFound, errorHandler } from "./http.js";
 
 const app = express();
 app.use(cors());
-app.use(express.json());
+// Default express.json() limit is 100kb — too small for team payloads that
+// include a base64 logo (frontend allows data URLs up to ~300kb after JPEG
+// compression), which silently failed every save with an unhelpful 500.
+app.use(express.json({ limit: "1mb" }));
 
 // --- REST API ---
 app.get("/api/health", (_req, res) => res.json({ ok: true }));

@@ -11,7 +11,7 @@ const links = [
   { to: "/create", label: "Створити турнір" },
   { to: "/tournament", label: "Турнір" },
   { to: "/team", label: "Команда" },
-  { to: "/profile", label: "Профіль" },
+  { to: "/profile", label: "Команди" },
   { to: "/hall", label: "Рейтинг" },
 ];
 
