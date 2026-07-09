@@ -4,7 +4,7 @@ import prisma from "../db.js";
 import { isValidScore } from "../bracket.js";
 import { advanceWinner } from "../advance.js";
 import { avgRating } from "../rating.js";
-import { asyncHandler, requireFields, HttpError } from "../http.js";
+import { asyncHandler, requireFields, HttpError, parseId } from "../http.js";
 
 const router = Router();
 
@@ -17,7 +17,7 @@ const router = Router();
 router.put(
   "/:id/score",
   asyncHandler(async (req, res) => {
-    const id = Number(req.params.id);
+    const id = parseId(req.params.id);
     const { scoreA, scoreB } = req.body ?? {};
     requireFields(req.body, ["scoreA", "scoreB"]);
 
@@ -42,10 +42,21 @@ router.put(
 
     const winnerId = a > b ? match.teamAId : match.teamBId;
 
-    const updated = await prisma.match.update({
-      where: { id },
+    // Read-then-write on `status` above is not atomic — two concurrent
+    // requests can both pass the "already done" check before either commits.
+    // updateMany with the same guard folded into the WHERE makes the
+    // check-and-set a single statement, so only one concurrent request can
+    // ever flip a given match to "done" (the loser gets count:0 → 409),
+    // instead of both proceeding to double-advance the winner and
+    // double-increment the champion's stats below.
+    const { count } = await prisma.match.updateMany({
+      where: { id, status: { not: "done" } },
       data: { scoreA: a, scoreB: b, status: "done" },
     });
+    if (count === 0) {
+      throw new HttpError(409, "Матч уже завершено, редагування рахунку недоступне.");
+    }
+    const updated = await prisma.match.findUnique({ where: { id } });
 
     // Snapshot both teams' current rating into history for every played match
     // (byes don't go through this endpoint, so they're excluded naturally).

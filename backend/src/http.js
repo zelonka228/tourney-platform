@@ -34,6 +34,19 @@ export function requireEnum(field, value, allowed) {
   }
 }
 
+// Route :id params through this instead of a bare Number(...) — a non-numeric
+// string (e.g. "abc") becomes NaN, which Prisma rejects with a
+// PrismaClientValidationError that errorHandler doesn't map, surfacing as a
+// bare 500. Negative/huge/non-existent (but numeric) ids are left to the
+// route's own findUnique + 404 check, unchanged.
+export function parseId(raw) {
+  const id = Number(raw);
+  if (!Number.isFinite(id)) {
+    throw new HttpError(400, "Невалідний ID.");
+  }
+  return id;
+}
+
 // 404 for unmatched routes.
 export function notFound(_req, res) {
   res.status(404).json({ error: "Ресурс не знайдено." });
@@ -46,6 +59,12 @@ export function errorHandler(err, _req, res, _next) {
   }
   if (err.type === "entity.too.large") {
     return res.status(413).json({ error: "Запит завеликий (можливо, завелике лого)." });
+  }
+  if (err.type === "entity.parse.failed" || err instanceof SyntaxError) {
+    return res.status(400).json({ error: "Невалідний JSON у тілі запиту." });
+  }
+  if (err instanceof Prisma.PrismaClientValidationError) {
+    return res.status(400).json({ error: "Невалідні дані запиту." });
   }
   if (err instanceof Prisma.PrismaClientKnownRequestError) {
     if (err.code === "P2002") {

@@ -4,7 +4,7 @@ import prisma from "../db.js";
 import { DISCIPLINES } from "../rating.js";
 import { buildBracketRows } from "../bracket.js";
 import { resolveByes } from "../advance.js";
-import { asyncHandler, requireFields, requireEnum, HttpError } from "../http.js";
+import { asyncHandler, requireFields, requireEnum, HttpError, parseId } from "../http.js";
 
 const router = Router();
 
@@ -30,7 +30,7 @@ router.get(
 router.get(
   "/:id",
   asyncHandler(async (req, res) => {
-    const id = Number(req.params.id);
+    const id = parseId(req.params.id);
     const tournament = await prisma.tournament.findUnique({
       where: { id },
       include: { teams: TEAMS_WITH_TEAM, matches: true },
@@ -91,7 +91,7 @@ router.post(
 router.post(
   "/:id/generate-bracket",
   asyncHandler(async (req, res) => {
-    const id = Number(req.params.id);
+    const id = parseId(req.params.id);
     const tournament = await prisma.tournament.findUnique({
       where: { id },
       include: { teams: { orderBy: { seed: "asc" }, include: { team: true } }, matches: true },
@@ -125,7 +125,7 @@ router.post(
 router.put(
   "/:id",
   asyncHandler(async (req, res) => {
-    const id = Number(req.params.id);
+    const id = parseId(req.params.id);
     const { name, discipline, bracketType, matchFormat, status, date } = req.body ?? {};
 
     if (discipline !== undefined) requireEnum("discipline", discipline, DISCIPLINE_VALUES);
@@ -157,7 +157,7 @@ router.put(
 router.delete(
   "/:id",
   asyncHandler(async (req, res) => {
-    const id = Number(req.params.id);
+    const id = parseId(req.params.id);
     const existing = await prisma.tournament.findUnique({ where: { id } });
     if (!existing) throw new HttpError(404, "Турнір не знайдено.");
     await prisma.tournament.delete({ where: { id } });
@@ -169,13 +169,22 @@ router.delete(
 router.post(
   "/:id/register",
   asyncHandler(async (req, res) => {
-    const id = Number(req.params.id);
+    const id = parseId(req.params.id);
     const { teamId } = req.body ?? {};
 
     requireFields(req.body, ["teamId"]);
 
-    const tournament = await prisma.tournament.findUnique({ where: { id } });
+    const tournament = await prisma.tournament.findUnique({
+      where: { id },
+      include: { _count: { select: { matches: true } } },
+    });
     if (!tournament) throw new HttpError(404, "Турнір не знайдено.");
+    if (tournament.status === "completed") {
+      throw new HttpError(409, "Турнір вже завершено, реєстрація закрита.");
+    }
+    if (tournament._count.matches > 0) {
+      throw new HttpError(409, "Сітку вже згенеровано, реєстрація закрита.");
+    }
 
     const team = await prisma.team.findUnique({ where: { id: Number(teamId) } });
     if (!team) throw new HttpError(404, "Команду не знайдено.");
@@ -186,9 +195,14 @@ router.post(
     });
     if (already) throw new HttpError(409, "Команда вже зареєстрована в цьому турнірі.");
 
-    const count = await prisma.tournamentTeam.count({ where: { tournamentId: id } });
-    await prisma.tournamentTeam.create({
-      data: { tournamentId: id, teamId: Number(teamId), seed: count + 1 },
+    // count()+create() as two separate statements let concurrent registrations
+    // read the same count and collide on the same seed — wrap in a transaction
+    // so SQLite serializes them instead of interleaving.
+    await prisma.$transaction(async (tx) => {
+      const count = await tx.tournamentTeam.count({ where: { tournamentId: id } });
+      await tx.tournamentTeam.create({
+        data: { tournamentId: id, teamId: Number(teamId), seed: count + 1 },
+      });
     });
 
     const teams = await prisma.tournamentTeam.findMany({ where: { tournamentId: id } });

@@ -2,17 +2,20 @@
 import { Router } from "express";
 import prisma from "../db.js";
 import { avgRating, DISCIPLINES } from "../rating.js";
-import { asyncHandler, requireFields, requireEnum, HttpError } from "../http.js";
+import { asyncHandler, requireFields, requireEnum, HttpError, parseId } from "../http.js";
 
 const router = Router();
 
 const DISCIPLINE_VALUES = Object.keys(DISCIPLINES); // ["CS2", "Dota 2", "Valorant"]
 
-// Player.nick/role/rank are non-null columns — validate before handing the
-// array to Prisma's nested create, otherwise a blank player throws a
-// PrismaClientValidationError that errorHandler doesn't map, surfacing as a
-// bare 500 instead of a clean 400.
+// Player.nick/role/rank are non-null String columns — validate shape before
+// handing the array to Prisma's nested create, otherwise a blank/wrong-type
+// player (or a non-array `players`) throws a PrismaClientValidationError or
+// bare TypeError that errorHandler doesn't map, surfacing as a 500.
 function validatePlayers(players) {
+  if (!Array.isArray(players)) {
+    throw new HttpError(400, "Поле \"players\" має бути масивом.");
+  }
   players.forEach((p, i) => {
     const missing = ["nick", "role", "rank"].filter((f) => {
       const v = p?.[f];
@@ -22,6 +25,13 @@ function validatePlayers(players) {
       throw new HttpError(
         400,
         `Гравець #${i + 1}: відсутні обов'язкові поля: ${missing.join(", ")}.`
+      );
+    }
+    const wrongType = ["nick", "role", "rank"].filter((f) => typeof p[f] !== "string");
+    if (wrongType.length > 0) {
+      throw new HttpError(
+        400,
+        `Гравець #${i + 1}: поля ${wrongType.join(", ")} мають бути рядком.`
       );
     }
   });
@@ -41,7 +51,7 @@ router.get(
 router.get(
   "/:id/rating",
   asyncHandler(async (req, res) => {
-    const id = Number(req.params.id);
+    const id = parseId(req.params.id);
     const team = await prisma.team.findUnique({
       where: { id },
       include: { players: true },
@@ -65,7 +75,7 @@ router.get(
 router.get(
   "/:id",
   asyncHandler(async (req, res) => {
-    const id = Number(req.params.id);
+    const id = parseId(req.params.id);
     const team = await prisma.team.findUnique({
       where: { id },
       include: { players: true },
@@ -114,7 +124,7 @@ router.post(
 router.put(
   "/:id",
   asyncHandler(async (req, res) => {
-    const id = Number(req.params.id);
+    const id = parseId(req.params.id);
     const { name, discipline, logo, winrate, streak, tournaments, best, players } =
       req.body ?? {};
 
@@ -155,13 +165,28 @@ router.put(
   })
 );
 
-// DELETE /api/teams/:id → 204 (cascade handles children)
+// DELETE /api/teams/:id → 204 (cascade handles TournamentTeam/Player/RatingHistory)
 router.delete(
   "/:id",
   asyncHandler(async (req, res) => {
-    const id = Number(req.params.id);
+    const id = parseId(req.params.id);
     const existing = await prisma.team.findUnique({ where: { id } });
     if (!existing) throw new HttpError(404, "Команду не знайдено.");
+
+    // Match.teamAId/teamBId are plain columns with no FK relation (a bye slot
+    // is legitimately null), so cascading delete can't clean them up — a team
+    // that already played a match would leave that Match pointing at a
+    // vanished team, permanently unrenderable in the bracket.
+    const playedMatch = await prisma.match.findFirst({
+      where: { OR: [{ teamAId: id }, { teamBId: id }] },
+    });
+    if (playedMatch) {
+      throw new HttpError(
+        409,
+        "Неможливо видалити команду: вона бере участь у матчах турніру."
+      );
+    }
+
     await prisma.team.delete({ where: { id } });
     res.status(204).end();
   })
