@@ -1,40 +1,52 @@
-import { useState, useEffect } from "react";
+import { useEffect, useState } from "react";
 import { Link } from "react-router-dom";
-import { DISCIPLINES, avgRating } from "../lib/demo";
+import { motion } from "framer-motion";
+import { useI18n } from "../lib/i18n";
 import { getTeams } from "../lib/api";
+import { avgRating, DISCIPLINES } from "../lib/demo";
+import { Btn, Overline, Panel, Stat } from "../components/arena";
 
-export default function Profile() {
+export function Profile() {
+  const { t } = useI18n();
   const [sel, setSel] = useState(null);
-  const [TEAMS, setTeams] = useState([]);
+  const [teams, setTeams] = useState([]);
 
   useEffect(() => {
     getTeams().then(setTeams);
   }, []);
 
-  // --- Список команд (картки) ---
   if (sel === null) {
     return (
-      <div className="page">
-        <h1>Команди</h1>
-        <p className="sub">Натисніть на команду, щоб переглянути її профіль.</p>
-        <div className="cards">
-          {TEAMS.map((t, i) => {
-            // Рейтинг — середнє лише основного складу, як і на /team; підстави
-            // (isSubstitute) не мають тягнути середнє вниз/вгору.
-            const r = avgRating(
-              t.discipline,
-              t.players.filter((p) => !p.isSubstitute).map((p) => p.rank)
-            );
+      <div className="py-10" data-testid="profile-list">
+        <h1 className="font-display font-black text-4xl sm:text-5xl tracking-tighter text-white">
+          {t("profile.title")}
+        </h1>
+        <p className="text-[#a1a1aa] mt-2">{t("profile.sub")}</p>
+        <div className="grid sm:grid-cols-2 lg:grid-cols-3 gap-4 mt-8">
+          {teams.map((team, i) => {
+            // Рейтинг — середнє лише основного складу, підстави не враховуються.
+            const r = avgRating(team.discipline, team.players.filter((p) => !p.isSubstitute).map((p) => p.rank));
             return (
-              <div className="box nav-card team-card" key={t.id ?? t.name} onClick={() => setSel(i)}>
-                <div className="ph tlogo">{t.logo ? <img src={t.logo} alt="" /> : "лого"}</div>
-                <div>
-                  <h3>{t.name} →</h3>
-                  <p>
-                    {t.discipline} · {r.label} {r.unit}
-                  </p>
-                </div>
-              </div>
+              <motion.button
+                key={team.id}
+                data-testid={`team-card-${i}`}
+                onClick={() => setSel(i)}
+                initial={{ opacity: 0, y: 16 }}
+                animate={{ opacity: 1, y: 0 }}
+                transition={{ delay: i * 0.05 }}
+                whileHover={{ y: -4 }}
+                className="text-left"
+              >
+                <Panel clip className="p-5 flex items-center gap-4 hover:border-cyan transition-colors">
+                  <Logo logo={team.logo} className="w-12 h-12" />
+                  <div className="min-w-0">
+                    <h3 className="font-display font-bold text-white truncate">{team.name}</h3>
+                    <p className="text-xs font-mono text-[#a1a1aa] mt-1">
+                      {team.discipline} · {r.label} {t(`unit.${r.unitKey}`)}
+                    </p>
+                  </div>
+                </Panel>
+              </motion.button>
             );
           })}
         </div>
@@ -42,139 +54,114 @@ export default function Profile() {
     );
   }
 
-  // --- Профіль обраної команди ---
-  const team = TEAMS[sel];
-  const unit = DISCIPLINES[team.discipline].unit;
+  const team = teams[sel];
   const mainPlayers = team.players.filter((p) => !p.isSubstitute);
-  const subPlayers = team.players.filter((p) => p.isSubstitute);
-  const rating = avgRating(
-    team.discipline,
-    mainPlayers.map((p) => p.rank)
-  );
+  const rating = avgRating(team.discipline, mainPlayers.map((p) => p.rank));
+  const unit = t(`unit.${DISCIPLINES[team.discipline].unitKey}`);
 
   return (
-    <div className="page">
-      <div
-        className="row"
-        style={{ justifyContent: "space-between", alignItems: "center", marginBottom: 6 }}
-      >
-        <button className="btn sm" onClick={() => setSel(null)}>
-          ← Усі команди
-        </button>
-        <Link to={`/team/${team.id}`}>Редагувати склад →</Link>
+    <div className="py-10" data-testid="profile-detail">
+      <div className="flex items-center justify-between">
+        <Btn size="sm" variant="ghost" data-testid="profile-back-btn" onClick={() => setSel(null)}>
+          {t("profile.back")}
+        </Btn>
+        <Link to={`/team/${team.id}`} className="text-cyan text-sm font-mono hover:underline">
+          {t("profile.edit")}
+        </Link>
       </div>
-      <h1>{team.name}</h1>
 
-      <div className="pcols">
-        <div className="tcard">
-          <div className="head">
-            <div className="ph logo">{team.logo ? <img src={team.logo} alt="" /> : "лого"}</div>
+      <h1 className="font-display font-black text-4xl sm:text-5xl tracking-tighter text-white mt-6">
+        {team.name}
+      </h1>
+
+      <div className="grid lg:grid-cols-[340px_1fr] gap-6 mt-8 items-start">
+        <Panel clip>
+          <div className="flex items-center gap-4 p-5 border-b border-[#27272a]">
+            <Logo logo={team.logo} className="w-14 h-14" />
             <div>
-              <div className="nm">{team.name}</div>
-              <div className="tier">
-                {team.discipline} · середній {rating.unit}: <b>{rating.label}</b>
+              <div className="font-display font-bold text-lg text-white">{team.name}</div>
+              <div className="text-xs font-mono text-[#a1a1aa] mt-1">
+                {team.discipline} · {unit}: <span className="text-cyan">{rating.label}</span>
               </div>
             </div>
           </div>
-          <div className="statgrid">
-            <div className="s">
-              <div className="v">{team.winrate ?? "—"}</div>
-              <div className="l">Winrate</div>
-            </div>
-            <div className="s">
-              <div className="v">{team.streak ?? "—"}</div>
-              <div className="l">Стрик</div>
-            </div>
-            <div className="s">
-              <div className="v">{team.tournaments}</div>
-              <div className="l">Турнірів</div>
-            </div>
-            <div className="s">
-              <div className="v">{team.best ?? "—"}</div>
-              <div className="l">Найкращий результат</div>
-            </div>
+          <div className="grid grid-cols-2 gap-px bg-[#27272a]">
+            <Stat value={team.winrate ?? "—"} label={t("profile.winrate")} />
+            <Stat value={team.streak ?? "—"} label={t("profile.streak")} accent="volt" />
+            <Stat value={team.tournaments} label={t("profile.tournaments")} />
+            <Stat value={team.best ?? "—"} label={t("profile.best")} accent="volt" />
           </div>
-          <div className="roster">
-            <div
-              className="muted"
-              style={{
-                fontSize: 12,
-                textTransform: "uppercase",
-                letterSpacing: ".5px",
-                marginBottom: 4,
-              }}
-            >
-              Склад · {unit}
+          <div className="p-5">
+            <Overline>{t("profile.roster")} · {unit}</Overline>
+            <div className="mt-3 divide-y divide-[#27272a]/60">
+              {mainPlayers.map((p, i) => (
+                <PlayerRow key={p.id ?? `${p.nick}-${i}`} p={p} />
+              ))}
             </div>
-            {mainPlayers.map((p, i) => (
-              <div className="r" key={p.id ?? `${p.nick}-${i}`}>
-                <div className="ph pa" />
-                <div>
-                  {p.nick}
-                  <div className="role">{p.role}</div>
-                </div>
-                <span className="kd">{p.rank}</span>
-              </div>
-            ))}
-            {subPlayers.length > 0 && (
+            {team.players.some((p) => p.isSubstitute) && (
               <>
-                <div
-                  className="muted"
-                  style={{
-                    fontSize: 12,
-                    textTransform: "uppercase",
-                    letterSpacing: ".5px",
-                    margin: "12px 0 4px",
-                  }}
-                >
-                  Запасні
+                <Overline className="mt-4">{t("profile.subs")}</Overline>
+                <div className="mt-3 divide-y divide-[#27272a]/60">
+                  {team.players
+                    .filter((p) => p.isSubstitute)
+                    .map((p, i) => (
+                      <PlayerRow key={p.id ?? `sub-${p.nick}-${i}`} p={p} />
+                    ))}
                 </div>
-                {subPlayers.map((p, i) => (
-                  <div className="r" key={p.id ?? `${p.nick}-${i}`}>
-                    <div className="ph pa" />
-                    <div>
-                      {p.nick}
-                      <div className="role">{p.role}</div>
-                    </div>
-                    <span className="kd">{p.rank}</span>
-                  </div>
-                ))}
               </>
             )}
           </div>
-          <div className="cardfoot">
-            <button
-              className="btn"
-              style={{ width: "100%" }}
-              onClick={() =>
-                alert("У робочій версії картка рендериться у PNG (html2canvas / Puppeteer).")
-              }
-            >
-              Зберегти картку зображенням
-            </button>
-          </div>
-        </div>
+        </Panel>
 
-        <div>
-          <div className="box">
-            <h2 style={{ marginTop: 0 }}>Рейтинг команди</h2>
-            <p style={{ margin: "0 0 6px" }}>
-              Середній {rating.unit}: <b>{rating.label}</b> ({mainPlayers.length} гравців)
-            </p>
-            <p className="muted" style={{ margin: 0, fontSize: 13 }}>
-              Рейтинг рахується в одиниці дисципліни: CS2 — FACEIT ELO, Dota 2 — MMR, Valorant —
-              звання. Команди порівнюються в межах однієї гри.
-            </p>
-          </div>
-          <div className="box" style={{ marginTop: 16 }}>
-            <h2 style={{ marginTop: 0 }}>Рідкість картки</h2>
-            <p className="muted" style={{ margin: 0, fontSize: 14 }}>
-              Common → Rare → Epic → Legendary. Відкривається за досягнення (виграні турніри,
-              нагороди MVP). Суто візуальна колекційна позначка — лише формули та шаблон, без ШІ.
-            </p>
-          </div>
+        <div className="space-y-4">
+          <Panel clip className="p-6">
+            <Overline>{t("profile.rating")}</Overline>
+            <div className="font-mono text-5xl text-cyan mt-4">{rating.label}</div>
+            <div className="overline mt-1">{unit} · {mainPlayers.length} {t("profile.players")}</div>
+            <p className="text-[#a1a1aa] text-sm mt-4">{t("profile.ratingDesc")}</p>
+          </Panel>
+          <Panel clip className="p-6">
+            <Overline>{t("profile.rarity")}</Overline>
+            <div className="flex gap-2 mt-4">
+              {["Common", "Rare", "Epic", "Legendary"].map((tier, i) => (
+                <span
+                  key={tier}
+                  className={`px-3 py-1 text-xs font-mono border rounded-sm ${
+                    i === 2 ? "border-volt text-volt bg-volt/10" : "border-[#27272a] text-[#52525b]"
+                  }`}
+                >
+                  {tier}
+                </span>
+              ))}
+            </div>
+          </Panel>
         </div>
       </div>
+    </div>
+  );
+}
+
+function PlayerRow({ p }) {
+  return (
+    <div className="flex items-center gap-3 py-2.5">
+      <span className="w-1.5 h-1.5 bg-cyan/60 rotate-45 shrink-0" />
+      <div className="min-w-0">
+        <div className="text-sm text-white truncate">{p.nick}</div>
+        <div className="text-[11px] font-mono text-[#a1a1aa]">{p.role}</div>
+      </div>
+      <span className="ml-auto font-mono text-sm text-cyan">{p.rank}</span>
+    </div>
+  );
+}
+
+function Logo({ logo, className }) {
+  return (
+    <div className={`shrink-0 border border-[#27272a] bg-void grid place-items-center overflow-hidden ${className}`}>
+      {logo ? (
+        <img src={logo} alt="" className="w-full h-full object-cover" />
+      ) : (
+        <span className="w-3 h-3 border border-cyan/40 rotate-45" />
+      )}
     </div>
   );
 }

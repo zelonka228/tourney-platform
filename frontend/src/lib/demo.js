@@ -1,46 +1,34 @@
-// Дані застосунку та допоміжна логіка.
-// Тимчасово — статичні дані; згодом замінюються на запити до API + WebSocket.
+// Довідники дисциплін, ролей, рангів + формули рейтингу та сітки.
+// unitKey ('elo'|'mmr'|'rank') перекладається у компонентах через t();
+// unit лишається як текстовий фолбек для місць, де немає доступу до i18n
+// (напр. api.js demo-фолбек, коли бекенд недоступний).
 
-// Кожна дисципліна має власну систему рейтингу.
-// Рейтинг команди = середнє рейтингів гравців у рідній одиниці гри.
+export const DISCIPLINE_LIST = ["CS2", "Dota 2", "Valorant"];
+
 export const DISCIPLINES = {
-  CS2: { unit: "FACEIT ELO", kind: "number" },
-  "Dota 2": { unit: "MMR", kind: "number" },
-  Valorant: { unit: "звання", kind: "rank" },
+  CS2: { unit: "FACEIT ELO", unitKey: "elo", kind: "elo" },
+  "Dota 2": { unit: "MMR", unitKey: "mmr", kind: "mmr" },
+  Valorant: { unit: "звання", unitKey: "rank", kind: "rank" },
+};
+
+// Ролі гравців залежать від дисципліни. Порядок і написання ("Carry (1)"
+// тощо) збігаються з backend/prisma/seed.js — реальними даними в БД.
+export const ROLES_BY_GAME = {
+  CS2: ["Entry", "Support", "AWPer", "IGL", "Lurker"],
+  "Dota 2": ["Carry (1)", "Mid (2)", "Offlane (3)", "Soft Support (4)", "Hard Support (5)"],
+  Valorant: ["Duelist", "Controller", "Initiator", "Sentinel", "Flex"],
 };
 
 // Звання Valorant за зростанням (для усереднення).
 export const VALORANT_RANKS = [
-  "Iron",
-  "Bronze",
-  "Silver",
-  "Gold",
-  "Platinum",
-  "Diamond",
-  "Ascendant",
-  "Immortal",
-  "Radiant",
+  "Iron", "Bronze", "Silver", "Gold", "Platinum",
+  "Diamond", "Ascendant", "Immortal", "Radiant",
 ];
 
-// Середній рейтинг команди в одиниці її дисципліни.
-export function avgRating(discipline, ranks) {
-  const def = DISCIPLINES[discipline];
-  if (!def || ranks.length === 0) return { label: "—", unit: def?.unit ?? "", value: 0 };
-  if (def.kind === "rank") {
-    const idx = ranks.map((r) => VALORANT_RANKS.indexOf(r)).filter((i) => i >= 0);
-    const a = Math.round(idx.reduce((s, x) => s + x, 0) / idx.length);
-    return { label: VALORANT_RANKS[a], unit: def.unit, value: a };
-  }
-  const a = Math.round(ranks.reduce((s, x) => s + Number(x), 0) / ranks.length);
-  return { label: String(a), unit: def.unit, value: a };
-}
-
-// Формат матчу (best-of): скільки карт у матчі, перемога — за більшістю.
 export const BEST_OF = [1, 3, 5];
 export const winTarget = (bo) => Math.ceil(bo / 2); // BO1→1, BO3→2, BO5→3
 
 // Усі допустимі рахунки для формату BO (переможець завжди є).
-// Напр. BO3 → [[2,0],[2,1],[1,2],[0,2]].
 export function validScorelines(bo) {
   const t = winTarget(bo);
   const out = [];
@@ -49,15 +37,60 @@ export function validScorelines(bo) {
   return out;
 }
 
+const nextPow2 = (n) => {
+  let p = 1;
+  while (p < n) p *= 2;
+  return p;
+};
+
 // Доповнення до найближчого степеня двійки через «баї».
 export function bracketPlan(n) {
-  const rounds = Math.ceil(Math.log2(n));
-  const full = 2 ** rounds;
-  return { rounds, full, byes: full - n, matches: full - 1 };
+  const full = nextPow2(Math.max(n, 1));
+  return {
+    full,
+    rounds: Math.max(Math.log2(full), 0),
+    matches: Math.max(full - 1, 0),
+    byes: full - n,
+  };
 }
 
-// Єдине джерело даних команд: склад із рейтингами в одиниці гри.
-// Рейтинг команди й рядок рейтингу обчислюються через avgRating().
+// Стандартний порядок посіву в сітці (1-indexed seeds у порядку слотів).
+// Дзеркалить backend/src/bracket.js seedOrder() — та сама формула (перевірено
+// збіг для розмірів 2/4/8: [1,2] → [1,4,2,3] → [1,8,4,5,2,7,3,6]).
+export function seedPositions(size) {
+  let seeds = [1];
+  while (seeds.length < size) {
+    const len = seeds.length * 2 + 1;
+    const round = [];
+    for (const s of seeds) {
+      round.push(s);
+      round.push(len - s);
+    }
+    seeds = round;
+  }
+  return seeds;
+}
+
+// Середній рейтинг команди в одиниці її дисципліни.
+export function avgRating(discipline, ranks) {
+  const def = DISCIPLINES[discipline];
+  if (!def || !ranks?.length) return { value: null, label: "—", unit: def?.unit ?? "", unitKey: def?.unitKey ?? "elo" };
+  if (def.kind === "rank") {
+    const idxs = ranks.map((r) => Math.max(VALORANT_RANKS.indexOf(r), 0));
+    const avg = Math.round(idxs.reduce((a, b) => a + b, 0) / idxs.length);
+    return { value: avg, label: VALORANT_RANKS[avg] ?? "—", unit: def.unit, unitKey: "rank" };
+  }
+  // Number("") === 0, not NaN — treat blank/whitespace-only ranks as missing
+  // instead of silently averaging them in as a rating of 0.
+  const nums = ranks
+    .map((r) => (typeof r === "string" && r.trim() === "" ? NaN : Number(r)))
+    .filter((n) => !Number.isNaN(n));
+  if (!nums.length) return { value: null, label: "—", unit: def.unit, unitKey: def.unitKey };
+  const avg = Math.round(nums.reduce((a, b) => a + b, 0) / nums.length);
+  return { value: avg, label: String(avg), unit: def.unit, unitKey: def.unitKey };
+}
+
+// Демо-команди для м'якого фолбеку в lib/api.js, коли бекенд недоступний.
 export const TEAMS = [
   {
     name: "Night Wolves",
@@ -188,12 +221,3 @@ export const TEAMS = [
     ],
   },
 ];
-
-// Ролі гравців залежать від дисципліни.
-export const ROLES_BY_GAME = {
-  CS2: ["Entry", "Support", "AWPer", "IGL", "Lurker"],
-  "Dota 2": ["Carry (1)", "Mid (2)", "Offlane (3)", "Soft Support (4)", "Hard Support (5)"],
-  Valorant: ["Duelist", "Controller", "Initiator", "Sentinel", "Flex"],
-};
-
-export const DISCIPLINE_LIST = Object.keys(DISCIPLINES);

@@ -1,10 +1,10 @@
 import { useEffect, useState } from "react";
 import { useNavigate } from "react-router-dom";
-import { bracketPlan, BEST_OF, winTarget, DISCIPLINE_LIST, avgRating } from "../lib/demo";
+import { motion } from "framer-motion";
+import { useI18n } from "../lib/i18n";
 import { getTeams, createTournament } from "../lib/api";
-
-const SINGLE_LABEL = "На вибування (виліт за 1 поразку)";
-const DOUBLE_LABEL = "Подвійне вибування (виліт за 2 поразки)";
+import { bracketPlan, BEST_OF, winTarget, DISCIPLINE_LIST, avgRating } from "../lib/demo";
+import { Btn, Field, Input, Overline, Panel, Select } from "../components/arena";
 
 function shuffled(arr) {
   const a = [...arr];
@@ -15,33 +15,34 @@ function shuffled(arr) {
   return a;
 }
 
-// Порядок teamIds = порядок посіву (перший — seed 1). "За рейтингом" сортує
-// найсильніших першими, "Випадковий" перемішує, "Ручний" лишає порядок кліків.
-function seedTeamIds(selectedIds, allTeams, seedType) {
-  if (seedType === "Випадковий") return shuffled(selectedIds);
-  if (seedType === "За рейтингом") {
+// Порядок teamIds = порядок посіву (перший — seed 1). Рейтинг рахується
+// лише по основному складу — запасні (isSubstitute) не повинні впливати
+// на посів "За рейтингом".
+function seedTeamIds(ids, allTeams, seedType) {
+  if (seedType === "random") return shuffled(ids);
+  if (seedType === "rating") {
     const byId = new Map(allTeams.map((t) => [t.id, t]));
     const ratingOf = (id) => {
       const t = byId.get(id);
       return (
-        avgRating(t.discipline, t.players.filter((p) => !p.isSubstitute).map((p) => p.rank))
-          .value ?? -Infinity
+        avgRating(t.discipline, t.players.filter((p) => !p.isSubstitute).map((p) => p.rank)).value ??
+        -Infinity
       );
     };
-    return [...selectedIds].sort((a, b) => ratingOf(b) - ratingOf(a));
+    return [...ids].sort((a, b) => ratingOf(b) - ratingOf(a));
   }
-  return selectedIds;
+  return ids;
 }
 
-export default function Create() {
+export function Create() {
   const nav = useNavigate();
+  const { t } = useI18n();
   const [name, setName] = useState("LAN Cup");
-  const [bracket, setBracket] = useState(SINGLE_LABEL);
+  const [bracket, setBracket] = useState("single");
   const [bo, setBo] = useState(3);
   const [discipline, setDiscipline] = useState("CS2");
   const [date, setDate] = useState("2026-07-12");
-  const [seedType, setSeedType] = useState("За рейтингом");
-
+  const [seedType, setSeedType] = useState("rating");
   const [allTeams, setAllTeams] = useState([]);
   const [selectedIds, setSelectedIds] = useState([]);
   const [submitting, setSubmitting] = useState(false);
@@ -51,18 +52,15 @@ export default function Create() {
     getTeams().then(setAllTeams);
   }, []);
 
-  // Зміна дисципліни очищає вибір — не можна змішувати команди різних ігор в одному турнірі.
-  function changeDiscipline(d) {
+  const changeDiscipline = (d) => {
     setDiscipline(d);
     setSelectedIds([]);
-  }
-
-  function toggleTeam(id) {
+  };
+  const toggleTeam = (id) =>
     setSelectedIds((ids) => (ids.includes(id) ? ids.filter((x) => x !== id) : [...ids, id]));
-  }
 
-  const teamsInDiscipline = allTeams.filter((t) => t.discipline === discipline);
-  const isDouble = bracket === DOUBLE_LABEL;
+  const teamsInDiscipline = allTeams.filter((tm) => tm.discipline === discipline);
+  const isDouble = bracket === "double";
   const plan = bracketPlan(Math.max(selectedIds.length, 1));
   const canSubmit = !isDouble && selectedIds.length >= 2 && name.trim() !== "" && !submitting;
 
@@ -78,124 +76,126 @@ export default function Create() {
         teamIds: seedTeamIds(selectedIds, allTeams, seedType),
         date,
       });
-      if (!created?.id) throw new Error("Не вдалося створити турнір.");
+      if (!created?.id) throw new Error("Failed.");
       nav(`/tournament/${created.id}`);
     } catch (e) {
-      setError(e.message || "Не вдалося створити турнір.");
+      setError(e.message);
       setSubmitting(false);
     }
   }
 
   return (
-    <div className="page">
-      <h1>Створення турніру</h1>
-      <div className="row" style={{ alignItems: "flex-start" }}>
-        <div className="box" style={{ flex: 1, minWidth: 300 }}>
-          <div className="field">
-            <label>Назва турніру</label>
-            <input value={name} onChange={(e) => setName(e.target.value)} />
-          </div>
-          <div className="row">
-            <div className="field" style={{ flex: 1 }}>
-              <label>Тип сітки</label>
-              <select value={bracket} onChange={(e) => setBracket(e.target.value)}>
-                <option>{SINGLE_LABEL}</option>
-                <option>{DOUBLE_LABEL}</option>
-              </select>
+    <div className="py-10" data-testid="create-page">
+      <Overline className="text-cyan">// {t("nav.create")}</Overline>
+      <h1 className="font-display font-black text-4xl sm:text-5xl tracking-tighter text-white mt-3">
+        {t("create.title")}
+      </h1>
+
+      <div className="grid lg:grid-cols-[1fr_320px] gap-6 mt-8 items-start">
+        <Panel clip className="p-6">
+          <Field label={t("create.name")}>
+            <Input value={name} data-testid="create-name-input" onChange={(e) => setName(e.target.value)} />
+          </Field>
+          <div className="grid sm:grid-cols-2 gap-x-4">
+            <Field label={t("create.bracket")}>
+              <Select value={bracket} data-testid="create-bracket-select" onChange={(e) => setBracket(e.target.value)}>
+                <option value="single">{t("create.single")}</option>
+                <option value="double">{t("create.double")}</option>
+              </Select>
               {isDouble && (
-                <div className="hint" style={{ marginTop: 4 }}>
-                  Подвійне вибування ще не підтримується — оберіть «На вибування».
-                </div>
+                <span className="block mt-2 text-xs text-[#ff0055]">{t("create.doubleHint")}</span>
               )}
-            </div>
-            <div className="field" style={{ flex: 1 }}>
-              <label>Формат матчу</label>
-              <select value={bo} onChange={(e) => setBo(+e.target.value)}>
+            </Field>
+            <Field label={t("create.format")}>
+              <Select value={bo} data-testid="create-bo-select" onChange={(e) => setBo(+e.target.value)}>
                 {BEST_OF.map((n) => (
-                  <option key={n} value={n}>
-                    BO{n} — до {winTarget(n)} перемог{winTarget(n) > 1 ? "" : "и"}
-                  </option>
+                  <option key={n} value={n}>BO{n} — {t("create.winTo", { n: winTarget(n) })}</option>
                 ))}
-              </select>
-            </div>
+              </Select>
+            </Field>
           </div>
-          <div className="row">
-            <div className="field" style={{ flex: 1 }}>
-              <label>Дисципліна</label>
-              <select value={discipline} onChange={(e) => changeDiscipline(e.target.value)}>
-                {DISCIPLINE_LIST.map((d) => (
-                  <option key={d}>{d}</option>
-                ))}
-              </select>
-            </div>
-            <div className="field" style={{ flex: 1 }}>
-              <label>Дата проведення</label>
-              <input type="date" value={date} onChange={(e) => setDate(e.target.value)} />
-            </div>
+          <div className="grid sm:grid-cols-2 gap-x-4">
+            <Field label={t("create.discipline")}>
+              <Select value={discipline} data-testid="create-discipline-select" onChange={(e) => changeDiscipline(e.target.value)}>
+                {DISCIPLINE_LIST.map((d) => <option key={d}>{d}</option>)}
+              </Select>
+            </Field>
+            <Field label={t("create.date")}>
+              <Input type="date" value={date} data-testid="create-date-input" onChange={(e) => setDate(e.target.value)} />
+            </Field>
           </div>
-          <div className="field">
-            <label>Посів учасників</label>
-            <select value={seedType} onChange={(e) => setSeedType(e.target.value)}>
-              <option>Випадковий</option>
-              <option>За рейтингом</option>
-              <option>Ручний</option>
-            </select>
-          </div>
+          <Field label={t("create.seed")}>
+            <Select value={seedType} data-testid="create-seed-select" onChange={(e) => setSeedType(e.target.value)}>
+              <option value="random">{t("create.seed.random")}</option>
+              <option value="rating">{t("create.seed.rating")}</option>
+              <option value="manual">{t("create.seed.manual")}</option>
+            </Select>
+          </Field>
 
-          <div className="field">
-            <label>Учасники ({discipline})</label>
-            {teamsInDiscipline.length === 0 && (
-              <div className="hint">Немає команд у цій дисципліні — створіть команду спочатку.</div>
+          <div className="mt-2">
+            <Overline>{t("create.participants")} ({discipline})</Overline>
+            {teamsInDiscipline.length === 0 ? (
+              <p className="text-xs text-[#ff0055] mt-3">{t("create.noTeams")}</p>
+            ) : (
+              <div className="grid sm:grid-cols-2 gap-2 mt-3" data-testid="create-team-picker">
+                {teamsInDiscipline.map((tm) => {
+                  const on = selectedIds.includes(tm.id);
+                  return (
+                    <button
+                      key={tm.id}
+                      data-testid={`create-team-${tm.id}`}
+                      onClick={() => toggleTeam(tm.id)}
+                      className={`flex items-center gap-3 px-3 py-2.5 border rounded-sm text-left text-sm transition-colors ${
+                        on ? "border-cyan bg-cyan/10 text-white ring-1 ring-cyan" : "border-[#27272a] text-[#a1a1aa] hover:border-[#3f3f46]"
+                      }`}
+                    >
+                      <span className={`w-3 h-3 rotate-45 shrink-0 ${on ? "bg-cyan" : "border border-[#3f3f46]"}`} />
+                      {tm.name}
+                    </button>
+                  );
+                })}
+              </div>
             )}
-            {teamsInDiscipline.map((t) => (
-              <label key={t.id} className="plRow" style={{ gridTemplateColumns: "24px 1fr" }}>
-                <input
-                  type="checkbox"
-                  checked={selectedIds.includes(t.id)}
-                  onChange={() => toggleTeam(t.id)}
-                />
-                <span>{t.name}</span>
-              </label>
-            ))}
           </div>
 
-          {error && (
-            <div className="hint" style={{ color: "var(--danger, #c0392b)" }}>
-              {error}
+          {error && <p className="text-[#ff0055] text-sm mt-4" data-testid="create-error">{error}</p>}
+
+          <div className="mt-6">
+            <Btn variant="primary" data-testid="create-submit-btn" onClick={handleSubmit} disabled={!canSubmit}>
+              {submitting ? t("create.submitting") : t("create.submit")}
+            </Btn>
+          </div>
+        </Panel>
+
+        <motion.div layout>
+          <Panel clip className="p-6 sticky top-24">
+            <Overline className="text-cyan">{t("create.preview")}</Overline>
+            <dl className="mt-5 space-y-3 text-sm font-mono">
+              <Row k={t("create.p.bracket")} v={t(`create.${bracket}`).split(" (")[0]} />
+              <Row k={t("create.p.format")} v={`BO${bo}`} />
+              <Row k={t("create.p.selected")} v={selectedIds.length} />
+              <Row k={t("create.p.rounds")} v={plan.rounds} />
+              <Row k={t("create.p.matches")} v={plan.matches} />
+            </dl>
+            <div className="mt-5 pt-4 border-t border-[#27272a] text-xs text-[#a1a1aa]">
+              {selectedIds.length < 2
+                ? t("create.min2")
+                : plan.byes === 0
+                  ? t("create.pow2", { n: selectedIds.length })
+                  : t("create.byes", { n: selectedIds.length, full: plan.full, byes: plan.byes })}
             </div>
-          )}
-
-          <button className="btn solid" onClick={handleSubmit} disabled={!canSubmit}>
-            {submitting ? "Створення…" : "Згенерувати сітку"}
-          </button>
-        </div>
-
-        <div className="box" style={{ width: 300 }}>
-          <h2 style={{ marginTop: 0 }}>Попередній перегляд</h2>
-          <div className="muted" style={{ fontSize: 14 }}>
-            Тип сітки: <b>{bracket.split(" (")[0]}</b>
-            <br />
-            Формат матчу: <b>BO{bo}</b> (до {winTarget(bo)} перемог)
-            <br />
-            Команд обрано: <b>{selectedIds.length}</b>
-            <br />
-            Раундів: <b>{plan.rounds}</b>
-            <br />
-            Матчів: <b>{plan.matches}</b>
-          </div>
-          <div className="hint" style={{ marginTop: 12 }}>
-            BO{bo}: матч грається до {winTarget(bo)} виграних карт
-            {bo > 1 ? `, максимум ${bo} карт` : ""}.
-          </div>
-          <div className="hint" style={{ marginTop: 8 }}>
-            {selectedIds.length < 2
-              ? "Оберіть щонайменше 2 команди."
-              : plan.byes === 0
-                ? `${selectedIds.length} команд — степінь двійки, «баї» не потрібні.`
-                : `${selectedIds.length} команд → доповнюємо до ${plan.full} через ${plan.byes} «бай» (автопрохід без матчу).`}
-          </div>
-        </div>
+          </Panel>
+        </motion.div>
       </div>
+    </div>
+  );
+}
+
+function Row({ k, v }) {
+  return (
+    <div className="flex items-center justify-between">
+      <dt className="text-[#a1a1aa] uppercase text-[11px] tracking-widest">{k}</dt>
+      <dd className="text-cyan">{v}</dd>
     </div>
   );
 }
