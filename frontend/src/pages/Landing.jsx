@@ -4,6 +4,32 @@ import { motion } from "framer-motion";
 import { useI18n } from "../lib/i18n";
 import { getTeams, getTournaments, getTournament } from "../lib/api";
 import { Btn, Overline, Panel } from "../components/arena";
+import { AnimatedNumber, Reveal } from "../components/motion";
+
+// A few slow-drifting glow orbs behind the hero content — the one signature
+// ambient moment on the site (deliberately not repeated elsewhere, to keep
+// it a first-impression thing rather than a persistent perf cost).
+const ORBS = [
+  { size: 220, top: "8%", left: "58%", color: "#00F0FF", delay: 0 },
+  { size: 160, top: "52%", left: "82%", color: "#DFFF00", delay: 1.4 },
+  { size: 190, top: "68%", left: "12%", color: "#00F0FF", delay: 2.6 },
+];
+
+function AmbientGlow() {
+  return (
+    <div className="absolute inset-0 overflow-hidden pointer-events-none">
+      {ORBS.map((o, i) => (
+        <motion.div
+          key={i}
+          className="absolute rounded-full"
+          style={{ width: o.size, height: o.size, top: o.top, left: o.left, background: o.color, filter: "blur(70px)" }}
+          animate={{ y: [0, -22, 0], opacity: [0.08, 0.16, 0.08] }}
+          transition={{ duration: 8, repeat: Infinity, ease: "easeInOut", delay: o.delay }}
+        />
+      ))}
+    </div>
+  );
+}
 
 const container = { hidden: {}, show: { transition: { staggerChildren: 0.08 } } };
 const item = {
@@ -64,6 +90,7 @@ export function Landing() {
             className="w-full h-full object-cover opacity-40"
           />
           <div className="absolute inset-0 bg-gradient-to-r from-void via-void/85 to-void/30" />
+          <AmbientGlow />
           <div className="absolute inset-0 scanlines" />
         </div>
         <motion.div
@@ -99,7 +126,7 @@ export function Landing() {
       <div className="grid grid-cols-3 border-x border-b border-[#27272a] divide-x divide-[#27272a]">
         {statRow.map((s) => (
           <div key={s.key} className="px-4 sm:px-8 py-6">
-            <div className="font-mono text-3xl sm:text-4xl text-cyan leading-none">{s.v}</div>
+            <AnimatedNumber value={s.v} className="block font-mono text-3xl sm:text-4xl text-cyan leading-none" />
             <div className="overline mt-2">{t(s.key)}</div>
           </div>
         ))}
@@ -141,10 +168,10 @@ export function Landing() {
         <Overline>{t("landing.how")}</Overline>
         <div className="grid md:grid-cols-3 gap-px bg-[#27272a] border border-[#27272a] mt-5">
           {["landing.step1", "landing.step2", "landing.step3"].map((k, i) => (
-            <div key={k} className="bg-void p-6">
+            <Reveal key={k} index={i} className="bg-void p-6">
               <span className="font-display font-black text-4xl text-cyan/25">{i + 1}</span>
               <p className="text-[#d4d4d8] text-sm mt-3">{t(k)}</p>
-            </div>
+            </Reveal>
           ))}
         </div>
       </div>

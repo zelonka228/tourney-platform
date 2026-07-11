@@ -6,6 +6,7 @@ import { getTeams, getPlayerStats } from "../lib/api";
 import { avgRating, effectivePlayerRank, liveRankFromStats, DISCIPLINES } from "../lib/demo";
 import { Btn, Overline, Panel, Stat } from "../components/arena";
 import { PlayerStatsWidget } from "../components/PlayerStatsWidget";
+import { Reveal } from "../components/motion";
 
 export function Profile() {
   const { t } = useI18n();
@@ -113,12 +114,13 @@ export function Profile() {
             <Overline>{t("profile.roster")} · {unit}</Overline>
             <div className="mt-3 divide-y divide-[#27272a]/60">
               {mainPlayers.map((p, i) => (
-                <PlayerRow
-                  key={p.id ?? `${p.nick}-${i}`}
-                  p={p}
-                  discipline={team.discipline}
-                  onLiveElo={(elo) => setLiveElo((prev) => ({ ...prev, [p.id]: elo }))}
-                />
+                <Reveal key={p.id ?? `${p.nick}-${i}`} index={i} y={10}>
+                  <PlayerRow
+                    p={p}
+                    discipline={team.discipline}
+                    onLiveElo={(elo) => setLiveElo((prev) => ({ ...prev, [p.id]: elo }))}
+                  />
+                </Reveal>
               ))}
             </div>
             {team.players.some((p) => p.isSubstitute) && (

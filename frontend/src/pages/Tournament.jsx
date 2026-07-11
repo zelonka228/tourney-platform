@@ -9,6 +9,7 @@ import {
 } from "../lib/api";
 import { validScorelines } from "../lib/demo";
 import { Btn, Overline, Panel } from "../components/arena";
+import { Reveal } from "../components/motion";
 
 const SOCKET_URL = import.meta.env.VITE_API_URL ?? "http://localhost:4000";
 
@@ -237,7 +238,36 @@ export function Tournament() {
         dot.setAttribute("cy", pt.y);
         dot.style.opacity = String(fade);
       },
-      onComplete: () => { dot.remove(); activePulses.current.delete(controls); },
+      onComplete: () => {
+        const end = pathEl.getPointAtLength(length);
+        fireImpactRing(overlay, end.x, end.y);
+        dot.remove();
+        activePulses.current.delete(controls);
+      },
+    });
+    activePulses.current.add(controls);
+  }
+
+  // A quick expanding-and-fading ring where the pulse dot lands — a small
+  // "arrival" pop so advancing to the next round reads as an event, not
+  // just the dot quietly vanishing at the match card's edge.
+  function fireImpactRing(overlay, x, y) {
+    const svgNS = "http://www.w3.org/2000/svg";
+    const ring = document.createElementNS(svgNS, "circle");
+    ring.setAttribute("cx", x);
+    ring.setAttribute("cy", y);
+    ring.setAttribute("fill", "none");
+    ring.setAttribute("stroke", "#00F0FF");
+    ring.setAttribute("stroke-width", "2");
+    overlay.appendChild(ring);
+    const controls = animate(0, 1, {
+      duration: 0.5,
+      ease: [0.2, 0.65, 0.4, 1],
+      onUpdate: (p) => {
+        ring.setAttribute("r", String(3 + p * 14));
+        ring.style.opacity = String(1 - p);
+      },
+      onComplete: () => { ring.remove(); activePulses.current.delete(controls); },
     });
     activePulses.current.add(controls);
   }
@@ -518,7 +548,7 @@ export function Tournament() {
           )}
           <div className="mt-4 divide-y divide-[#27272a]/60">
             {tournament.teams.slice().sort((x, y) => x.seed - y.seed).map((tt, i, sorted) => (
-              <div key={tt.id} data-testid={`participant-row-${tt.teamId}`} className="flex items-center gap-4 py-2.5">
+              <Reveal key={tt.id} index={i} y={10} data-testid={`participant-row-${tt.teamId}`} className="flex items-center gap-4 py-2.5">
                 <span className="font-mono text-xs text-cyan w-6">{String(tt.seed).padStart(2, "0")}</span>
                 <span className="text-white">{tt.team?.name}</span>
                 {matches.length === 0 && isAdmin && (
@@ -537,7 +567,7 @@ export function Tournament() {
                     >▼</button>
                   </span>
                 )}
-              </div>
+              </Reveal>
             ))}
           </div>
           <p className="text-xs text-[#52525b] mt-4">{tournament.teams.length} {t("tour.teamsCount")}</p>

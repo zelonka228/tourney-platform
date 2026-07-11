@@ -7,6 +7,7 @@ import {
   DISCIPLINE_LIST, DISCIPLINES, ROLES_BY_GAME, VALORANT_RANKS, avgRating,
 } from "../lib/demo";
 import { Btn, Field, Input, Overline, Panel, Select } from "../components/arena";
+import { Reveal } from "../components/motion";
 
 const DEFAULT_RANK = { CS2: 1800, "Dota 2": 3000, Valorant: "Diamond" };
 const DEFAULT_NAME = "Night Wolves";
@@ -139,7 +140,7 @@ export function Team() {
         ))}
       </div>
       {list.map((p, i) => (
-        <div className="mb-2" key={i}>
+        <Reveal key={i} index={i} y={10} className="mb-2">
           <div className="grid grid-cols-[24px_1fr_1fr_110px_36px] gap-2 items-center">
             <span className="font-mono text-xs text-[#52525b]">{i + 1}</span>
             <Input value={p.nick} onChange={(e) => setList((l) => l.map((x, idx) => idx === i ? { ...x, nick: e.target.value } : x))} />
@@ -162,7 +163,7 @@ export function Team() {
               className="w-[calc(100%-58px)] ml-[32px] mt-1 bg-void border border-[#27272a] rounded-sm px-2 py-1 text-xs text-[#a1a1aa] placeholder:text-[#3f3f46] focus:outline-none focus:border-cyan transition-colors"
             />
           )}
-        </div>
+        </Reveal>
       ))}
       <Btn size="sm" variant="ghost" disabled={list.length >= max} className="mt-2"
         onClick={() => setList((l) => [...l, { nick: "", role: roles[0], rank: DEFAULT_RANK[discipline] }])}>
