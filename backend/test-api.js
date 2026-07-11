@@ -22,10 +22,15 @@ function ok(cond, label) {
   }
 }
 
+let authToken = null;
+
 async function call(method, path, body) {
   const res = await fetch(`${BASE}${path}`, {
     method,
-    headers: { "Content-Type": "application/json" },
+    headers: {
+      "Content-Type": "application/json",
+      ...(authToken ? { Authorization: `Bearer ${authToken}` } : {}),
+    },
     ...(body !== undefined ? { body: JSON.stringify(body) } : {}),
   });
   let data = null;
@@ -45,6 +50,20 @@ async function main() {
   // Health
   const health = await call("GET", "/api/health");
   ok(health.status === 200 && health.data?.ok === true, "GET /api/health → 200 {ok:true}");
+
+  // Auth: mutating routes require an admin token (see backend/src/auth.js).
+  const login = await call("POST", "/api/auth/login", { username: "Admin", password: "admin" });
+  ok(login.status === 200 && login.data?.token, "POST /api/auth/login (Admin) → 200 with token");
+  authToken = login.data?.token;
+
+  const badLogin = await call("POST", "/api/auth/login", { username: "Admin", password: "wrong" });
+  ok(badLogin.status === 401, "POST /api/auth/login with bad password → 401");
+
+  const unauthed = authToken;
+  authToken = null;
+  const blocked = await call("POST", "/api/teams", { name: "ShouldBeBlocked", discipline: "CS2" });
+  ok(blocked.status === 401, "POST /api/teams without a token → 401");
+  authToken = unauthed;
 
   // --- Teams: happy path ---
   const created = await call("POST", "/api/teams", {

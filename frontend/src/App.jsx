@@ -1,12 +1,15 @@
 import { BrowserRouter, NavLink, Route, Routes, useNavigate, useLocation } from "react-router-dom";
 import { AnimatePresence, motion, MotionConfig } from "framer-motion";
 import { I18nProvider, useI18n } from "./lib/i18n";
+import { AuthProvider, useAuth } from "./lib/auth";
 import { Landing } from "./pages/Landing";
 import { Create } from "./pages/Create";
 import { Team } from "./pages/Team";
 import { Profile } from "./pages/Profile";
 import { Hall } from "./pages/Hall";
 import { Tournament } from "./pages/Tournament";
+import { Login } from "./pages/Login";
+import { Account } from "./pages/Account";
 
 const links = [
   { to: "/", key: "nav.home", end: true },
@@ -37,6 +40,36 @@ function LangSwitch() {
         </button>
       ))}
     </div>
+  );
+}
+
+function AuthLink() {
+  const { t } = useI18n();
+  const { user, isAdmin } = useAuth();
+  if (!user) {
+    return (
+      <NavLink
+        to="/login"
+        data-testid="nav-login"
+        className={({ isActive }) =>
+          `px-3 py-1.5 text-xs font-mono uppercase tracking-widest border rounded-sm transition-colors ${
+            isActive ? "border-cyan text-cyan" : "border-[#27272a] text-[#a1a1aa] hover:text-white hover:border-[#3f3f46]"
+          }`
+        }
+      >
+        {t("auth.signIn")}
+      </NavLink>
+    );
+  }
+  return (
+    <NavLink
+      to="/account"
+      data-testid="nav-account"
+      className="flex items-center gap-2 px-3 py-1.5 text-xs font-mono border border-[#27272a] rounded-sm hover:border-[#3f3f46] transition-colors"
+    >
+      <span className={`w-1.5 h-1.5 rotate-45 ${isAdmin ? "bg-volt" : "bg-cyan"}`} />
+      <span className="text-white">{user.username}</span>
+    </NavLink>
   );
 }
 
@@ -74,6 +107,8 @@ function Header() {
           ))}
         </nav>
         <span className="flex-1" />
+        <AuthLink />
+        <span className="w-2" />
         <LangSwitch />
       </div>
       {/* mobile nav */}
@@ -115,6 +150,8 @@ function AnimatedRoutes() {
           <Route path="/team/:id?" element={<Team />} />
           <Route path="/profile" element={<Profile />} />
           <Route path="/hall" element={<Hall />} />
+          <Route path="/login" element={<Login />} />
+          <Route path="/account" element={<Account />} />
         </Routes>
       </motion.div>
     </AnimatePresence>
@@ -139,11 +176,13 @@ function Shell() {
 export default function App() {
   return (
     <I18nProvider>
-      <MotionConfig reducedMotion="user">
-        <BrowserRouter>
-          <Shell />
-        </BrowserRouter>
-      </MotionConfig>
+      <AuthProvider>
+        <MotionConfig reducedMotion="user">
+          <BrowserRouter>
+            <Shell />
+          </BrowserRouter>
+        </MotionConfig>
+      </AuthProvider>
     </I18nProvider>
   );
 }

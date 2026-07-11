@@ -3,6 +3,7 @@ import { Router } from "express";
 import prisma from "../db.js";
 import { avgRating, DISCIPLINES } from "../rating.js";
 import { asyncHandler, requireFields, requireEnum, HttpError, parseId } from "../http.js";
+import { requireAdmin } from "../auth.js";
 
 const router = Router();
 
@@ -90,6 +91,7 @@ router.get(
 // POST /api/teams → create team + nested players
 router.post(
   "/",
+  requireAdmin,
   asyncHandler(async (req, res) => {
     const { name, discipline, logo, winrate, streak, tournaments, best, players = [] } =
       req.body ?? {};
@@ -126,6 +128,7 @@ router.post(
 // PUT /api/teams/:id → update scalar fields; replace roster if players provided
 router.put(
   "/:id",
+  requireAdmin,
   asyncHandler(async (req, res) => {
     const id = parseId(req.params.id);
     const { name, discipline, logo, winrate, streak, tournaments, best, players } =
@@ -172,6 +175,7 @@ router.put(
 // DELETE /api/teams/:id → 204 (cascade handles TournamentTeam/Player/RatingHistory)
 router.delete(
   "/:id",
+  requireAdmin,
   asyncHandler(async (req, res) => {
     const id = parseId(req.params.id);
     const existing = await prisma.team.findUnique({ where: { id } });

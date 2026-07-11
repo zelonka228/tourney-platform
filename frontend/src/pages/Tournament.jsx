@@ -3,6 +3,7 @@ import { Link, useParams, useNavigate } from "react-router-dom";
 import { AnimatePresence, animate, motion } from "framer-motion";
 import { io } from "socket.io-client";
 import { useI18n } from "../lib/i18n";
+import { useAuth } from "../lib/auth";
 import {
   getTournament, getTournaments, submitMatchScore, generateBracket, deleteTournament,
 } from "../lib/api";
@@ -22,7 +23,7 @@ function useRoundLabel() {
   };
 }
 
-function MatchCard({ m, teamName, openEdit, cardRef, enterScoreLabel, byeLabel }) {
+function MatchCard({ m, teamName, openEdit, cardRef, enterScoreLabel, byeLabel, isAdmin }) {
   const a = teamName(m.teamAId);
   const b = teamName(m.teamBId);
   const isBye = m.status === "bye";
@@ -31,6 +32,7 @@ function MatchCard({ m, teamName, openEdit, cardRef, enterScoreLabel, byeLabel }
     ? (m.teamAId ?? m.teamBId)
     : m.status === "done" ? (m.scoreA > m.scoreB ? m.teamAId : m.teamBId) : null;
   const todo = a && b && m.status === "pending";
+  const clickable = isAdmin && todo;
   const pending = (!a || !b) && !isBye;
 
   return (
@@ -45,9 +47,9 @@ function MatchCard({ m, teamName, openEdit, cardRef, enterScoreLabel, byeLabel }
     // box's layout rect constant throughout, so the wire never drifts.
     <div
       ref={cardRef}
-      onClick={() => openEdit(m)}
+      onClick={clickable ? () => openEdit(m) : undefined}
       className={`w-[220px] bg-surface border rounded-sm overflow-hidden transition-colors ${
-        todo ? "border-cyan cursor-pointer shadow-[0_0_0_1px_#00f0ff]" : "border-[#27272a]"
+        todo ? `border-cyan shadow-[0_0_0_1px_#00f0ff] ${clickable ? "cursor-pointer" : ""}` : "border-[#27272a]"
       } ${pending ? "opacity-45" : ""}`}
       data-testid={`match-card-${m.id}`}
     >
@@ -131,6 +133,7 @@ export function Tournament() {
   const { id } = useParams();
   const nav = useNavigate();
   const { t } = useI18n();
+  const { isAdmin } = useAuth();
   const roundLabel = useRoundLabel();
   const [tournament, setTournament] = useState(null);
   const [notFound, setNotFound] = useState(false);
@@ -293,7 +296,7 @@ export function Tournament() {
   }, [matches, totalRounds]);
 
   function openEdit(m) {
-    if (m.teamAId && m.teamBId && m.status === "pending") {
+    if (isAdmin && m.teamAId && m.teamBId && m.status === "pending") {
       setEdit({ matchId: m.id, a: teamName(m.teamAId), b: teamName(m.teamBId) });
       setScoreError(null);
     }
@@ -334,10 +337,12 @@ export function Tournament() {
           <Overline className="text-cyan">// {tournament.discipline} · BO{bo}{tournament.status === "completed" ? ` · ${t("tour.completed")}` : ""}</Overline>
           <h1 className="font-display font-black text-4xl sm:text-5xl tracking-tighter text-white mt-2">{tournament.name}</h1>
         </div>
-        <div className="text-right">
-          <Btn size="sm" variant="danger" data-testid="tournament-delete-btn" onClick={handleDelete}>{t("tour.delete")}</Btn>
-          {deleteError && <p className="text-[#ff0055] text-xs mt-2 max-w-[220px]">{deleteError}</p>}
-        </div>
+        {isAdmin && (
+          <div className="text-right">
+            <Btn size="sm" variant="danger" data-testid="tournament-delete-btn" onClick={handleDelete}>{t("tour.delete")}</Btn>
+            {deleteError && <p className="text-[#ff0055] text-xs mt-2 max-w-[220px]">{deleteError}</p>}
+          </div>
+        )}
       </div>
 
       <div className="flex gap-1 mt-8 border-b border-[#27272a]">
@@ -354,9 +359,13 @@ export function Tournament() {
           {matches.length === 0 && (
             <Panel clip className="p-6 max-w-md">
               <p className="text-[#a1a1aa] text-sm">{t("tour.notGenerated")}</p>
-              <Btn variant="primary" className="mt-4" data-testid="generate-btn" onClick={handleGenerate} disabled={generating}>
-                {generating ? t("tour.generating") : t("tour.generate")}
-              </Btn>
+              {isAdmin ? (
+                <Btn variant="primary" className="mt-4" data-testid="generate-btn" onClick={handleGenerate} disabled={generating}>
+                  {generating ? t("tour.generating") : t("tour.generate")}
+                </Btn>
+              ) : (
+                <p className="text-[#52525b] text-xs mt-3">{t("auth.signInToEdit")}</p>
+              )}
               {scoreError && <p className="text-[#ff0055] text-sm mt-3">{scoreError}</p>}
             </Panel>
           )}
@@ -368,9 +377,9 @@ export function Tournament() {
               <span className="font-display font-black text-2xl text-white">{champion}</span>
               <span className="ml-auto text-volt text-2xl">★</span>
             </motion.div>
-          ) : (
+          ) : isAdmin ? (
             <p className="text-[#a1a1aa] text-sm mb-6">{t("tour.hint")}</p>
-          ))}
+          ) : null)}
 
           {matches.length > 0 && (
             <div ref={bracketRef} className="relative flex gap-10 overflow-x-auto pb-4 cursor-grab active:cursor-grabbing" data-testid="bracket">
@@ -393,7 +402,7 @@ export function Tournament() {
                     <div className="flex flex-col justify-around gap-4 flex-1">
                       {rm.map((m) => (
                         <MatchCard key={`${m.id}-${m.status}`} m={m} teamName={teamName} openEdit={openEdit}
-                          cardRef={setNodeRef(`m-${m.id}`)}
+                          cardRef={setNodeRef(`m-${m.id}`)} isAdmin={isAdmin}
                           enterScoreLabel={t("tour.enterScore")} byeLabel={t("tour.bye")} />
                       ))}
                     </div>

@@ -10,6 +10,16 @@ datasource db {
   url      = env("DATABASE_URL")
 }
 
+// Two fixed demo accounts (seeded, no self-registration) — "admin" can create/
+// edit/delete teams, tournaments and match scores; "user" is read-only.
+model User {
+  id           Int      @id @default(autoincrement())
+  username     String   @unique
+  passwordHash String
+  role         String // "admin" | "user"
+  createdAt    DateTime @default(now())
+}
+
 model Team {
   id          Int      @id @default(autoincrement())
   name        String   @unique

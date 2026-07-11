@@ -24,11 +24,22 @@ export class ApiError extends Error {
   }
 }
 
+// Той самий ключ, що й lib/auth.jsx використовує для токена в localStorage
+// (не імпортуємо звідти напряму, щоб уникнути циклічної залежності —
+// auth.jsx сам імпортує login/getMe з цього файлу).
+const TOKEN_KEY = "arena_token";
+
 // Обгортка над fetch: на мережевій помилці кидає її як є (фолбек нижче її
 // зловить), а на не-OK відповіді кидає ApiError з повідомленням бекенду.
+// Токен (якщо є) додається автоматично — бекенд ігнорує його на публічних
+// GET-роутах і вимагає лише на мутуючих (create/update/delete).
 async function request(path, options) {
+  const token = localStorage.getItem(TOKEN_KEY);
   const res = await fetch(`${BASE_URL}${path}`, {
-    headers: { "Content-Type": "application/json" },
+    headers: {
+      "Content-Type": "application/json",
+      ...(token ? { Authorization: `Bearer ${token}` } : {}),
+    },
     ...options,
   });
   if (!res.ok) {
@@ -163,6 +174,20 @@ export async function submitMatchScore(matchId, scoreA, scoreB) {
     method: "PUT",
     body: JSON.stringify({ scoreA, scoreB }),
   });
+}
+
+// --- Автентифікація ---
+
+// Без demo-фолбеку — логін без бекенду не має сенсу, помилка має дійти до UI.
+export async function login(username, password) {
+  return request("/api/auth/login", {
+    method: "POST",
+    body: JSON.stringify({ username, password }),
+  });
+}
+
+export async function getMe() {
+  return request("/api/auth/me");
 }
 
 // --- Гравці ---

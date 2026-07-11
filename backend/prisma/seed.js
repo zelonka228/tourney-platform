@@ -1,8 +1,16 @@
 // Seed script: clears existing rows and inserts the 8 demo teams (with players).
 // Source data mirrors frontend/src/lib/demo.js TEAMS. Player.rank stored as String.
 import { PrismaClient } from "@prisma/client";
+import bcrypt from "bcryptjs";
 
 const prisma = new PrismaClient();
+
+// Two fixed demo accounts — deliberately simple passwords for a learning
+// project with no self-registration, not meant to gate anything sensitive.
+const USERS = [
+  { username: "Admin", password: "admin", role: "admin" },
+  { username: "User", password: "user", role: "user" },
+];
 
 // Пробні лого команд — inline SVG data URI (квадрат з ініціалами), той самий
 // формат data URL, що продукує завантаження лого через Team.jsx (canvas →
@@ -156,6 +164,13 @@ async function main() {
   await prisma.player.deleteMany();
   await prisma.tournament.deleteMany();
   await prisma.team.deleteMany();
+  await prisma.user.deleteMany();
+
+  for (const u of USERS) {
+    await prisma.user.create({
+      data: { username: u.username, role: u.role, passwordHash: await bcrypt.hash(u.password, 10) },
+    });
+  }
 
   for (const t of TEAMS) {
     await prisma.team.create({
@@ -180,7 +195,7 @@ async function main() {
   }
 
   const count = await prisma.team.count();
-  console.log(`Seeded ${count} teams.`);
+  console.log(`Seeded ${count} teams and ${USERS.length} users.`);
 }
 
 main()

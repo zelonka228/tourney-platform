@@ -5,6 +5,7 @@ import { DISCIPLINES } from "../rating.js";
 import { buildBracketRows } from "../bracket.js";
 import { resolveByes } from "../advance.js";
 import { asyncHandler, requireFields, requireEnum, HttpError, parseId } from "../http.js";
+import { requireAdmin } from "../auth.js";
 
 const router = Router();
 
@@ -44,6 +45,7 @@ router.get(
 // (single elimination only) immediately generate the Match bracket in the same call.
 router.post(
   "/",
+  requireAdmin,
   asyncHandler(async (req, res) => {
     const { name, discipline, bracketType, matchFormat, teamIds } = req.body ?? {};
 
@@ -90,6 +92,7 @@ router.post(
 // already registered via /register (for when teamIds weren't supplied at creation).
 router.post(
   "/:id/generate-bracket",
+  requireAdmin,
   asyncHandler(async (req, res) => {
     const id = parseId(req.params.id);
     const tournament = await prisma.tournament.findUnique({
@@ -124,6 +127,7 @@ router.post(
 // PUT /api/tournaments/:id → update scalar fields (name, status, date, matchFormat, ...)
 router.put(
   "/:id",
+  requireAdmin,
   asyncHandler(async (req, res) => {
     const id = parseId(req.params.id);
     const { name, discipline, bracketType, matchFormat, status, date } = req.body ?? {};
@@ -156,6 +160,7 @@ router.put(
 // DELETE /api/tournaments/:id → 204 (cascade removes teams/matches)
 router.delete(
   "/:id",
+  requireAdmin,
   asyncHandler(async (req, res) => {
     const id = parseId(req.params.id);
     const existing = await prisma.tournament.findUnique({ where: { id } });
@@ -168,6 +173,7 @@ router.delete(
 // POST /api/tournaments/:id/register → register a team (seed = count + 1)
 router.post(
   "/:id/register",
+  requireAdmin,
   asyncHandler(async (req, res) => {
     const id = parseId(req.params.id);
     const { teamId } = req.body ?? {};

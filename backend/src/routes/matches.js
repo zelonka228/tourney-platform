@@ -5,6 +5,7 @@ import { isValidScore } from "../bracket.js";
 import { advanceWinner } from "../advance.js";
 import { avgRating } from "../rating.js";
 import { asyncHandler, requireFields, HttpError, parseId } from "../http.js";
+import { requireAdmin } from "../auth.js";
 
 const router = Router();
 
@@ -16,6 +17,7 @@ const router = Router();
 // champion's stats.
 router.put(
   "/:id/score",
+  requireAdmin,
   asyncHandler(async (req, res) => {
     const id = parseId(req.params.id);
     const { scoreA, scoreB } = req.body ?? {};

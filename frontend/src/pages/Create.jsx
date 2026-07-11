@@ -1,7 +1,8 @@
 import { useEffect, useState } from "react";
-import { useNavigate } from "react-router-dom";
+import { Link, useNavigate } from "react-router-dom";
 import { motion } from "framer-motion";
 import { useI18n } from "../lib/i18n";
+import { useAuth } from "../lib/auth";
 import { getTeams, createTournament } from "../lib/api";
 import { bracketPlan, BEST_OF, winTarget, DISCIPLINE_LIST, avgRating } from "../lib/demo";
 import { Btn, Field, Input, Overline, Panel, Select } from "../components/arena";
@@ -37,6 +38,7 @@ function seedTeamIds(ids, allTeams, seedType) {
 export function Create() {
   const nav = useNavigate();
   const { t } = useI18n();
+  const { isAdmin } = useAuth();
   const [name, setName] = useState("LAN Cup");
   const [bracket, setBracket] = useState("single");
   const [bo, setBo] = useState(3);
@@ -82,6 +84,23 @@ export function Create() {
       setError(e.message);
       setSubmitting(false);
     }
+  }
+
+  if (!isAdmin) {
+    return (
+      <div className="py-10" data-testid="create-admin-only">
+        <Overline className="text-cyan">// {t("nav.create")}</Overline>
+        <h1 className="font-display font-black text-4xl sm:text-5xl tracking-tighter text-white mt-3">
+          {t("create.title")}
+        </h1>
+        <Panel clip className="p-6 mt-8 max-w-md">
+          <p className="text-[#a1a1aa] text-sm">{t("auth.adminOnly")}</p>
+          <Link to="/login" className="block mt-4 text-cyan text-sm hover:underline">
+            {t("auth.signInToEdit")}
+          </Link>
+        </Panel>
+      </div>
+    );
   }
 
   return (

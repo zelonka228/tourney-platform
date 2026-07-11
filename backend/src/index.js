@@ -10,6 +10,8 @@ import teamsRouter from "./routes/teams.js";
 import tournamentsRouter from "./routes/tournaments.js";
 import matchesRouter from "./routes/matches.js";
 import playersRouter from "./routes/players.js";
+import authRouter from "./routes/auth.js";
+import { attachUser } from "./auth.js";
 import { notFound, errorHandler } from "./http.js";
 
 const app = express();
@@ -18,9 +20,11 @@ app.use(cors());
 // include a base64 logo (frontend allows data URLs up to ~300kb after JPEG
 // compression), which silently failed every save with an unhelpful 500.
 app.use(express.json({ limit: "1mb" }));
+app.use(attachUser);
 
 // --- REST API ---
 app.get("/api/health", (_req, res) => res.json({ ok: true }));
+app.use("/api/auth", authRouter);
 app.use("/api/teams", teamsRouter);
 app.use("/api/tournaments", tournamentsRouter);
 app.use("/api/matches", matchesRouter);

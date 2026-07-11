@@ -1,6 +1,7 @@
 import { useEffect, useState } from "react";
 import { useNavigate, useParams, Link } from "react-router-dom";
 import { useI18n } from "../lib/i18n";
+import { useAuth } from "../lib/auth";
 import { getTeam, createTeam, updateTeam } from "../lib/api";
 import {
   DISCIPLINE_LIST, DISCIPLINES, ROLES_BY_GAME, VALORANT_RANKS, avgRating,
@@ -49,6 +50,7 @@ export function Team() {
   const nav = useNavigate();
   const { id } = useParams();
   const { t } = useI18n();
+  const { isAdmin } = useAuth();
   const [discipline, setDiscipline] = useState(DEFAULT_DISCIPLINE);
   const [name, setName] = useState(DEFAULT_NAME);
   const [logo, setLogo] = useState(null);
@@ -178,6 +180,23 @@ export function Team() {
           {t("team.notFound")}{" "}
           <Link to="/profile" className="text-cyan hover:underline">{t("team.allTeams")}</Link>
         </p>
+      </div>
+    );
+  }
+
+  if (!isAdmin) {
+    return (
+      <div className="py-10" data-testid="team-admin-only">
+        <Overline className="text-cyan">// {t("nav.team")}</Overline>
+        <h1 className="font-display font-black text-4xl sm:text-5xl tracking-tighter text-white mt-3">
+          {t("team.title")}
+        </h1>
+        <Panel clip className="p-6 mt-8 max-w-md">
+          <p className="text-[#a1a1aa] text-sm">{t("auth.adminOnly")}</p>
+          <Link to="/login" className="block mt-4 text-cyan text-sm hover:underline">
+            {t("auth.signInToEdit")}
+          </Link>
+        </Panel>
       </div>
     );
   }
