@@ -45,10 +45,11 @@ model Player {
   rank         String // stored as text: "2510" for CS2/Dota, "Immortal" for Valorant
   isSubstitute Boolean @default(false)
 
-  // Optional link to an external profile (FACEIT nickname/URL for CS2, Steam
-  // profile URL for Dota 2, Riot ID "Name#Tag" for Valorant) used to fetch
-  // live stats. externalStats/externalStatsAt cache the last successful
-  // fetch so the widget doesn't hit the third-party API on every open.
+  // Optional link to an external profile (FACEIT nickname/URL for CS2, Riot
+  // ID "Name#Tag" for Valorant — no integration for Dota 2, see rank above)
+  // used to fetch live stats. externalStats/externalStatsAt cache the last
+  // successful fetch so the widget doesn't hit the third-party API on every
+  // open.
   externalRef       String?
   externalStats     String? // JSON-stringified stats payload
   externalStatsAt   DateTime?

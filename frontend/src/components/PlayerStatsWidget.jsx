@@ -6,8 +6,9 @@ import { Panel } from "./arena";
 // FACEIT/tracker.gg-style "mini profile" card — fetched lazily when a
 // player row is expanded (see Profile.jsx). `status` is "loading" | "error"
 // | "ready"; the fields available in `data.stats` vary by discipline (e.g.
-// Valorant has no reliable K/D source, Dota has no numeric MMR), so every
-// stat cell is conditionally rendered instead of assuming a fixed shape.
+// Valorant has no reliable K/D source), so every stat cell is conditionally
+// rendered instead of assuming a fixed shape. Dota 2 has no integration at
+// all (Valve hides numeric MMR) — its roster uses manual entry only.
 export function PlayerStatsWidget({ status, data, error, onRetry }) {
   const { t } = useI18n();
   const [avatarFailed, setAvatarFailed] = useState(false);

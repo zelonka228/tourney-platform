@@ -20,7 +20,7 @@ const defaultPlayers = () => [
 ];
 const defaultSubs = () => [{ nick: "spare1", role: "Support", rank: 1800 }];
 const fromDbRank = (d, rank) => (DISCIPLINES[d].kind === "rank" ? rank : Number(rank));
-const LINK_HINT_KEY = { CS2: "team.link.cs2", "Dota 2": "team.link.dota", Valorant: "team.link.valorant" };
+const LINK_HINT_KEY = { CS2: "team.link.cs2", Valorant: "team.link.valorant" };
 
 const LOGO_SIZE = 256;
 const LOGO_MAX_BYTES = 300 * 1024;
@@ -152,14 +152,16 @@ export function Team() {
               className="h-[42px] border border-[#27272a] rounded-sm text-[#a1a1aa] hover:border-[#ff0055] hover:text-[#ff0055] transition-colors"
             >×</button>
           </div>
-          <input
-            type="text"
-            value={p.externalRef ?? ""}
-            data-testid={`player-external-ref-${i}`}
-            onChange={(e) => setList((l) => l.map((x, idx) => idx === i ? { ...x, externalRef: e.target.value } : x))}
-            placeholder={t(LINK_HINT_KEY[discipline])}
-            className="w-[calc(100%-58px)] ml-[32px] mt-1 bg-void border border-[#27272a] rounded-sm px-2 py-1 text-xs text-[#a1a1aa] placeholder:text-[#3f3f46] focus:outline-none focus:border-cyan transition-colors"
-          />
+          {LINK_HINT_KEY[discipline] && (
+            <input
+              type="text"
+              value={p.externalRef ?? ""}
+              data-testid={`player-external-ref-${i}`}
+              onChange={(e) => setList((l) => l.map((x, idx) => idx === i ? { ...x, externalRef: e.target.value } : x))}
+              placeholder={t(LINK_HINT_KEY[discipline])}
+              className="w-[calc(100%-58px)] ml-[32px] mt-1 bg-void border border-[#27272a] rounded-sm px-2 py-1 text-xs text-[#a1a1aa] placeholder:text-[#3f3f46] focus:outline-none focus:border-cyan transition-colors"
+            />
+          )}
         </div>
       ))}
       <Btn size="sm" variant="ghost" disabled={list.length >= max} className="mt-2"

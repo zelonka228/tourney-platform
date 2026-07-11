@@ -1,4 +1,4 @@
-// Players API — external stats widget (FACEIT/OpenDota/Valorant lookup).
+// Players API — external stats widget (FACEIT/Valorant lookup).
 import { Router } from "express";
 import prisma from "../db.js";
 import { asyncHandler, HttpError, parseId } from "../http.js";
