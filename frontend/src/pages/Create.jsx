@@ -4,7 +4,7 @@ import { motion } from "framer-motion";
 import { useI18n } from "../lib/i18n";
 import { useAuth } from "../lib/auth";
 import { getTeams, createTournament } from "../lib/api";
-import { bracketPlan, BEST_OF, winTarget, DISCIPLINE_LIST, avgRating } from "../lib/demo";
+import { bracketPlan, BEST_OF, winTarget, DISCIPLINE_LIST, avgRating, effectivePlayerRank } from "../lib/demo";
 import { Btn, Field, Input, Overline, Panel, Select } from "../components/arena";
 
 function shuffled(arr) {
@@ -26,8 +26,10 @@ function seedTeamIds(ids, allTeams, seedType) {
     const ratingOf = (id) => {
       const t = byId.get(id);
       return (
-        avgRating(t.discipline, t.players.filter((p) => !p.isSubstitute).map((p) => p.rank)).value ??
-        -Infinity
+        avgRating(
+          t.discipline,
+          t.players.filter((p) => !p.isSubstitute).map((p) => effectivePlayerRank(t.discipline, p))
+        ).value ?? -Infinity
       );
     };
     return [...ids].sort((a, b) => ratingOf(b) - ratingOf(a));

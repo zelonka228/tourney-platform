@@ -90,6 +90,26 @@ export function avgRating(discipline, ranks) {
   return { value: avg, label: String(avg), unit: def.unit, unitKey: def.unitKey };
 }
 
+// If a player has a linked FACEIT profile and we already have its cached
+// stats, their live FACEIT ELO is the same unit as our internal CS2 rank
+// field — use it instead of the manually-entered value so the roster row
+// and the average rating don't silently drift from what the widget shows.
+// Only CS2 qualifies: OpenDota never exposes a numeric MMR (only a medal
+// tier, a different scale) and HenrikDev's RR isn't the same thing as our
+// internal Valorant rank name — substituting either would corrupt the
+// average instead of fixing it.
+export function effectivePlayerRank(discipline, player) {
+  if (discipline === "CS2" && player.externalStats) {
+    try {
+      const parsed = JSON.parse(player.externalStats);
+      if (parsed.eloOrMmr != null) return parsed.eloOrMmr;
+    } catch {
+      // Malformed cache — fall through to the manual rank.
+    }
+  }
+  return player.rank;
+}
+
 // Демо-команди для м'якого фолбеку в lib/api.js, коли бекенд недоступний.
 export const TEAMS = [
   {

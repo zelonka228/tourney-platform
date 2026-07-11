@@ -2,7 +2,7 @@ import { useEffect, useState } from "react";
 import { motion } from "framer-motion";
 import { useI18n } from "../lib/i18n";
 import { getTeams } from "../lib/api";
-import { avgRating } from "../lib/demo";
+import { avgRating, effectivePlayerRank } from "../lib/demo";
 import { Overline } from "../components/arena";
 
 const TABS = ["all", "CS2", "Dota 2", "Valorant"];
@@ -19,7 +19,12 @@ export function Hall() {
   const rows = teams
     .map((tm) => {
       // Рейтинг — середнє лише основного складу, підстави не враховуються.
-      const r = avgRating(tm.discipline, tm.players.filter((p) => !p.isSubstitute).map((p) => p.rank));
+      // effectivePlayerRank підміняє на живий FACEIT ELO для CS2, якщо він
+      // вже закешований (без зайвого фетчу тут — просто те, що вже є).
+      const r = avgRating(
+        tm.discipline,
+        tm.players.filter((p) => !p.isSubstitute).map((p) => effectivePlayerRank(tm.discipline, p))
+      );
       return {
         id: tm.id,
         name: tm.name,

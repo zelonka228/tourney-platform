@@ -3,7 +3,7 @@ import { Link } from "react-router-dom";
 import { motion } from "framer-motion";
 import { useI18n } from "../lib/i18n";
 import { getTeams, getPlayerStats } from "../lib/api";
-import { avgRating, DISCIPLINES } from "../lib/demo";
+import { avgRating, effectivePlayerRank, DISCIPLINES } from "../lib/demo";
 import { Btn, Overline, Panel, Stat } from "../components/arena";
 import { PlayerStatsWidget } from "../components/PlayerStatsWidget";
 
@@ -11,6 +11,14 @@ export function Profile() {
   const { t } = useI18n();
   const [sel, setSel] = useState(null);
   const [teams, setTeams] = useState([]);
+  // PlayerRow eager-fetches live FACEIT ELO for CS2-linked players on mount
+  // (not just on click) and reports it up here via onLiveElo, so the team
+  // average updates to the freshest value instead of only the DB-cached one
+  // from the last time someone opened that player's widget. Declared here
+  // (not after the list/detail branch below) — conditionally calling
+  // useState only on the detail render broke the Rules of Hooks and crashed
+  // the whole page on switching from the team list to a team's detail view.
+  const [liveElo, setLiveElo] = useState({});
 
   useEffect(() => {
     getTeams().then(setTeams);
@@ -26,7 +34,12 @@ export function Profile() {
         <div className="grid sm:grid-cols-2 lg:grid-cols-3 gap-4 mt-8">
           {teams.map((team, i) => {
             // Рейтинг — середнє лише основного складу, підстави не враховуються.
-            const r = avgRating(team.discipline, team.players.filter((p) => !p.isSubstitute).map((p) => p.rank));
+            // Для CS2-гравців з прив'язаним FACEIT — живий ELO замість
+            // застарілого вручну введеного значення (з кешу останнього фетчу).
+            const r = avgRating(
+              team.discipline,
+              team.players.filter((p) => !p.isSubstitute).map((p) => effectivePlayerRank(team.discipline, p))
+            );
             return (
               <motion.button
                 key={team.id}
@@ -57,8 +70,9 @@ export function Profile() {
 
   const team = teams[sel];
   const mainPlayers = team.players.filter((p) => !p.isSubstitute);
-  const rating = avgRating(team.discipline, mainPlayers.map((p) => p.rank));
   const unit = t(`unit.${DISCIPLINES[team.discipline].unitKey}`);
+  const rankFor = (p) => liveElo[p.id] ?? effectivePlayerRank(team.discipline, p);
+  const rating = avgRating(team.discipline, mainPlayers.map(rankFor));
 
   return (
     <div className="py-10" data-testid="profile-detail">
@@ -96,7 +110,12 @@ export function Profile() {
             <Overline>{t("profile.roster")} · {unit}</Overline>
             <div className="mt-3 divide-y divide-[#27272a]/60">
               {mainPlayers.map((p, i) => (
-                <PlayerRow key={p.id ?? `${p.nick}-${i}`} p={p} />
+                <PlayerRow
+                  key={p.id ?? `${p.nick}-${i}`}
+                  p={p}
+                  discipline={team.discipline}
+                  onLiveElo={(elo) => setLiveElo((prev) => ({ ...prev, [p.id]: elo }))}
+                />
               ))}
             </div>
             {team.players.some((p) => p.isSubstitute) && (
@@ -106,7 +125,7 @@ export function Profile() {
                   {team.players
                     .filter((p) => p.isSubstitute)
                     .map((p, i) => (
-                      <PlayerRow key={p.id ?? `sub-${p.nick}-${i}`} p={p} />
+                      <PlayerRow key={p.id ?? `sub-${p.nick}-${i}`} p={p} discipline={team.discipline} />
                     ))}
                 </div>
               </>
@@ -143,16 +162,21 @@ export function Profile() {
 }
 
 // Clicking a player with a linked external profile expands a "mini profile"
-// widget below the row (FACEIT/tracker.gg-style). Fetched lazily on first
-// expand and cached in this component's state — collapsing/re-expanding
-// doesn't refetch (backend already caches for an hour anyway).
-function PlayerRow({ p }) {
+// widget below the row (FACEIT/tracker.gg-style). For CS2 specifically, the
+// fetch also happens eagerly on mount (not just on click) — the displayed
+// rank number for a FACEIT-linked player is that live ELO, not the
+// manually-entered rank, and it needs to be correct even before anyone
+// expands the widget. Other disciplines stay fully lazy (their live stats
+// don't feed the rank number, see effectivePlayerRank in lib/demo.js — no
+// point spending an API call before the user asks to see it).
+function PlayerRow({ p, discipline, onLiveElo }) {
   const { t } = useI18n();
   const [open, setOpen] = useState(false);
   const [status, setStatus] = useState("idle"); // idle | loading | ready | error
   const [data, setData] = useState(null);
   const [error, setError] = useState(null);
   const clickable = Boolean(p.externalRef);
+  const isCs2 = discipline === "CS2";
 
   function load(refresh = false) {
     setStatus("loading");
@@ -161,6 +185,7 @@ function PlayerRow({ p }) {
       .then((res) => {
         setData(res);
         setStatus("ready");
+        if (res.eloOrMmr != null) onLiveElo?.(res.eloOrMmr);
       })
       .catch((err) => {
         setError(err.message ?? String(err));
@@ -168,12 +193,19 @@ function PlayerRow({ p }) {
       });
   }
 
+  useEffect(() => {
+    if (clickable && isCs2 && status === "idle") load();
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
+
   function toggle() {
     if (!clickable) return;
     const next = !open;
     setOpen(next);
     if (next && status === "idle") load();
   }
+
+  const displayRank = isCs2 && data?.eloOrMmr != null ? data.eloOrMmr : p.rank;
 
   return (
     <div className="py-2.5">
@@ -192,7 +224,7 @@ function PlayerRow({ p }) {
           </div>
           <div className="text-[11px] font-mono text-[#a1a1aa]">{p.role}</div>
         </div>
-        <span className="ml-auto font-mono text-sm text-cyan">{p.rank}</span>
+        <span className="ml-auto font-mono text-sm text-cyan">{displayRank}</span>
         {clickable && (
           <span className={`text-[#52525b] text-xs transition-transform ${open ? "rotate-180" : ""}`}>▾</span>
         )}
