@@ -113,6 +113,7 @@ router.post(
             role: p.role,
             rank: p.rank,
             isSubstitute: p.isSubstitute ?? false,
+            externalRef: p.externalRef || null,
           })),
         },
       },
@@ -154,6 +155,7 @@ router.put(
           role: p.role,
           rank: p.rank,
           isSubstitute: p.isSubstitute ?? false,
+          externalRef: p.externalRef || null,
         })),
       };
     }

@@ -78,6 +78,9 @@ const DICT = {
     "team.save": "Зберегти команду",
     "team.col.nick": "Нік",
     "team.col.role": "Роль",
+    "team.link.cs2": "FACEIT: посилання на профіль або нік (необов'язково)",
+    "team.link.dota": "Steam: steamcommunity.com/profiles/<цифри> (необов'язково)",
+    "team.link.valorant": "Riot ID: Ім'я#Тег (необов'язково)",
     "team.notFound": "Команду не знайдено.",
     "team.allTeams": "Усі команди →",
 
@@ -95,6 +98,13 @@ const DICT = {
     "profile.rating": "Рейтинг команди",
     "profile.rarity": "Рідкість картки",
     "profile.ratingDesc": "Рейтинг рахується в одиниці дисципліни: CS2 — FACEIT ELO, Dota 2 — MMR, Valorant — звання. Команди порівнюються в межах однієї гри.",
+
+    "widget.loading": "Завантаження статистики…",
+    "widget.viewProfile": "Повний профіль →",
+    "widget.stale": "Дані застарілі, показано останню відому статистику.",
+    "widget.noRef": "Немає посилання на зовнішній профіль.",
+    "widget.retry": "Спробувати ще раз",
+    "widget.refresh": "Оновити",
 
     "hall.title": "Загальний рейтинг",
     "hall.all": "Усі",
@@ -215,6 +225,9 @@ const DICT = {
     "team.save": "Save team",
     "team.col.nick": "Nick",
     "team.col.role": "Role",
+    "team.link.cs2": "FACEIT: profile link or nickname (optional)",
+    "team.link.dota": "Steam: steamcommunity.com/profiles/<digits> (optional)",
+    "team.link.valorant": "Riot ID: Name#Tag (optional)",
     "team.notFound": "Team not found.",
     "team.allTeams": "All teams →",
 
@@ -232,6 +245,13 @@ const DICT = {
     "profile.rating": "Team rating",
     "profile.rarity": "Card rarity",
     "profile.ratingDesc": "Rating is measured in each game's own unit: CS2 — FACEIT ELO, Dota 2 — MMR, Valorant — rank. Teams are compared within one game.",
+
+    "widget.loading": "Loading stats…",
+    "widget.viewProfile": "Full profile →",
+    "widget.stale": "Data is stale, showing the last known stats.",
+    "widget.noRef": "No linked external profile.",
+    "widget.retry": "Try again",
+    "widget.refresh": "Refresh",
 
     "hall.title": "Global rating",
     "hall.all": "All",

@@ -165,6 +165,14 @@ export async function submitMatchScore(matchId, scoreA, scoreB) {
   });
 }
 
+// --- Гравці ---
+
+// Без demo-фолбеку, як і submitMatchScore — без бекенду немає що показувати,
+// виклик має впасти явно, щоб UI показав помилку замість фейкових даних.
+export async function getPlayerStats(id, { refresh = false } = {}) {
+  return request(`/api/players/${id}/stats${refresh ? "?refresh=1" : ""}`);
+}
+
 // --- Рейтинг ---
 
 export async function getTeamRating(id) {

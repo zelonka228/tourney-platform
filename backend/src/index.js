@@ -9,6 +9,7 @@ import { Server } from "socket.io";
 import teamsRouter from "./routes/teams.js";
 import tournamentsRouter from "./routes/tournaments.js";
 import matchesRouter from "./routes/matches.js";
+import playersRouter from "./routes/players.js";
 import { notFound, errorHandler } from "./http.js";
 
 const app = express();
@@ -23,6 +24,7 @@ app.get("/api/health", (_req, res) => res.json({ ok: true }));
 app.use("/api/teams", teamsRouter);
 app.use("/api/tournaments", tournamentsRouter);
 app.use("/api/matches", matchesRouter);
+app.use("/api/players", playersRouter);
 
 // Unmatched routes → 404, then the central error handler (must be last).
 app.use(notFound);

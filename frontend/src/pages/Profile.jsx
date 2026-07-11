@@ -2,9 +2,10 @@ import { useEffect, useState } from "react";
 import { Link } from "react-router-dom";
 import { motion } from "framer-motion";
 import { useI18n } from "../lib/i18n";
-import { getTeams } from "../lib/api";
+import { getTeams, getPlayerStats } from "../lib/api";
 import { avgRating, DISCIPLINES } from "../lib/demo";
 import { Btn, Overline, Panel, Stat } from "../components/arena";
+import { PlayerStatsWidget } from "../components/PlayerStatsWidget";
 
 export function Profile() {
   const { t } = useI18n();
@@ -141,15 +142,69 @@ export function Profile() {
   );
 }
 
+// Clicking a player with a linked external profile expands a "mini profile"
+// widget below the row (FACEIT/tracker.gg-style). Fetched lazily on first
+// expand and cached in this component's state — collapsing/re-expanding
+// doesn't refetch (backend already caches for an hour anyway).
 function PlayerRow({ p }) {
+  const { t } = useI18n();
+  const [open, setOpen] = useState(false);
+  const [status, setStatus] = useState("idle"); // idle | loading | ready | error
+  const [data, setData] = useState(null);
+  const [error, setError] = useState(null);
+  const clickable = Boolean(p.externalRef);
+
+  function load(refresh = false) {
+    setStatus("loading");
+    setError(null);
+    getPlayerStats(p.id, { refresh })
+      .then((res) => {
+        setData(res);
+        setStatus("ready");
+      })
+      .catch((err) => {
+        setError(err.message ?? String(err));
+        setStatus("error");
+      });
+  }
+
+  function toggle() {
+    if (!clickable) return;
+    const next = !open;
+    setOpen(next);
+    if (next && status === "idle") load();
+  }
+
   return (
-    <div className="flex items-center gap-3 py-2.5">
-      <span className="w-1.5 h-1.5 bg-cyan/60 rotate-45 shrink-0" />
-      <div className="min-w-0">
-        <div className="text-sm text-white truncate">{p.nick}</div>
-        <div className="text-[11px] font-mono text-[#a1a1aa]">{p.role}</div>
+    <div className="py-2.5">
+      <div
+        role={clickable ? "button" : undefined}
+        onClick={toggle}
+        data-testid={`player-row-${p.id}`}
+        className={`flex items-center gap-3 ${clickable ? "cursor-pointer group" : ""}`}
+      >
+        <span
+          className={`w-1.5 h-1.5 rotate-45 shrink-0 ${clickable ? "bg-cyan group-hover:shadow-[0_0_6px_#00f0ff]" : "bg-cyan/60"}`}
+        />
+        <div className="min-w-0">
+          <div className={`text-sm truncate ${clickable ? "text-white group-hover:text-cyan transition-colors" : "text-white"}`}>
+            {p.nick}
+          </div>
+          <div className="text-[11px] font-mono text-[#a1a1aa]">{p.role}</div>
+        </div>
+        <span className="ml-auto font-mono text-sm text-cyan">{p.rank}</span>
+        {clickable && (
+          <span className={`text-[#52525b] text-xs transition-transform ${open ? "rotate-180" : ""}`}>▾</span>
+        )}
       </div>
-      <span className="ml-auto font-mono text-sm text-cyan">{p.rank}</span>
+      {open && (
+        <PlayerStatsWidget
+          status={status === "ready" ? "ready" : status}
+          data={data}
+          error={error}
+          onRetry={() => load()}
+        />
+      )}
     </div>
   );
 }
