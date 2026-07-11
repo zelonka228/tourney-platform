@@ -50,7 +50,14 @@ async function fetchMmrAnyRegion(name, tag) {
 
 export async function fetchValorantStats(rawRef) {
   const { name, tag } = parseValorantRef(rawRef);
-  const body = await fetchMmrAnyRegion(name, tag);
+  // Riot's API has no face photo for Valorant — `card.small` is the player
+  // card art, which is what trackers show in place of an avatar. Best-effort:
+  // a failure here (rate limit, transient error) shouldn't sink the whole
+  // widget, so it's fetched alongside the MMR call and just left blank.
+  const [body, account] = await Promise.all([
+    fetchMmrAnyRegion(name, tag),
+    call(`/valorant/v1/account/${encodeURIComponent(name)}/${encodeURIComponent(tag)}`).catch(() => null),
+  ]);
   const data = body?.data;
   if (!data) throw new IntegrationError(404, "Гравця не знайдено.");
 
@@ -65,7 +72,7 @@ export async function fetchValorantStats(rawRef) {
   return {
     provider: "valorant",
     displayName: `${name}#${tag}`,
-    avatar: null,
+    avatar: account?.data?.card?.small ?? null,
     profileUrl: `https://tracker.gg/valorant/profile/riot/${encodeURIComponent(`${name}#${tag}`)}/overview`,
     rank: { label: data.current?.tier?.name ?? "—", value: data.current?.tier?.id ?? null },
     eloOrMmr: data.current?.rr ?? null,
