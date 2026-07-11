@@ -185,7 +185,12 @@ function PlayerRow({ p, discipline, onLiveElo }) {
       .then((res) => {
         setData(res);
         setStatus("ready");
-        if (res.eloOrMmr != null) onLiveElo?.(res.eloOrMmr);
+        // Live-elo substitution is CS2-only by design (see effectivePlayerRank
+        // in lib/demo.js) — for Valorant, eloOrMmr is RR (a plain number),
+        // not a VALORANT_RANKS index, so feeding it into the team rating
+        // here would corrupt the rank display (e.g. RR 0 read as index 0 →
+        // "Iron", regardless of the player's actual rank).
+        if (isCs2 && res.eloOrMmr != null) onLiveElo?.(res.eloOrMmr);
       })
       .catch((err) => {
         setError(err.message ?? String(err));
