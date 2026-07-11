@@ -11,16 +11,16 @@ export function Profile() {
   const { t } = useI18n();
   const [sel, setSel] = useState(null);
   const [teams, setTeams] = useState([]);
-  // PlayerRow eager-fetches live FACEIT ELO for CS2-linked players on mount
-  // (not just on click); Valorant is lazy (only on click, see PlayerRow).
-  // Either way, once fresh stats come back they're reported up here via
-  // onLiveElo (already converted to our internal unit by liveRankFromStats)
-  // so the team average updates to the freshest value instead of only the
-  // DB-cached one from the last time someone opened that player's widget.
-  // Declared here (not after the list/detail branch below) — conditionally
-  // calling useState only on the detail render broke the Rules of Hooks and
-  // crashed the whole page on switching from the team list to a team's
-  // detail view.
+  // PlayerRow eager-fetches live stats for any linked player on mount (not
+  // just on click, see PlayerRow) so the roster row shows the real rank
+  // right away instead of a stale manually-entered one. Once fresh stats
+  // come back they're reported up here via onLiveElo (already converted to
+  // our internal unit by liveRankFromStats) so the team average updates to
+  // the freshest value too, not only the DB-cached one from the last time
+  // someone opened that player's widget. Declared here (not after the
+  // list/detail branch below) — conditionally calling useState only on the
+  // detail render broke the Rules of Hooks and crashed the whole page on
+  // switching from the team list to a team's detail view.
   const [liveElo, setLiveElo] = useState({});
 
   useEffect(() => {
@@ -165,16 +165,17 @@ export function Profile() {
 }
 
 // Clicking a player with a linked external profile expands a "mini profile"
-// widget below the row (FACEIT/tracker.gg-style). For CS2 specifically, the
-// fetch also happens eagerly on mount (not just on click) — the displayed
-// rank number for a FACEIT-linked player is that live ELO, not the
-// manually-entered rank, and it needs to be correct even before anyone
-// expands the widget. Valorant stays lazy (only fetches once the widget is
-// opened) but, once it has, also substitutes the live rank the same way —
-// see liveRankFromStats in lib/demo.js, which converts each discipline's
-// raw payload (FACEIT ELO number / HenrikDev tier name) into our internal
-// unit, or returns null when it can't (e.g. Valorant "Unrated" has no
-// mapping — the manually-entered rank stays authoritative in that case).
+// widget below the row (FACEIT/tracker.gg-style). The fetch also happens
+// eagerly on mount (not just on click) for every linked player, not only
+// CS2 — the displayed rank next to the name is the live one (FACEIT ELO /
+// HenrikDev tier), not the manually-entered rank, and it needs to be
+// correct even before anyone expands the widget (a Valorant row showing a
+// stale "Diamond" until clicked, when the account is actually Radiant, was
+// confusing). See liveRankFromStats in lib/demo.js, which converts each
+// discipline's raw payload into our internal unit, or returns null when it
+// can't (e.g. Valorant "Unrated" has no mapping — the manually-entered rank
+// stays authoritative in that case, and the eager fetch here doesn't change
+// that).
 function PlayerRow({ p, discipline, onLiveElo }) {
   const { t } = useI18n();
   const [open, setOpen] = useState(false);
@@ -182,7 +183,6 @@ function PlayerRow({ p, discipline, onLiveElo }) {
   const [data, setData] = useState(null);
   const [error, setError] = useState(null);
   const clickable = Boolean(p.externalRef);
-  const isCs2 = discipline === "CS2";
 
   function load(refresh = false) {
     setStatus("loading");
@@ -201,7 +201,7 @@ function PlayerRow({ p, discipline, onLiveElo }) {
   }
 
   useEffect(() => {
-    if (clickable && isCs2 && status === "idle") load();
+    if (clickable && status === "idle") load();
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
