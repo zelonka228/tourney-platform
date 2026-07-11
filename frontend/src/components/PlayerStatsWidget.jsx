@@ -3,6 +3,51 @@ import { motion } from "framer-motion";
 import { useI18n } from "../lib/i18n";
 import { Panel } from "./arena";
 
+// Neon platform badge that links out to the external profile. Deliberately
+// NOT the real FACEIT/tracker.gg logos — those are trademarked assets in
+// brand colors (orange/red) that would clash with the site's cyan/volt
+// palette. Instead reuses the diamond motif already used everywhere on this
+// site (logo mark, roster bullets, empty-logo placeholders) as a small
+// glowing corner badge, so it reads as "part of this UI" rather than a
+// bolted-on external icon.
+const PROVIDER_META = {
+  faceit: { initial: "F", color: "#00F0FF", labelKey: "widget.viewProfile.faceit" },
+  valorant: { initial: "V", color: "#DFFF00", labelKey: "widget.viewProfile.valorant" },
+};
+
+function ProviderBadge({ provider, href }) {
+  const { t } = useI18n();
+  const meta = PROVIDER_META[provider];
+  if (!meta || !href) return null;
+  const label = t(meta.labelKey);
+  return (
+    <motion.a
+      href={href}
+      target="_blank"
+      rel="noreferrer"
+      aria-label={label}
+      title={label}
+      data-testid={`provider-badge-${provider}`}
+      whileHover={{ scale: 1.15, filter: `drop-shadow(0 0 6px ${meta.color})` }}
+      whileTap={{ scale: 0.92 }}
+      animate={{ filter: [`drop-shadow(0 0 1px ${meta.color}88)`, `drop-shadow(0 0 4px ${meta.color}aa)`, `drop-shadow(0 0 1px ${meta.color}88)`] }}
+      transition={{ filter: { duration: 2.2, repeat: Infinity, ease: "easeInOut" } }}
+      className="absolute -bottom-1.5 -right-1.5 w-5 h-5 grid place-items-center cursor-pointer"
+    >
+      <span
+        className="absolute inset-0 rotate-45 rounded-[2px] border bg-void"
+        style={{ borderColor: meta.color }}
+      />
+      <span
+        className="relative font-display font-black leading-none"
+        style={{ color: meta.color, fontSize: "9px" }}
+      >
+        {meta.initial}
+      </span>
+    </motion.a>
+  );
+}
+
 // FACEIT/tracker.gg-style "mini profile" card — fetched lazily when a
 // player row is expanded (see Profile.jsx). `status` is "loading" | "error"
 // | "ready"; the fields available in `data.stats` vary by discipline (e.g.
@@ -47,18 +92,21 @@ export function PlayerStatsWidget({ status, data, error, onRetry }) {
     <motion.div initial={{ opacity: 0, y: -6 }} animate={{ opacity: 1, y: 0 }} transition={{ duration: 0.2 }}>
       <Panel clip className="p-4 mt-2">
         <div className="flex items-center gap-3">
-          {avatar && !avatarFailed ? (
-            <img
-              src={avatar}
-              alt=""
-              onError={() => setAvatarFailed(true)}
-              className="w-10 h-10 rounded-sm object-cover border border-[#27272a] shrink-0"
-            />
-          ) : (
-            <div className="w-10 h-10 border border-cyan/30 grid place-items-center shrink-0">
-              <span className="w-3 h-3 border border-cyan/40 rotate-45" />
-            </div>
-          )}
+          <div className="relative shrink-0">
+            {avatar && !avatarFailed ? (
+              <img
+                src={avatar}
+                alt=""
+                onError={() => setAvatarFailed(true)}
+                className="w-10 h-10 rounded-sm object-cover border border-[#27272a]"
+              />
+            ) : (
+              <div className="w-10 h-10 border border-cyan/30 grid place-items-center">
+                <span className="w-3 h-3 border border-cyan/40 rotate-45" />
+              </div>
+            )}
+            <ProviderBadge provider={data.provider} href={profileUrl} />
+          </div>
           <div className="min-w-0 flex-1">
             <div className="text-sm font-display font-bold text-white truncate">{displayName}</div>
             <div className="text-xs font-mono text-cyan truncate">{rank?.label}</div>
@@ -92,16 +140,6 @@ export function PlayerStatsWidget({ status, data, error, onRetry }) {
           </div>
         )}
 
-        {profileUrl && (
-          <a
-            href={profileUrl}
-            target="_blank"
-            rel="noreferrer"
-            className="block mt-3 text-center text-xs text-cyan hover:underline"
-          >
-            {t("widget.viewProfile")}
-          </a>
-        )}
         {stale && <div className="mt-2 text-[10px] text-[#52525b] text-center">{t("widget.stale")}</div>}
       </Panel>
     </motion.div>

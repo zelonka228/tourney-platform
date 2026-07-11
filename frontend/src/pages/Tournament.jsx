@@ -160,7 +160,15 @@ export function Tournament() {
   useEffect(() => {
     if (!id) return;
     setTournament(null); setNotFound(false);
-    getTournament(id).then((tm) => { if (!tm) setNotFound(true); else setTournament(tm); });
+    getTournament(id).then((tm) => {
+      if (!tm) { setNotFound(true); return; }
+      setTournament(tm);
+      // Land straight on "Команди" when there's manual-seeding work to do
+      // (teams registered, no bracket yet) — the "Сітка" tab in that state
+      // has nothing but a "not generated" message, and the actual reorder
+      // controls live on the teams tab, easy to miss otherwise.
+      if (tm.matches.length === 0 && tm.teams.length > 0) setTab("teams");
+    });
   }, [id]);
 
   function mergeMatches(...updated) {
@@ -378,9 +386,20 @@ export function Tournament() {
             <Panel clip className="p-6 max-w-md">
               <p className="text-[#a1a1aa] text-sm">{t("tour.notGenerated")}</p>
               {isAdmin ? (
-                <Btn variant="primary" className="mt-4" data-testid="generate-btn" onClick={handleGenerate} disabled={generating}>
-                  {generating ? t("tour.generating") : t("tour.generate")}
-                </Btn>
+                <>
+                  {tournament.teams.length > 0 && (
+                    <button
+                      data-testid="go-to-teams-tab"
+                      onClick={() => setTab("teams")}
+                      className="block mt-3 text-cyan text-sm hover:underline"
+                    >
+                      {t("tour.goToTeams")}
+                    </button>
+                  )}
+                  <Btn variant="primary" className="mt-4" data-testid="generate-btn" onClick={handleGenerate} disabled={generating}>
+                    {generating ? t("tour.generating") : t("tour.generate")}
+                  </Btn>
+                </>
               ) : (
                 <p className="text-[#52525b] text-xs mt-3">{t("auth.signInToEdit")}</p>
               )}
