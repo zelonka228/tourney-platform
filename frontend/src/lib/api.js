@@ -155,6 +155,15 @@ export async function generateBracket(tournamentId) {
   return request(`/api/tournaments/${tournamentId}/generate-bracket`, { method: "POST" });
 }
 
+// Без demo-фолбеку — переупорядкування без бекенду не зберегти, помилка має
+// дійти до UI, а не тихо відкотитись.
+export async function reorderTournamentTeams(tournamentId, teamIds) {
+  return request(`/api/tournaments/${tournamentId}/teams/reorder`, {
+    method: "PUT",
+    body: JSON.stringify({ teamIds }),
+  });
+}
+
 export async function deleteTournament(id) {
   try {
     await request(`/api/tournaments/${id}`, { method: "DELETE" });

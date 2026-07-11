@@ -79,6 +79,10 @@ export function Create() {
         matchFormat: bo,
         teamIds: seedTeamIds(selectedIds, allTeams, seedType),
         date,
+        // Manual seeding: register the teams but don't lock in a bracket yet —
+        // the admin reorders them on the tournament page and generates the
+        // bracket explicitly once satisfied (see Tournament.jsx "teams" tab).
+        generateBracket: seedType !== "manual",
       });
       if (!created?.id) throw new Error("Failed.");
       nav(`/tournament/${created.id}`);
@@ -151,6 +155,9 @@ export function Create() {
               <option value="rating">{t("create.seed.rating")}</option>
               <option value="manual">{t("create.seed.manual")}</option>
             </Select>
+            {seedType === "manual" && (
+              <span className="block mt-2 text-xs text-[#a1a1aa]">{t("create.seed.manualHint")}</span>
+            )}
           </Field>
 
           <div className="mt-2">
@@ -183,7 +190,7 @@ export function Create() {
 
           <div className="mt-6">
             <Btn variant="primary" data-testid="create-submit-btn" onClick={handleSubmit} disabled={!canSubmit}>
-              {submitting ? t("create.submitting") : t("create.submit")}
+              {submitting ? t("create.submitting") : t(seedType === "manual" ? "create.submit.manual" : "create.submit")}
             </Btn>
           </div>
         </Panel>

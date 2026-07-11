@@ -5,7 +5,7 @@ import { io } from "socket.io-client";
 import { useI18n } from "../lib/i18n";
 import { useAuth } from "../lib/auth";
 import {
-  getTournament, getTournaments, submitMatchScore, generateBracket, deleteTournament,
+  getTournament, getTournaments, submitMatchScore, generateBracket, deleteTournament, reorderTournamentTeams,
 } from "../lib/api";
 import { validScorelines } from "../lib/demo";
 import { Btn, Overline, Panel } from "../components/arena";
@@ -142,6 +142,8 @@ export function Tournament() {
   const [scoreError, setScoreError] = useState(null);
   const [generating, setGenerating] = useState(false);
   const [deleteError, setDeleteError] = useState(null);
+  const [reordering, setReordering] = useState(false);
+  const [reorderError, setReorderError] = useState(null);
 
   const bracketRef = useRef(null);
   const svgRef = useRef(null);
@@ -316,6 +318,22 @@ export function Tournament() {
     try { setTournament(await generateBracket(id)); } catch (e) { setScoreError(e.message); } finally { setGenerating(false); }
   }
 
+  // Manual seeding: swap a team with its neighbor and persist the full
+  // resulting order — reorder is only meaningful before the bracket exists
+  // (the backend rejects it 409 once matches are generated, see teams tab).
+  async function moveTeam(teamId, dir) {
+    const ordered = tournament.teams.slice().sort((a, b) => a.seed - b.seed).map((tt) => tt.teamId);
+    const i = ordered.indexOf(teamId);
+    const j = i + dir;
+    if (j < 0 || j >= ordered.length) return;
+    [ordered[i], ordered[j]] = [ordered[j], ordered[i]];
+    setReordering(true);
+    setReorderError(null);
+    try { setTournament(await reorderTournamentTeams(id, ordered)); }
+    catch (e) { setReorderError(e.message); }
+    finally { setReordering(false); }
+  }
+
   if (!id) return <TournamentPicker />;
   if (notFound) return (
     <div className="py-10">
@@ -476,15 +494,40 @@ export function Tournament() {
       {tab === "teams" && (
         <Panel clip className="p-6 max-w-lg mt-6">
           <Overline>{t("tour.participants")}</Overline>
+          {matches.length === 0 && isAdmin && (
+            <p className="text-xs text-[#a1a1aa] mt-2">{t("tour.reorderHint")}</p>
+          )}
           <div className="mt-4 divide-y divide-[#27272a]/60">
-            {tournament.teams.slice().sort((x, y) => x.seed - y.seed).map((tt) => (
-              <div key={tt.id} className="flex items-center gap-4 py-2.5">
+            {tournament.teams.slice().sort((x, y) => x.seed - y.seed).map((tt, i, sorted) => (
+              <div key={tt.id} data-testid={`participant-row-${tt.teamId}`} className="flex items-center gap-4 py-2.5">
                 <span className="font-mono text-xs text-cyan w-6">{String(tt.seed).padStart(2, "0")}</span>
                 <span className="text-white">{tt.team?.name}</span>
+                {matches.length === 0 && isAdmin && (
+                  <span className="ml-auto flex gap-1">
+                    <button
+                      data-testid={`participant-up-${tt.teamId}`}
+                      disabled={i === 0 || reordering}
+                      onClick={() => moveTeam(tt.teamId, -1)}
+                      className="w-6 h-6 grid place-items-center border border-[#27272a] rounded-sm text-[#a1a1aa] hover:border-cyan hover:text-cyan transition-colors disabled:opacity-30 disabled:hover:border-[#27272a] disabled:hover:text-[#a1a1aa]"
+                    >▲</button>
+                    <button
+                      data-testid={`participant-down-${tt.teamId}`}
+                      disabled={i === sorted.length - 1 || reordering}
+                      onClick={() => moveTeam(tt.teamId, 1)}
+                      className="w-6 h-6 grid place-items-center border border-[#27272a] rounded-sm text-[#a1a1aa] hover:border-cyan hover:text-cyan transition-colors disabled:opacity-30 disabled:hover:border-[#27272a] disabled:hover:text-[#a1a1aa]"
+                    >▼</button>
+                  </span>
+                )}
               </div>
             ))}
           </div>
           <p className="text-xs text-[#52525b] mt-4">{tournament.teams.length} {t("tour.teamsCount")}</p>
+          {reorderError && <p className="text-[#ff0055] text-sm mt-3">{reorderError}</p>}
+          {matches.length === 0 && isAdmin && tournament.teams.length >= 2 && (
+            <Btn variant="primary" size="sm" className="mt-4" data-testid="generate-btn-teams-tab" onClick={handleGenerate} disabled={generating}>
+              {generating ? t("tour.generating") : t("tour.generate")}
+            </Btn>
+          )}
         </Panel>
       )}
     </div>

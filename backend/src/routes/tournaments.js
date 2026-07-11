@@ -41,13 +41,17 @@ router.get(
   })
 );
 
-// POST /api/tournaments → create; optional teamIds seed TournamentTeam rows AND
-// (single elimination only) immediately generate the Match bracket in the same call.
+// POST /api/tournaments → create; optional teamIds seed TournamentTeam rows.
+// By default (single elimination only) this also immediately generates the
+// Match bracket in the same call — pass `generateBracket: false` to register
+// the teams but leave the bracket ungenerated, e.g. for manual seeding: the
+// admin reorders teams on the tournament page (PUT .../teams/reorder) and
+// generates the bracket later via POST .../generate-bracket once satisfied.
 router.post(
   "/",
   requireAdmin,
   asyncHandler(async (req, res) => {
-    const { name, discipline, bracketType, matchFormat, teamIds } = req.body ?? {};
+    const { name, discipline, bracketType, matchFormat, teamIds, generateBracket } = req.body ?? {};
 
     requireFields(req.body, ["name", "discipline", "bracketType", "matchFormat"]);
     requireEnum("discipline", discipline, DISCIPLINE_VALUES);
@@ -58,6 +62,7 @@ router.post(
     if (hasTeams && bracketType === "double") {
       throw new HttpError(400, "Подвійне вибування ще не підтримується.");
     }
+    const shouldGenerate = hasTeams && generateBracket !== false;
 
     const data = { name, discipline, bracketType, matchFormat: Number(matchFormat) };
 
@@ -65,6 +70,8 @@ router.post(
       data.teams = {
         create: teamIds.map((teamId, i) => ({ teamId: Number(teamId), seed: i + 1 })),
       };
+    }
+    if (shouldGenerate) {
       data.matches = {
         create: buildBracketRows(teamIds.map(Number)),
       };
@@ -76,7 +83,7 @@ router.post(
     });
 
     let result = tournament;
-    if (hasTeams) {
+    if (shouldGenerate) {
       await resolveByes(prisma, tournament.id);
       result = await prisma.tournament.findUnique({
         where: { id: tournament.id },
@@ -121,6 +128,56 @@ router.post(
       include: { teams: TEAMS_WITH_TEAM, matches: true },
     });
     res.status(201).json(updated);
+  })
+);
+
+// PUT /api/tournaments/:id/teams/reorder → reassign seed = index+1 from a
+// full ordered list of the tournament's already-registered teamIds. Manual
+// seeding: the admin rearranges the "Учасники" list before generating the
+// bracket. Blocked once the bracket exists — seed no longer affects
+// anything at that point, and silently accepting it would be misleading.
+router.put(
+  "/:id/teams/reorder",
+  requireAdmin,
+  asyncHandler(async (req, res) => {
+    const id = parseId(req.params.id);
+    const { teamIds } = req.body ?? {};
+    requireFields(req.body, ["teamIds"]);
+    if (!Array.isArray(teamIds) || teamIds.length === 0) {
+      throw new HttpError(400, "teamIds має бути непорожнім масивом.");
+    }
+
+    const tournament = await prisma.tournament.findUnique({
+      where: { id },
+      include: { teams: true, _count: { select: { matches: true } } },
+    });
+    if (!tournament) throw new HttpError(404, "Турнір не знайдено.");
+    if (tournament._count.matches > 0) {
+      throw new HttpError(409, "Сітку вже згенеровано, порядок команд більше не можна змінити.");
+    }
+
+    const current = new Set(tournament.teams.map((t) => t.teamId));
+    const proposed = teamIds.map(Number);
+    const sameSet =
+      proposed.length === current.size && proposed.every((tid) => current.has(tid)) && new Set(proposed).size === proposed.length;
+    if (!sameSet) {
+      throw new HttpError(400, "teamIds має містити рівно ті команди, що вже зареєстровані в турнірі, без повторів.");
+    }
+
+    await prisma.$transaction(
+      proposed.map((teamId, i) =>
+        prisma.tournamentTeam.update({
+          where: { tournamentId_teamId: { tournamentId: id, teamId } },
+          data: { seed: i + 1 },
+        })
+      )
+    );
+
+    const updated = await prisma.tournament.findUnique({
+      where: { id },
+      include: { teams: TEAMS_WITH_TEAM, matches: true },
+    });
+    res.json(updated);
   })
 );
 
