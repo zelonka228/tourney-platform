@@ -90,19 +90,37 @@ export function avgRating(discipline, ranks) {
   return { value: avg, label: String(avg), unit: def.unit, unitKey: def.unitKey };
 }
 
-// If a player has a linked FACEIT profile and we already have its cached
-// stats, their live FACEIT ELO is the same unit as our internal CS2 rank
-// field — use it instead of the manually-entered value so the roster row
-// and the average rating don't silently drift from what the widget shows.
-// Only CS2 qualifies: OpenDota never exposes a numeric MMR (only a medal
-// tier, a different scale) and HenrikDev's RR isn't the same thing as our
-// internal Valorant rank name — substituting either would corrupt the
-// average instead of fixing it.
+// HenrikDev's tier name is e.g. "Diamond 2" or "Immortal 3" (sub-tier
+// number appended) while "Radiant"/"Unrated" have none — strip a trailing
+// " <digits>" and match against our own (sub-tier-less) VALORANT_RANKS.
+// "Unrated" (and anything else unrecognized) intentionally returns null so
+// callers fall back to the manually-entered rank instead of showing "—".
+function mapValorantRankLabel(label) {
+  if (!label) return null;
+  const base = label.replace(/\s+\d+$/, "").trim();
+  return VALORANT_RANKS.includes(base) ? base : null;
+}
+
+// Extracts the live rank value (in our internal unit) from a fetched stats
+// payload, or null if that discipline/payload doesn't carry one we can use.
+export function liveRankFromStats(discipline, stats) {
+  if (!stats) return null;
+  if (discipline === "CS2") return stats.eloOrMmr ?? null;
+  if (discipline === "Valorant") return mapValorantRankLabel(stats.rank?.label);
+  return null;
+}
+
+// If a player has a linked external profile and we already have its cached
+// stats, their live rank is the same unit as our internal rank field — use
+// it instead of the manually-entered value so the roster row and the
+// average rating don't silently drift from what the widget shows. Dota 2
+// never qualifies: it has no integration (Valve hides numeric MMR), so its
+// roster is manual-entry only.
 export function effectivePlayerRank(discipline, player) {
-  if (discipline === "CS2" && player.externalStats) {
+  if (player.externalStats) {
     try {
-      const parsed = JSON.parse(player.externalStats);
-      if (parsed.eloOrMmr != null) return parsed.eloOrMmr;
+      const live = liveRankFromStats(discipline, JSON.parse(player.externalStats));
+      if (live != null) return live;
     } catch {
       // Malformed cache — fall through to the manual rank.
     }

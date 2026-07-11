@@ -3,7 +3,7 @@ import { Link } from "react-router-dom";
 import { motion } from "framer-motion";
 import { useI18n } from "../lib/i18n";
 import { getTeams, getPlayerStats } from "../lib/api";
-import { avgRating, effectivePlayerRank, DISCIPLINES } from "../lib/demo";
+import { avgRating, effectivePlayerRank, liveRankFromStats, DISCIPLINES } from "../lib/demo";
 import { Btn, Overline, Panel, Stat } from "../components/arena";
 import { PlayerStatsWidget } from "../components/PlayerStatsWidget";
 
@@ -12,12 +12,15 @@ export function Profile() {
   const [sel, setSel] = useState(null);
   const [teams, setTeams] = useState([]);
   // PlayerRow eager-fetches live FACEIT ELO for CS2-linked players on mount
-  // (not just on click) and reports it up here via onLiveElo, so the team
-  // average updates to the freshest value instead of only the DB-cached one
-  // from the last time someone opened that player's widget. Declared here
-  // (not after the list/detail branch below) — conditionally calling
-  // useState only on the detail render broke the Rules of Hooks and crashed
-  // the whole page on switching from the team list to a team's detail view.
+  // (not just on click); Valorant is lazy (only on click, see PlayerRow).
+  // Either way, once fresh stats come back they're reported up here via
+  // onLiveElo (already converted to our internal unit by liveRankFromStats)
+  // so the team average updates to the freshest value instead of only the
+  // DB-cached one from the last time someone opened that player's widget.
+  // Declared here (not after the list/detail branch below) — conditionally
+  // calling useState only on the detail render broke the Rules of Hooks and
+  // crashed the whole page on switching from the team list to a team's
+  // detail view.
   const [liveElo, setLiveElo] = useState({});
 
   useEffect(() => {
@@ -166,9 +169,12 @@ export function Profile() {
 // fetch also happens eagerly on mount (not just on click) — the displayed
 // rank number for a FACEIT-linked player is that live ELO, not the
 // manually-entered rank, and it needs to be correct even before anyone
-// expands the widget. Other disciplines stay fully lazy (their live stats
-// don't feed the rank number, see effectivePlayerRank in lib/demo.js — no
-// point spending an API call before the user asks to see it).
+// expands the widget. Valorant stays lazy (only fetches once the widget is
+// opened) but, once it has, also substitutes the live rank the same way —
+// see liveRankFromStats in lib/demo.js, which converts each discipline's
+// raw payload (FACEIT ELO number / HenrikDev tier name) into our internal
+// unit, or returns null when it can't (e.g. Valorant "Unrated" has no
+// mapping — the manually-entered rank stays authoritative in that case).
 function PlayerRow({ p, discipline, onLiveElo }) {
   const { t } = useI18n();
   const [open, setOpen] = useState(false);
@@ -185,12 +191,8 @@ function PlayerRow({ p, discipline, onLiveElo }) {
       .then((res) => {
         setData(res);
         setStatus("ready");
-        // Live-elo substitution is CS2-only by design (see effectivePlayerRank
-        // in lib/demo.js) — for Valorant, eloOrMmr is RR (a plain number),
-        // not a VALORANT_RANKS index, so feeding it into the team rating
-        // here would corrupt the rank display (e.g. RR 0 read as index 0 →
-        // "Iron", regardless of the player's actual rank).
-        if (isCs2 && res.eloOrMmr != null) onLiveElo?.(res.eloOrMmr);
+        const live = liveRankFromStats(discipline, res);
+        if (live != null) onLiveElo?.(live);
       })
       .catch((err) => {
         setError(err.message ?? String(err));
@@ -210,7 +212,7 @@ function PlayerRow({ p, discipline, onLiveElo }) {
     if (next && status === "idle") load();
   }
 
-  const displayRank = isCs2 && data?.eloOrMmr != null ? data.eloOrMmr : p.rank;
+  const displayRank = (data && liveRankFromStats(discipline, data)) ?? p.rank;
 
   return (
     <div className="py-2.5">
