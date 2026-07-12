@@ -53,7 +53,9 @@ function AuthLink() {
         data-testid="nav-login"
         className={({ isActive }) =>
           `px-3 py-1.5 text-xs font-mono uppercase tracking-widest border rounded-sm transition-colors ${
-            isActive ? "border-cyan text-cyan" : "border-[#27272a] text-[#a1a1aa] hover:text-white hover:border-[#3f3f46]"
+            isActive
+              ? "border-cyan text-cyan"
+              : "border-[#27272a] text-[#a1a1aa] hover:text-white hover:border-[#3f3f46]"
           }`
         }
       >

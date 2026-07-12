@@ -5,10 +5,18 @@ import { io } from "socket.io-client";
 import { useI18n } from "../lib/i18n";
 import { useAuth } from "../lib/auth";
 import {
-  getTournament, getTournaments, submitMatchScore, resetMatch, generateBracket, deleteTournament, reorderTournamentTeams,
+  getTournament,
+  getTournaments,
+  submitMatchScore,
+  resetMatch,
+  generateBracket,
+  deleteTournament,
+  reorderTournamentTeams,
+  updateTournament,
+  unregisterTeam,
 } from "../lib/api";
-import { validScorelines } from "../lib/demo";
-import { Btn, Overline, Panel } from "../components/arena";
+import { validScorelines, BEST_OF, winTarget } from "../lib/demo";
+import { Btn, Field, Input, Overline, Panel, Select } from "../components/arena";
 
 const SOCKET_URL = import.meta.env.VITE_API_URL ?? "http://localhost:4000";
 
@@ -23,14 +31,27 @@ function useRoundLabel() {
   };
 }
 
-function MatchCard({ m, teamName, openEdit, cardRef, enterScoreLabel, byeLabel, editLabel, isAdmin }) {
+function MatchCard({
+  m,
+  teamName,
+  openEdit,
+  cardRef,
+  enterScoreLabel,
+  byeLabel,
+  editLabel,
+  isAdmin,
+}) {
   const a = teamName(m.teamAId);
   const b = teamName(m.teamBId);
   const isBye = m.status === "bye";
   const decided = m.status === "done" || isBye;
   const winnerId = isBye
     ? (m.teamAId ?? m.teamBId)
-    : m.status === "done" ? (m.scoreA > m.scoreB ? m.teamAId : m.teamBId) : null;
+    : m.status === "done"
+      ? m.scoreA > m.scoreB
+        ? m.teamAId
+        : m.teamBId
+      : null;
   const todo = a && b && m.status === "pending";
   // A done match stays clickable for admins too -- opens the reset flow
   // instead of the score picker (see openEdit) so a misclick isn't a
@@ -52,16 +73,40 @@ function MatchCard({ m, teamName, openEdit, cardRef, enterScoreLabel, byeLabel, 
     <div
       ref={cardRef}
       onClick={clickable ? () => openEdit(m) : undefined}
+      role={clickable ? "button" : undefined}
+      tabIndex={clickable ? 0 : undefined}
+      onKeyDown={
+        clickable
+          ? (e) => {
+              if (e.key === "Enter" || e.key === " ") {
+                e.preventDefault();
+                openEdit(m);
+              }
+            }
+          : undefined
+      }
       className={`w-[220px] bg-surface border rounded-sm overflow-hidden transition-colors ${
-        todo ? `border-cyan shadow-[0_0_0_1px_#00f0ff] ${clickable ? "cursor-pointer" : ""}` : "border-[#27272a]"
-      } ${pending ? "opacity-45" : ""}`}
+        todo
+          ? `border-cyan shadow-[0_0_0_1px_#00f0ff] ${clickable ? "cursor-pointer" : ""}`
+          : "border-[#27272a]"
+      } ${pending ? "opacity-45" : ""} ${clickable ? "focus-visible:outline focus-visible:outline-2 focus-visible:outline-cyan" : ""}`}
       data-testid={`match-card-${m.id}`}
     >
       <motion.div
         initial={decided ? { scale: 0.92, opacity: 0.5 } : { opacity: 0, x: -16 }}
-        animate={decided
-          ? { scale: [0.92, 1.03, 1], opacity: 1, boxShadow: ["0 0 0 rgba(0,240,255,0)", "0 0 22px rgba(0,240,255,0.5)", "0 0 0 rgba(0,240,255,0)"] }
-          : { opacity: 1, x: 0 }}
+        animate={
+          decided
+            ? {
+                scale: [0.92, 1.03, 1],
+                opacity: 1,
+                boxShadow: [
+                  "0 0 0 rgba(0,240,255,0)",
+                  "0 0 22px rgba(0,240,255,0.5)",
+                  "0 0 0 rgba(0,240,255,0)",
+                ],
+              }
+            : { opacity: 1, x: 0 }
+        }
         transition={{ duration: 0.5, ease: "easeOut" }}
       >
         {[
@@ -94,8 +139,16 @@ function MatchCard({ m, teamName, openEdit, cardRef, enterScoreLabel, byeLabel, 
             </div>
           );
         })}
-        {todo && <div className="text-center py-1 bg-cyan text-void text-[10px] font-mono uppercase tracking-widest">{enterScoreLabel}</div>}
-        {isBye && <div className="text-center py-1 bg-[#3f3f46] text-[#d4d4d8] text-[10px] font-mono uppercase tracking-widest">{byeLabel}</div>}
+        {todo && (
+          <div className="text-center py-1 bg-cyan text-void text-[10px] font-mono uppercase tracking-widest">
+            {enterScoreLabel}
+          </div>
+        )}
+        {isBye && (
+          <div className="text-center py-1 bg-[#3f3f46] text-[#d4d4d8] text-[10px] font-mono uppercase tracking-widest">
+            {byeLabel}
+          </div>
+        )}
         {editable && (
           <div className="text-center py-1 border-t border-[#27272a] text-[#52525b] text-[10px] font-mono uppercase tracking-widest hover:text-[#ff0055] transition-colors">
             {editLabel}
@@ -109,18 +162,39 @@ function MatchCard({ m, teamName, openEdit, cardRef, enterScoreLabel, byeLabel, 
 function TournamentPicker() {
   const { t } = useI18n();
   const [list, setList] = useState(null);
-  useEffect(() => { getTournaments().then(setList); }, []);
+  const [query, setQuery] = useState("");
+  useEffect(() => {
+    getTournaments().then(setList);
+  }, []);
+  const visible = list?.filter((tm) => tm.name.toLowerCase().includes(query.trim().toLowerCase()));
   return (
     <div className="py-10" data-testid="tournament-picker">
-      <h1 className="font-display font-black text-4xl sm:text-5xl tracking-tighter text-white">{t("tour.title")}</h1>
+      <h1 className="font-display font-black text-4xl sm:text-5xl tracking-tighter text-white">
+        {t("tour.title")}
+      </h1>
       {list === null && <p className="text-[#a1a1aa] mt-4">{t("tour.loading")}</p>}
       {list?.length === 0 && (
         <p className="text-[#a1a1aa] mt-4">
-          {t("tour.none")} <Link to="/create" className="text-cyan hover:underline">{t("tour.createLink")}</Link>
+          {t("tour.none")}{" "}
+          <Link to="/create" className="text-cyan hover:underline">
+            {t("tour.createLink")}
+          </Link>
         </p>
       )}
+      {list && list.length > 5 && (
+        <Input
+          value={query}
+          data-testid="tournament-search"
+          placeholder={t("tour.search")}
+          onChange={(e) => setQuery(e.target.value)}
+          className="mt-4 max-w-sm"
+        />
+      )}
+      {visible?.length === 0 && list.length > 0 && (
+        <p className="text-[#52525b] text-sm mt-4">{t("create.noMatch")}</p>
+      )}
       <div className="grid sm:grid-cols-2 gap-4 mt-8">
-        {list?.map((tm) => (
+        {visible?.map((tm) => (
           <Link key={tm.id} to={`/tournament/${tm.id}`} data-testid={`tournament-link-${tm.id}`}>
             <Panel clip className="p-5 hover:border-cyan transition-colors">
               <div className="flex items-center justify-between">
@@ -154,6 +228,11 @@ export function Tournament() {
   const [deleteError, setDeleteError] = useState(null);
   const [reordering, setReordering] = useState(false);
   const [reorderError, setReorderError] = useState(null);
+  const [infoForm, setInfoForm] = useState(null); // null = not editing; else { name, date, matchFormat }
+  const [savingInfo, setSavingInfo] = useState(false);
+  const [infoError, setInfoError] = useState(null);
+  const [removingTeamId, setRemovingTeamId] = useState(null);
+  const [removeError, setRemoveError] = useState(null);
 
   const bracketRef = useRef(null);
   const svgRef = useRef(null);
@@ -165,13 +244,32 @@ export function Tournament() {
   const [connectors, setConnectors] = useState([]);
   const [svgSize, setSvgSize] = useState({ w: 0, h: 0 });
 
-  const setNodeRef = (key) => (el) => { if (el) nodeRefs.current.set(key, el); else nodeRefs.current.delete(key); };
+  const setNodeRef = (key) => (el) => {
+    if (el) nodeRefs.current.set(key, el);
+    else nodeRefs.current.delete(key);
+  };
+
+  // Escape closes whichever modal is open (score picker or reset confirm) —
+  // both render as plain Panels, not a <dialog>, so this has to be handled
+  // manually rather than relying on native dialog dismissal.
+  useEffect(() => {
+    if (!edit) return;
+    function onKeyDown(e) {
+      if (e.key === "Escape") setEdit(null);
+    }
+    window.addEventListener("keydown", onKeyDown);
+    return () => window.removeEventListener("keydown", onKeyDown);
+  }, [edit]);
 
   useEffect(() => {
     if (!id) return;
-    setTournament(null); setNotFound(false);
+    setTournament(null);
+    setNotFound(false);
     getTournament(id).then((tm) => {
-      if (!tm) { setNotFound(true); return; }
+      if (!tm) {
+        setNotFound(true);
+        return;
+      }
       setTournament(tm);
       // Land straight on "Команди" when there's manual-seeding work to do
       // (teams registered, no bracket yet) — the "Сітка" tab in that state
@@ -186,7 +284,10 @@ export function Tournament() {
     for (const m of updated) {
       if (!m) continue;
       const dec = m.status === "done" || m.status === "bye";
-      if (dec && !decidedIdsRef.current.has(m.id)) { decidedIdsRef.current.add(m.id); newlyDecided.push(m.id); }
+      if (dec && !decidedIdsRef.current.has(m.id)) {
+        decidedIdsRef.current.add(m.id);
+        newlyDecided.push(m.id);
+      }
     }
     setTournament((prev) => {
       if (!prev) return prev;
@@ -252,13 +353,17 @@ export function Tournament() {
     activePulses.current.add(controls);
   }
 
-  useEffect(() => () => {
-    activePulses.current.forEach((c) => c.stop());
-    activePulses.current.clear();
-    pulseSvgRef.current?.querySelectorAll(".flow-pulse-dot").forEach((d) => d.remove());
-  }, []);
+  useEffect(
+    () => () => {
+      activePulses.current.forEach((c) => c.stop());
+      activePulses.current.clear();
+      pulseSvgRef.current?.querySelectorAll(".flow-pulse-dot").forEach((d) => d.remove());
+    },
+    []
+  );
 
-  const teamName = (teamId) => tournament?.teams.find((tt) => tt.teamId === teamId)?.team?.name ?? null;
+  const teamName = (teamId) =>
+    tournament?.teams.find((tt) => tt.teamId === teamId)?.team?.name ?? null;
   const matches = tournament?.matches ?? [];
   const totalRounds = matches.length ? Math.max(...matches.map((m) => m.round)) + 1 : 0;
   const bo = tournament?.matchFormat ?? 3;
@@ -268,18 +373,36 @@ export function Tournament() {
     if (!finalMatch) return null;
     if (finalMatch.status === "bye") return teamName(finalMatch.teamAId ?? finalMatch.teamBId);
     if (finalMatch.status === "done")
-      return teamName(finalMatch.scoreA > finalMatch.scoreB ? finalMatch.teamAId : finalMatch.teamBId);
+      return teamName(
+        finalMatch.scoreA > finalMatch.scoreB ? finalMatch.teamAId : finalMatch.teamBId
+      );
     return null;
   }, [finalMatch, tournament]);
 
-  const results = useMemo(() => matches
-    .filter((m) => m.status === "done" || m.status === "bye")
-    .map((m) => {
-      const cnt = matches.filter((x) => x.round === m.round).length;
-      const winnerId = m.status === "bye" ? (m.teamAId ?? m.teamBId) : m.scoreA > m.scoreB ? m.teamAId : m.teamBId;
-      return { round: roundLabel(cnt), a: teamName(m.teamAId), b: teamName(m.teamBId), bye: m.status === "bye", sa: m.scoreA, sb: m.scoreB, w: teamName(winnerId) };
-    }),
-    [matches, tournament]);
+  const results = useMemo(
+    () =>
+      matches
+        .filter((m) => m.status === "done" || m.status === "bye")
+        .map((m) => {
+          const cnt = matches.filter((x) => x.round === m.round).length;
+          const winnerId =
+            m.status === "bye"
+              ? (m.teamAId ?? m.teamBId)
+              : m.scoreA > m.scoreB
+                ? m.teamAId
+                : m.teamBId;
+          return {
+            round: roundLabel(cnt),
+            a: teamName(m.teamAId),
+            b: teamName(m.teamBId),
+            bye: m.status === "bye",
+            sa: m.scoreA,
+            sb: m.scoreB,
+            w: teamName(winnerId),
+          };
+        }),
+    [matches, tournament]
+  );
 
   useLayoutEffect(() => {
     const container = bracketRef.current;
@@ -289,20 +412,28 @@ export function Tournament() {
       const next = [];
       for (const m of matches) {
         let destKey;
-        const destMatch = matches.find((x) => x.round === m.round + 1 && x.position === Math.floor(m.position / 2));
+        const destMatch = matches.find(
+          (x) => x.round === m.round + 1 && x.position === Math.floor(m.position / 2)
+        );
         if (destMatch) destKey = `m-${destMatch.id}`;
         else if (m.round === totalRounds - 1) destKey = "champion";
         else continue;
         const a = nodeRefs.current.get(`m-${m.id}`);
         const b = nodeRefs.current.get(destKey);
         if (!a || !b) continue;
-        const ar = a.getBoundingClientRect(), br = b.getBoundingClientRect();
+        const ar = a.getBoundingClientRect(),
+          br = b.getBoundingClientRect();
         const x1 = ar.right - cRect.left + container.scrollLeft;
         const y1 = ar.top + ar.height / 2 - cRect.top + container.scrollTop;
         const x2 = br.left - cRect.left + container.scrollLeft;
         const y2 = br.top + br.height / 2 - cRect.top + container.scrollTop;
         const midX = (x1 + x2) / 2;
-        next.push({ key: `${m.id}-${destKey}`, sourceId: m.id, d: `M ${x1} ${y1} H ${midX} V ${y2} H ${x2}`, live: m.status === "done" || m.status === "bye" });
+        next.push({
+          key: `${m.id}-${destKey}`,
+          sourceId: m.id,
+          d: `M ${x1} ${y1} H ${midX} V ${y2} H ${x2}`,
+          live: m.status === "done" || m.status === "bye",
+        });
       }
       connectorsRef.current = next;
       setConnectors(next);
@@ -312,7 +443,10 @@ export function Tournament() {
     const ro = new ResizeObserver(recompute);
     ro.observe(container);
     window.addEventListener("resize", recompute);
-    return () => { ro.disconnect(); window.removeEventListener("resize", recompute); };
+    return () => {
+      ro.disconnect();
+      window.removeEventListener("resize", recompute);
+    };
   }, [matches, totalRounds]);
 
   function openEdit(m) {
@@ -322,15 +456,24 @@ export function Tournament() {
       setScoreError(null);
     } else if (m.status === "done") {
       setEdit({
-        matchId: m.id, mode: "reset",
-        a: teamName(m.teamAId), b: teamName(m.teamBId), scoreA: m.scoreA, scoreB: m.scoreB,
+        matchId: m.id,
+        mode: "reset",
+        a: teamName(m.teamAId),
+        b: teamName(m.teamBId),
+        scoreA: m.scoreA,
+        scoreB: m.scoreB,
       });
       setScoreError(null);
     }
   }
   async function saveScore(sa, sb) {
-    try { const res = await submitMatchScore(edit.matchId, sa, sb); mergeMatches(res.match, res.advanced); setEdit(null); }
-    catch (e) { setScoreError(e.message); }
+    try {
+      const res = await submitMatchScore(edit.matchId, sa, sb);
+      mergeMatches(res.match, res.advanced);
+      setEdit(null);
+    } catch (e) {
+      setScoreError(e.message);
+    }
   }
   async function handleReset() {
     setResetting(true);
@@ -343,71 +486,219 @@ export function Tournament() {
       // matches array, not this top-level field).
       if (!res.nextMatch) setTournament((prev) => (prev ? { ...prev, status: "draft" } : prev));
       setEdit(null);
-    } catch (e) { setScoreError(e.message); }
-    finally { setResetting(false); }
+    } catch (e) {
+      setScoreError(e.message);
+    } finally {
+      setResetting(false);
+    }
   }
   async function handleDelete() {
     if (!window.confirm(t("tour.confirmDelete", { name: tournament.name }))) return;
     setDeleteError(null);
-    try { await deleteTournament(id); nav("/tournament"); }
-    catch (e) { setDeleteError(e.message); }
+    try {
+      await deleteTournament(id);
+      nav("/tournament");
+    } catch (e) {
+      setDeleteError(e.message);
+    }
+  }
+  async function handleSaveInfo() {
+    setSavingInfo(true);
+    setInfoError(null);
+    try {
+      const payload = { name: infoForm.name, date: infoForm.date };
+      if (matches.length === 0) payload.matchFormat = infoForm.matchFormat;
+      setTournament(await updateTournament(id, payload));
+      setInfoForm(null);
+    } catch (e) {
+      setInfoError(e.message);
+    } finally {
+      setSavingInfo(false);
+    }
+  }
+  async function handleRemoveTeam(teamId) {
+    setRemovingTeamId(teamId);
+    setRemoveError(null);
+    try {
+      setTournament(await unregisterTeam(id, teamId));
+    } catch (e) {
+      setRemoveError(e.message);
+    } finally {
+      setRemovingTeamId(null);
+    }
   }
   async function handleGenerate() {
     setGenerating(true);
-    try { setTournament(await generateBracket(id)); } catch (e) { setScoreError(e.message); } finally { setGenerating(false); }
+    try {
+      setTournament(await generateBracket(id));
+    } catch (e) {
+      setScoreError(e.message);
+    } finally {
+      setGenerating(false);
+    }
   }
 
   // Manual seeding: swap a team with its neighbor and persist the full
   // resulting order — reorder is only meaningful before the bracket exists
   // (the backend rejects it 409 once matches are generated, see teams tab).
   async function moveTeam(teamId, dir) {
-    const ordered = tournament.teams.slice().sort((a, b) => a.seed - b.seed).map((tt) => tt.teamId);
+    const ordered = tournament.teams
+      .slice()
+      .sort((a, b) => a.seed - b.seed)
+      .map((tt) => tt.teamId);
     const i = ordered.indexOf(teamId);
     const j = i + dir;
     if (j < 0 || j >= ordered.length) return;
     [ordered[i], ordered[j]] = [ordered[j], ordered[i]];
     setReordering(true);
     setReorderError(null);
-    try { setTournament(await reorderTournamentTeams(id, ordered)); }
-    catch (e) { setReorderError(e.message); }
-    finally { setReordering(false); }
+    try {
+      setTournament(await reorderTournamentTeams(id, ordered));
+    } catch (e) {
+      setReorderError(e.message);
+    } finally {
+      setReordering(false);
+    }
   }
 
   if (!id) return <TournamentPicker />;
-  if (notFound) return (
-    <div className="py-10">
-      <h1 className="font-display font-black text-4xl text-white">{t("tour.title")}</h1>
-      <p className="text-[#a1a1aa] mt-4">
-        {t("tour.notFound")}{" "}
-        <Link to="/tournament" className="text-cyan hover:underline">{t("tour.createLink")}</Link>
-      </p>
-    </div>
-  );
+  if (notFound)
+    return (
+      <div className="py-10">
+        <h1 className="font-display font-black text-4xl text-white">{t("tour.title")}</h1>
+        <p className="text-[#a1a1aa] mt-4">
+          {t("tour.notFound")}{" "}
+          <Link to="/tournament" className="text-cyan hover:underline">
+            {t("tour.createLink")}
+          </Link>
+        </p>
+      </div>
+    );
   if (!tournament) return <div className="py-20 text-center overline">{t("tour.loading")}</div>;
 
-  const tabs = [["grid", t("tour.tab.grid")], ["res", t("tour.tab.res")], ["teams", t("tour.tab.teams")]];
+  const tabs = [
+    ["grid", t("tour.tab.grid")],
+    ["res", t("tour.tab.res")],
+    ["teams", t("tour.tab.teams")],
+  ];
 
   return (
     <div className="py-10" data-testid="tournament-page">
       <div className="flex items-center justify-between gap-4">
         <div>
-          <Overline className="text-cyan">// {tournament.discipline} · BO{bo}{tournament.status === "completed" ? ` · ${t("tour.completed")}` : ""}</Overline>
-          <h1 className="font-display font-black text-4xl sm:text-5xl tracking-tighter text-white mt-2">{tournament.name}</h1>
+          <Overline className="text-cyan">
+            // {tournament.discipline} · BO{bo}
+            {tournament.status === "completed" ? ` · ${t("tour.completed")}` : ""}
+          </Overline>
+          <h1 className="font-display font-black text-4xl sm:text-5xl tracking-tighter text-white mt-2">
+            {tournament.name}
+          </h1>
         </div>
         {isAdmin && (
-          <div className="text-right">
-            <Btn size="sm" variant="danger" data-testid="tournament-delete-btn" onClick={handleDelete}>{t("tour.delete")}</Btn>
-            {deleteError && <p className="text-[#ff0055] text-xs mt-2 max-w-[220px]">{deleteError}</p>}
+          <div className="text-right shrink-0">
+            <div className="flex gap-2 justify-end">
+              <Btn
+                size="sm"
+                variant="ghost"
+                data-testid="tournament-edit-btn"
+                onClick={() =>
+                  setInfoForm(
+                    infoForm
+                      ? null
+                      : {
+                          name: tournament.name,
+                          date: tournament.date ?? "",
+                          matchFormat: tournament.matchFormat,
+                        }
+                  )
+                }
+              >
+                {infoForm ? t("tour.editCancel") : t("tour.edit")}
+              </Btn>
+              <Btn
+                size="sm"
+                variant="danger"
+                data-testid="tournament-delete-btn"
+                onClick={handleDelete}
+              >
+                {t("tour.delete")}
+              </Btn>
+            </div>
+            {deleteError && (
+              <p className="text-[#ff0055] text-xs mt-2 max-w-[220px]">{deleteError}</p>
+            )}
           </div>
         )}
       </div>
 
+      {infoForm && (
+        <Panel clip className="p-5 mt-4 max-w-md" data-testid="tournament-edit-panel">
+          <Field label={t("create.name")}>
+            <Input
+              value={infoForm.name}
+              data-testid="tournament-edit-name"
+              onChange={(e) => setInfoForm((f) => ({ ...f, name: e.target.value }))}
+            />
+          </Field>
+          <div className="grid sm:grid-cols-2 gap-x-4">
+            <Field label={t("create.date")}>
+              <Input
+                type="date"
+                value={infoForm.date}
+                data-testid="tournament-edit-date"
+                onChange={(e) => setInfoForm((f) => ({ ...f, date: e.target.value }))}
+              />
+            </Field>
+            <Field label={t("create.format")}>
+              <Select
+                value={infoForm.matchFormat}
+                data-testid="tournament-edit-format"
+                disabled={matches.length > 0}
+                onChange={(e) => setInfoForm((f) => ({ ...f, matchFormat: +e.target.value }))}
+              >
+                {BEST_OF.map((n) => (
+                  <option key={n} value={n}>
+                    BO{n} — {t("create.winTo", { n: winTarget(n) })}
+                  </option>
+                ))}
+              </Select>
+              {matches.length > 0 && (
+                <span className="block mt-2 text-xs text-[#52525b]">{t("tour.formatLocked")}</span>
+              )}
+            </Field>
+          </div>
+          {infoError && <p className="text-[#ff0055] text-sm mt-2">{infoError}</p>}
+          <div className="flex gap-2 mt-2">
+            <Btn
+              size="sm"
+              variant="primary"
+              data-testid="tournament-edit-save"
+              onClick={handleSaveInfo}
+              disabled={savingInfo || infoForm.name.trim() === ""}
+            >
+              {savingInfo ? t("tour.saving") : t("tour.save")}
+            </Btn>
+            <Btn size="sm" variant="ghost" onClick={() => setInfoForm(null)}>
+              {t("tour.cancel")}
+            </Btn>
+          </div>
+        </Panel>
+      )}
+
       <div className="flex gap-1 mt-8 border-b border-[#27272a]">
         {tabs.map(([k, label]) => (
-          <button key={k} data-testid={`tab-${k}`} onClick={() => setTab(k)}
+          <button
+            key={k}
+            data-testid={`tab-${k}`}
+            onClick={() => setTab(k)}
             className={`px-4 py-2.5 text-xs font-mono uppercase tracking-widest -mb-px border-b-2 transition-colors ${
-              tab === k ? "border-cyan text-cyan" : "border-transparent text-[#a1a1aa] hover:text-white"
-            }`}>{label}</button>
+              tab === k
+                ? "border-cyan text-cyan"
+                : "border-transparent text-[#a1a1aa] hover:text-white"
+            }`}
+          >
+            {label}
+          </button>
         ))}
       </div>
 
@@ -427,7 +718,13 @@ export function Tournament() {
                       {t("tour.goToTeams")}
                     </button>
                   )}
-                  <Btn variant="primary" className="mt-4" data-testid="generate-btn" onClick={handleGenerate} disabled={generating}>
+                  <Btn
+                    variant="primary"
+                    className="mt-4"
+                    data-testid="generate-btn"
+                    onClick={handleGenerate}
+                    disabled={generating}
+                  >
                     {generating ? t("tour.generating") : t("tour.generate")}
                   </Btn>
                 </>
@@ -438,26 +735,56 @@ export function Tournament() {
             </Panel>
           )}
 
-          {matches.length > 0 && (champion ? (
-            <motion.div initial={{ opacity: 0, scale: 0.96 }} animate={{ opacity: 1, scale: 1 }}
-              className="flex items-center gap-4 mb-6 px-5 py-4 border border-volt bg-volt/10 rounded-sm clip-corner" data-testid="champion-banner">
-              <span className="overline text-volt">{t("tour.champion")}</span>
-              <span className="font-display font-black text-2xl text-white">{champion}</span>
-              <span className="ml-auto text-volt text-2xl">★</span>
-            </motion.div>
-          ) : isAdmin ? (
-            <p className="text-[#a1a1aa] text-sm mb-6">{t("tour.hint")}</p>
-          ) : null)}
+          {matches.length > 0 &&
+            (champion ? (
+              <motion.div
+                initial={{ opacity: 0, scale: 0.96 }}
+                animate={{ opacity: 1, scale: 1 }}
+                className="flex items-center gap-4 mb-6 px-5 py-4 border border-volt bg-volt/10 rounded-sm clip-corner"
+                data-testid="champion-banner"
+              >
+                <span className="overline text-volt">{t("tour.champion")}</span>
+                <span className="font-display font-black text-2xl text-white">{champion}</span>
+                <span className="ml-auto text-volt text-2xl">★</span>
+              </motion.div>
+            ) : isAdmin ? (
+              <p className="text-[#a1a1aa] text-sm mb-6">{t("tour.hint")}</p>
+            ) : null)}
 
           {matches.length > 0 && (
-            <div ref={bracketRef} className="relative flex gap-10 overflow-x-auto pb-4 cursor-grab active:cursor-grabbing" data-testid="bracket">
-              <svg ref={svgRef} className="wire-layer absolute top-0 left-0" width={svgSize.w} height={svgSize.h} style={{ overflow: "visible", zIndex: 0 }}>
-                {connectors.map((c) => <path key={c.key} data-src={c.sourceId} d={c.d} className={"wire" + (c.live ? " live" : "")} />)}
+            <div
+              ref={bracketRef}
+              className="relative flex gap-10 overflow-x-auto pb-4 cursor-grab active:cursor-grabbing"
+              data-testid="bracket"
+            >
+              <svg
+                ref={svgRef}
+                className="wire-layer absolute top-0 left-0"
+                width={svgSize.w}
+                height={svgSize.h}
+                style={{ overflow: "visible", zIndex: 0 }}
+              >
+                {connectors.map((c) => (
+                  <path
+                    key={c.key}
+                    data-src={c.sourceId}
+                    d={c.d}
+                    className={"wire" + (c.live ? " live" : "")}
+                  />
+                ))}
               </svg>
-              <svg ref={pulseSvgRef} className="absolute top-0 left-0 pointer-events-none" width={svgSize.w} height={svgSize.h} style={{ overflow: "visible", zIndex: 4 }} />
+              <svg
+                ref={pulseSvgRef}
+                className="absolute top-0 left-0 pointer-events-none"
+                width={svgSize.w}
+                height={svgSize.h}
+                style={{ overflow: "visible", zIndex: 4 }}
+              />
 
               {Array.from({ length: totalRounds }, (_, r) => {
-                const rm = matches.filter((m) => m.round === r).sort((x, y) => x.position - y.position);
+                const rm = matches
+                  .filter((m) => m.round === r)
+                  .sort((x, y) => x.position - y.position);
                 return (
                   // The label used to sit inside the same `justify-around` flex
                   // box as the match cards, so on rounds/final with only ONE
@@ -469,9 +796,17 @@ export function Tournament() {
                     <Overline className="mb-1">{roundLabel(rm.length)}</Overline>
                     <div className="flex flex-col justify-around gap-4 flex-1">
                       {rm.map((m) => (
-                        <MatchCard key={`${m.id}-${m.status}`} m={m} teamName={teamName} openEdit={openEdit}
-                          cardRef={setNodeRef(`m-${m.id}`)} isAdmin={isAdmin}
-                          enterScoreLabel={t("tour.enterScore")} byeLabel={t("tour.bye")} editLabel={t("tour.editScore")} />
+                        <MatchCard
+                          key={`${m.id}-${m.status}`}
+                          m={m}
+                          teamName={teamName}
+                          openEdit={openEdit}
+                          cardRef={setNodeRef(`m-${m.id}`)}
+                          isAdmin={isAdmin}
+                          enterScoreLabel={t("tour.enterScore")}
+                          byeLabel={t("tour.bye")}
+                          editLabel={t("tour.editScore")}
+                        />
                       ))}
                     </div>
                   </div>
@@ -484,13 +819,23 @@ export function Tournament() {
                       as MatchCard: the wire-recompute effect could measure it
                       mid-FLIP-transform and lock the connector onto a transient
                       rect. Plain div for geometry, animation stays inner-only. */}
-                  <div ref={setNodeRef("champion")}
+                  <div
+                    ref={setNodeRef("champion")}
                     className="w-[220px] px-3 py-3 rounded-sm border bg-surface"
-                    style={{ borderColor: champion ? "#dfff00" : "#27272a", borderStyle: champion ? "solid" : "dashed" }}>
+                    style={{
+                      borderColor: champion ? "#dfff00" : "#27272a",
+                      borderStyle: champion ? "solid" : "dashed",
+                    }}
+                  >
                     <AnimatePresence mode="popLayout" initial={false}>
-                      <motion.span key={champion ?? "empty"} initial={{ opacity: 0, x: -16 }} animate={{ opacity: 1, x: 0 }} exit={{ opacity: 0 }}
+                      <motion.span
+                        key={champion ?? "empty"}
+                        initial={{ opacity: 0, x: -16 }}
+                        animate={{ opacity: 1, x: 0 }}
+                        exit={{ opacity: 0 }}
                         transition={{ type: "spring", stiffness: 420, damping: 30 }}
-                        className={`block font-display font-bold ${champion ? "text-volt" : "text-[#52525b]"}`}>
+                        className={`block font-display font-bold ${champion ? "text-volt" : "text-[#52525b]"}`}
+                      >
                         {champion ?? "—"}
                       </motion.span>
                     </AnimatePresence>
@@ -501,35 +846,73 @@ export function Tournament() {
           )}
 
           {edit?.mode === "score" && (
-            <Panel clip className="p-6 max-w-md mt-6" data-testid="score-modal">
-              <h2 className="font-display font-bold text-lg text-white">{t("tour.scoreTitle")} · BO{bo}</h2>
-              <p className="text-[#a1a1aa] text-sm mt-2">{edit.a} vs {edit.b} — {t("tour.scorePick")} {edit.a})</p>
+            <Panel
+              clip
+              className="p-6 max-w-md mt-6"
+              data-testid="score-modal"
+              role="dialog"
+              aria-modal="true"
+              aria-labelledby="score-modal-title"
+            >
+              <h2 id="score-modal-title" className="font-display font-bold text-lg text-white">
+                {t("tour.scoreTitle")} · BO{bo}
+              </h2>
+              <p className="text-[#a1a1aa] text-sm mt-2">
+                {edit.a} vs {edit.b} — {t("tour.scorePick")} {edit.a})
+              </p>
               <div className="flex flex-wrap gap-2 mt-4">
                 {validScorelines(bo).map(([x, y]) => (
-                  <button key={`${x}-${y}`} data-testid={`score-${x}-${y}`} onClick={() => saveScore(x, y)}
-                    className="px-4 py-2 font-mono text-sm border border-[#27272a] rounded-sm hover:border-cyan hover:text-cyan transition-colors">
+                  <button
+                    key={`${x}-${y}`}
+                    data-testid={`score-${x}-${y}`}
+                    onClick={() => saveScore(x, y)}
+                    className="px-4 py-2 font-mono text-sm border border-[#27272a] rounded-sm hover:border-cyan hover:text-cyan transition-colors"
+                  >
                     {x}:{y}
                   </button>
                 ))}
               </div>
               {scoreError && <p className="text-[#ff0055] text-sm mt-3">{scoreError}</p>}
-              <Btn size="sm" variant="ghost" className="mt-4" onClick={() => setEdit(null)}>{t("tour.cancel")}</Btn>
+              <Btn size="sm" variant="ghost" className="mt-4" onClick={() => setEdit(null)}>
+                {t("tour.cancel")}
+              </Btn>
             </Panel>
           )}
 
           {edit?.mode === "reset" && (
-            <Panel clip className="p-6 max-w-md mt-6" data-testid="reset-modal">
-              <h2 className="font-display font-bold text-lg text-white">{t("tour.resetTitle")}</h2>
+            <Panel
+              clip
+              className="p-6 max-w-md mt-6"
+              data-testid="reset-modal"
+              role="dialog"
+              aria-modal="true"
+              aria-labelledby="reset-modal-title"
+            >
+              <h2 id="reset-modal-title" className="font-display font-bold text-lg text-white">
+                {t("tour.resetTitle")}
+              </h2>
               <p className="text-[#a1a1aa] text-sm mt-2">
-                {edit.a} <span className="font-mono text-white">{edit.scoreA}:{edit.scoreB}</span> {edit.b}
+                {edit.a}{" "}
+                <span className="font-mono text-white">
+                  {edit.scoreA}:{edit.scoreB}
+                </span>{" "}
+                {edit.b}
               </p>
               <p className="text-[#a1a1aa] text-sm mt-2">{t("tour.resetWarning")}</p>
               {scoreError && <p className="text-[#ff0055] text-sm mt-3">{scoreError}</p>}
               <div className="flex gap-2 mt-4">
-                <Btn size="sm" variant="danger" data-testid="reset-confirm-btn" onClick={handleReset} disabled={resetting}>
+                <Btn
+                  size="sm"
+                  variant="danger"
+                  data-testid="reset-confirm-btn"
+                  onClick={handleReset}
+                  disabled={resetting}
+                >
                   {resetting ? t("tour.resetting") : t("tour.resetConfirm")}
                 </Btn>
-                <Btn size="sm" variant="ghost" onClick={() => setEdit(null)}>{t("tour.cancel")}</Btn>
+                <Btn size="sm" variant="ghost" onClick={() => setEdit(null)}>
+                  {t("tour.cancel")}
+                </Btn>
               </div>
             </Panel>
           )}
@@ -540,16 +923,39 @@ export function Tournament() {
         <div className="mt-6 border border-[#27272a] clip-corner overflow-x-auto">
           <table className="w-full text-sm min-w-[520px]">
             <thead>
-              <tr>{[t("tour.res.round"), t("tour.res.match"), t("tour.res.score"), t("tour.res.winner")].map((h) => (
-                <th key={h} className="overline px-4 py-3 text-left border-b border-[#27272a]">{h}</th>))}</tr>
+              <tr>
+                {[
+                  t("tour.res.round"),
+                  t("tour.res.match"),
+                  t("tour.res.score"),
+                  t("tour.res.winner"),
+                ].map((h) => (
+                  <th key={h} className="overline px-4 py-3 text-left border-b border-[#27272a]">
+                    {h}
+                  </th>
+                ))}
+              </tr>
             </thead>
             <tbody>
-              {results.length === 0 && <tr><td colSpan={4} className="px-4 py-6 text-[#52525b] text-center">{t("tour.res.empty")}</td></tr>}
+              {results.length === 0 && (
+                <tr>
+                  <td colSpan={4} className="px-4 py-6 text-[#52525b] text-center">
+                    {t("tour.res.empty")}
+                  </td>
+                </tr>
+              )}
               {results.map((m, i) => (
-                <tr key={i} className="border-b border-[#27272a]/50 hover:bg-[#27272a]/30 transition-colors">
+                <tr
+                  key={i}
+                  className="border-b border-[#27272a]/50 hover:bg-[#27272a]/30 transition-colors"
+                >
                   <td className="px-4 py-3 font-mono text-[#a1a1aa]">{m.round}</td>
-                  <td className="px-4 py-3 text-white">{m.a ?? "—"} — {m.b ?? "—"}</td>
-                  <td className="px-4 py-3 font-mono text-cyan">{m.bye ? t("tour.bye") : `${m.sa}:${m.sb}`}</td>
+                  <td className="px-4 py-3 text-white">
+                    {m.a ?? "—"} — {m.b ?? "—"}
+                  </td>
+                  <td className="px-4 py-3 font-mono text-cyan">
+                    {m.bye ? t("tour.bye") : `${m.sa}:${m.sb}`}
+                  </td>
                   <td className="px-4 py-3 font-display font-semibold text-white">{m.w}</td>
                 </tr>
               ))}
@@ -565,33 +971,65 @@ export function Tournament() {
             <p className="text-xs text-[#a1a1aa] mt-2">{t("tour.reorderHint")}</p>
           )}
           <div className="mt-4 divide-y divide-[#27272a]/60">
-            {tournament.teams.slice().sort((x, y) => x.seed - y.seed).map((tt, i, sorted) => (
-              <div key={tt.id} data-testid={`participant-row-${tt.teamId}`} className="flex items-center gap-4 py-2.5">
-                <span className="font-mono text-xs text-cyan w-6">{String(tt.seed).padStart(2, "0")}</span>
-                <span className="text-white">{tt.team?.name}</span>
-                {matches.length === 0 && isAdmin && (
-                  <span className="ml-auto flex gap-1">
-                    <button
-                      data-testid={`participant-up-${tt.teamId}`}
-                      disabled={i === 0 || reordering}
-                      onClick={() => moveTeam(tt.teamId, -1)}
-                      className="w-6 h-6 grid place-items-center border border-[#27272a] rounded-sm text-[#a1a1aa] hover:border-cyan hover:text-cyan transition-colors disabled:opacity-30 disabled:hover:border-[#27272a] disabled:hover:text-[#a1a1aa]"
-                    >▲</button>
-                    <button
-                      data-testid={`participant-down-${tt.teamId}`}
-                      disabled={i === sorted.length - 1 || reordering}
-                      onClick={() => moveTeam(tt.teamId, 1)}
-                      className="w-6 h-6 grid place-items-center border border-[#27272a] rounded-sm text-[#a1a1aa] hover:border-cyan hover:text-cyan transition-colors disabled:opacity-30 disabled:hover:border-[#27272a] disabled:hover:text-[#a1a1aa]"
-                    >▼</button>
+            {tournament.teams
+              .slice()
+              .sort((x, y) => x.seed - y.seed)
+              .map((tt, i, sorted) => (
+                <div
+                  key={tt.id}
+                  data-testid={`participant-row-${tt.teamId}`}
+                  className="flex items-center gap-4 py-2.5"
+                >
+                  <span className="font-mono text-xs text-cyan w-6">
+                    {String(tt.seed).padStart(2, "0")}
                   </span>
-                )}
-              </div>
-            ))}
+                  <span className="text-white">{tt.team?.name}</span>
+                  {matches.length === 0 && isAdmin && (
+                    <span className="ml-auto flex gap-1">
+                      <button
+                        data-testid={`participant-up-${tt.teamId}`}
+                        disabled={i === 0 || reordering}
+                        onClick={() => moveTeam(tt.teamId, -1)}
+                        className="w-6 h-6 grid place-items-center border border-[#27272a] rounded-sm text-[#a1a1aa] hover:border-cyan hover:text-cyan transition-colors disabled:opacity-30 disabled:hover:border-[#27272a] disabled:hover:text-[#a1a1aa]"
+                      >
+                        ▲
+                      </button>
+                      <button
+                        data-testid={`participant-down-${tt.teamId}`}
+                        disabled={i === sorted.length - 1 || reordering}
+                        onClick={() => moveTeam(tt.teamId, 1)}
+                        className="w-6 h-6 grid place-items-center border border-[#27272a] rounded-sm text-[#a1a1aa] hover:border-cyan hover:text-cyan transition-colors disabled:opacity-30 disabled:hover:border-[#27272a] disabled:hover:text-[#a1a1aa]"
+                      >
+                        ▼
+                      </button>
+                      <button
+                        data-testid={`participant-remove-${tt.teamId}`}
+                        disabled={removingTeamId === tt.teamId}
+                        onClick={() => handleRemoveTeam(tt.teamId)}
+                        title={t("tour.removeTeam")}
+                        className="w-6 h-6 grid place-items-center border border-[#27272a] rounded-sm text-[#a1a1aa] hover:border-[#ff0055] hover:text-[#ff0055] transition-colors disabled:opacity-30"
+                      >
+                        ×
+                      </button>
+                    </span>
+                  )}
+                </div>
+              ))}
           </div>
-          <p className="text-xs text-[#52525b] mt-4">{tournament.teams.length} {t("tour.teamsCount")}</p>
+          <p className="text-xs text-[#52525b] mt-4">
+            {tournament.teams.length} {t("tour.teamsCount")}
+          </p>
           {reorderError && <p className="text-[#ff0055] text-sm mt-3">{reorderError}</p>}
+          {removeError && <p className="text-[#ff0055] text-sm mt-3">{removeError}</p>}
           {matches.length === 0 && isAdmin && tournament.teams.length >= 2 && (
-            <Btn variant="primary" size="sm" className="mt-4" data-testid="generate-btn-teams-tab" onClick={handleGenerate} disabled={generating}>
+            <Btn
+              variant="primary"
+              size="sm"
+              className="mt-4"
+              data-testid="generate-btn-teams-tab"
+              onClick={handleGenerate}
+              disabled={generating}
+            >
               {generating ? t("tour.generating") : t("tour.generate")}
             </Btn>
           )}

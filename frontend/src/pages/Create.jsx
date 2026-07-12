@@ -4,7 +4,14 @@ import { motion } from "framer-motion";
 import { useI18n } from "../lib/i18n";
 import { useAuth } from "../lib/auth";
 import { getTeams, createTournament } from "../lib/api";
-import { bracketPlan, BEST_OF, winTarget, DISCIPLINE_LIST, avgRating, effectivePlayerRank } from "../lib/demo";
+import {
+  bracketPlan,
+  BEST_OF,
+  winTarget,
+  DISCIPLINE_LIST,
+  avgRating,
+  effectivePlayerRank,
+} from "../lib/demo";
 import { Btn, Field, Input, Overline, Panel, Select } from "../components/arena";
 
 function shuffled(arr) {
@@ -49,6 +56,7 @@ export function Create() {
   const [seedType, setSeedType] = useState("rating");
   const [allTeams, setAllTeams] = useState([]);
   const [selectedIds, setSelectedIds] = useState([]);
+  const [teamQuery, setTeamQuery] = useState("");
   const [submitting, setSubmitting] = useState(false);
   const [error, setError] = useState(null);
 
@@ -64,6 +72,9 @@ export function Create() {
     setSelectedIds((ids) => (ids.includes(id) ? ids.filter((x) => x !== id) : [...ids, id]));
 
   const teamsInDiscipline = allTeams.filter((tm) => tm.discipline === discipline);
+  const visibleTeams = teamsInDiscipline.filter((tm) =>
+    tm.name.toLowerCase().includes(teamQuery.trim().toLowerCase())
+  );
   const isDouble = bracket === "double";
   const plan = bracketPlan(Math.max(selectedIds.length, 1));
   const canSubmit = !isDouble && selectedIds.length >= 2 && name.trim() !== "" && !submitting;
@@ -119,11 +130,19 @@ export function Create() {
       <div className="grid lg:grid-cols-[1fr_320px] gap-6 mt-8 items-start">
         <Panel clip className="p-6">
           <Field label={t("create.name")}>
-            <Input value={name} data-testid="create-name-input" onChange={(e) => setName(e.target.value)} />
+            <Input
+              value={name}
+              data-testid="create-name-input"
+              onChange={(e) => setName(e.target.value)}
+            />
           </Field>
           <div className="grid sm:grid-cols-2 gap-x-4">
             <Field label={t("create.bracket")}>
-              <Select value={bracket} data-testid="create-bracket-select" onChange={(e) => setBracket(e.target.value)}>
+              <Select
+                value={bracket}
+                data-testid="create-bracket-select"
+                onChange={(e) => setBracket(e.target.value)}
+              >
                 <option value="single">{t("create.single")}</option>
                 <option value="double">{t("create.double")}</option>
               </Select>
@@ -132,65 +151,119 @@ export function Create() {
               )}
             </Field>
             <Field label={t("create.format")}>
-              <Select value={bo} data-testid="create-bo-select" onChange={(e) => setBo(+e.target.value)}>
+              <Select
+                value={bo}
+                data-testid="create-bo-select"
+                onChange={(e) => setBo(+e.target.value)}
+              >
                 {BEST_OF.map((n) => (
-                  <option key={n} value={n}>BO{n} — {t("create.winTo", { n: winTarget(n) })}</option>
+                  <option key={n} value={n}>
+                    BO{n} — {t("create.winTo", { n: winTarget(n) })}
+                  </option>
                 ))}
               </Select>
             </Field>
           </div>
           <div className="grid sm:grid-cols-2 gap-x-4">
             <Field label={t("create.discipline")}>
-              <Select value={discipline} data-testid="create-discipline-select" onChange={(e) => changeDiscipline(e.target.value)}>
-                {DISCIPLINE_LIST.map((d) => <option key={d}>{d}</option>)}
+              <Select
+                value={discipline}
+                data-testid="create-discipline-select"
+                onChange={(e) => changeDiscipline(e.target.value)}
+              >
+                {DISCIPLINE_LIST.map((d) => (
+                  <option key={d}>{d}</option>
+                ))}
               </Select>
             </Field>
             <Field label={t("create.date")}>
-              <Input type="date" value={date} data-testid="create-date-input" onChange={(e) => setDate(e.target.value)} />
+              <Input
+                type="date"
+                value={date}
+                data-testid="create-date-input"
+                onChange={(e) => setDate(e.target.value)}
+              />
             </Field>
           </div>
           <Field label={t("create.seed")}>
-            <Select value={seedType} data-testid="create-seed-select" onChange={(e) => setSeedType(e.target.value)}>
+            <Select
+              value={seedType}
+              data-testid="create-seed-select"
+              onChange={(e) => setSeedType(e.target.value)}
+            >
               <option value="random">{t("create.seed.random")}</option>
               <option value="rating">{t("create.seed.rating")}</option>
               <option value="manual">{t("create.seed.manual")}</option>
             </Select>
             {seedType === "manual" && (
-              <span className="block mt-2 text-xs text-[#a1a1aa]">{t("create.seed.manualHint")}</span>
+              <span className="block mt-2 text-xs text-[#a1a1aa]">
+                {t("create.seed.manualHint")}
+              </span>
             )}
           </Field>
 
           <div className="mt-2">
-            <Overline>{t("create.participants")} ({discipline})</Overline>
+            <Overline>
+              {t("create.participants")} ({discipline})
+            </Overline>
             {teamsInDiscipline.length === 0 ? (
               <p className="text-xs text-[#ff0055] mt-3">{t("create.noTeams")}</p>
             ) : (
-              <div className="grid sm:grid-cols-2 gap-2 mt-3" data-testid="create-team-picker">
-                {teamsInDiscipline.map((tm) => {
-                  const on = selectedIds.includes(tm.id);
-                  return (
-                    <button
-                      key={tm.id}
-                      data-testid={`create-team-${tm.id}`}
-                      onClick={() => toggleTeam(tm.id)}
-                      className={`flex items-center gap-3 px-3 py-2.5 border rounded-sm text-left text-sm transition-colors ${
-                        on ? "border-cyan bg-cyan/10 text-white ring-1 ring-cyan" : "border-[#27272a] text-[#a1a1aa] hover:border-[#3f3f46]"
-                      }`}
-                    >
-                      <span className={`w-3 h-3 rotate-45 shrink-0 ${on ? "bg-cyan" : "border border-[#3f3f46]"}`} />
-                      {tm.name}
-                    </button>
-                  );
-                })}
-              </div>
+              <>
+                {teamsInDiscipline.length > 5 && (
+                  <Input
+                    value={teamQuery}
+                    data-testid="create-team-search"
+                    placeholder={t("create.teamSearch")}
+                    onChange={(e) => setTeamQuery(e.target.value)}
+                    className="mt-3"
+                  />
+                )}
+                {visibleTeams.length === 0 && (
+                  <p className="text-xs text-[#52525b] mt-3">{t("create.noMatch")}</p>
+                )}
+                <div className="grid sm:grid-cols-2 gap-2 mt-3" data-testid="create-team-picker">
+                  {visibleTeams.map((tm) => {
+                    const on = selectedIds.includes(tm.id);
+                    return (
+                      <button
+                        key={tm.id}
+                        data-testid={`create-team-${tm.id}`}
+                        onClick={() => toggleTeam(tm.id)}
+                        className={`flex items-center gap-3 px-3 py-2.5 border rounded-sm text-left text-sm transition-colors ${
+                          on
+                            ? "border-cyan bg-cyan/10 text-white ring-1 ring-cyan"
+                            : "border-[#27272a] text-[#a1a1aa] hover:border-[#3f3f46]"
+                        }`}
+                      >
+                        <span
+                          className={`w-3 h-3 rotate-45 shrink-0 ${on ? "bg-cyan" : "border border-[#3f3f46]"}`}
+                        />
+                        {tm.name}
+                      </button>
+                    );
+                  })}
+                </div>
+              </>
             )}
           </div>
 
-          {error && <p className="text-[#ff0055] text-sm mt-4" data-testid="create-error">{error}</p>}
+          {error && (
+            <p className="text-[#ff0055] text-sm mt-4" data-testid="create-error">
+              {error}
+            </p>
+          )}
 
           <div className="mt-6">
-            <Btn variant="primary" data-testid="create-submit-btn" onClick={handleSubmit} disabled={!canSubmit}>
-              {submitting ? t("create.submitting") : t(seedType === "manual" ? "create.submit.manual" : "create.submit")}
+            <Btn
+              variant="primary"
+              data-testid="create-submit-btn"
+              onClick={handleSubmit}
+              disabled={!canSubmit}
+            >
+              {submitting
+                ? t("create.submitting")
+                : t(seedType === "manual" ? "create.submit.manual" : "create.submit")}
             </Btn>
           </div>
         </Panel>

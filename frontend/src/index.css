@@ -130,7 +130,9 @@ body {
   margin: -4px 0 0 -4px;
   border-radius: 50%;
   background: var(--cyan);
-  box-shadow: 0 0 8px 3px var(--cyan), 0 0 18px 7px rgba(0, 240, 255, 0.4);
+  box-shadow:
+    0 0 8px 3px var(--cyan),
+    0 0 18px 7px rgba(0, 240, 255, 0.4);
   will-change: transform, opacity;
 }
 
@@ -145,4 +147,3 @@ input[type="date"]::-webkit-calendar-picker-indicator {
   filter: invert(0.7);
   cursor: pointer;
 }
-

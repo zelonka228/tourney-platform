@@ -30,7 +30,13 @@ function ProviderBadge({ provider, href }) {
       data-testid={`provider-badge-${provider}`}
       whileHover={{ scale: 1.15, filter: `drop-shadow(0 0 6px ${meta.color})` }}
       whileTap={{ scale: 0.92 }}
-      animate={{ filter: [`drop-shadow(0 0 1px ${meta.color}88)`, `drop-shadow(0 0 4px ${meta.color}aa)`, `drop-shadow(0 0 1px ${meta.color}88)`] }}
+      animate={{
+        filter: [
+          `drop-shadow(0 0 1px ${meta.color}88)`,
+          `drop-shadow(0 0 4px ${meta.color}aa)`,
+          `drop-shadow(0 0 1px ${meta.color}88)`,
+        ],
+      }}
       transition={{ filter: { duration: 2.2, repeat: Infinity, ease: "easeInOut" } }}
       className="absolute -bottom-1.5 -right-1.5 w-5 h-5 grid place-items-center cursor-pointer"
     >
@@ -89,7 +95,11 @@ export function PlayerStatsWidget({ status, data, error, onRetry }) {
   ].filter(Boolean);
 
   return (
-    <motion.div initial={{ opacity: 0, y: -6 }} animate={{ opacity: 1, y: 0 }} transition={{ duration: 0.2 }}>
+    <motion.div
+      initial={{ opacity: 0, y: -6 }}
+      animate={{ opacity: 1, y: 0 }}
+      transition={{ duration: 0.2 }}
+    >
       <Panel clip className="p-4 mt-2">
         <div className="flex items-center gap-3">
           <div className="relative shrink-0">
@@ -119,7 +129,10 @@ export function PlayerStatsWidget({ status, data, error, onRetry }) {
         </div>
 
         {cells.length > 0 && (
-          <div className="grid gap-2 mt-3" style={{ gridTemplateColumns: `repeat(${cells.length}, 1fr)` }}>
+          <div
+            className="grid gap-2 mt-3"
+            style={{ gridTemplateColumns: `repeat(${cells.length}, 1fr)` }}
+          >
             {cells.map((c) => (
               <div key={c.l} className="text-center">
                 <div className="font-mono text-sm text-white">{c.v}</div>
@@ -140,7 +153,9 @@ export function PlayerStatsWidget({ status, data, error, onRetry }) {
           </div>
         )}
 
-        {stale && <div className="mt-2 text-[10px] text-[#52525b] text-center">{t("widget.stale")}</div>}
+        {stale && (
+          <div className="mt-2 text-[10px] text-[#52525b] text-center">{t("widget.stale")}</div>
+        )}
       </Panel>
     </motion.div>
   );

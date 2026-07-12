@@ -124,7 +124,9 @@ export function Landing() {
               <Panel clip className="p-6 h-full hover:border-cyan transition-colors">
                 <div className="flex items-center justify-between">
                   <span className="font-mono text-cyan text-xs">{c.tag}</span>
-                  <span className="text-cyan opacity-0 group-hover:opacity-100 transition-opacity">→</span>
+                  <span className="text-cyan opacity-0 group-hover:opacity-100 transition-opacity">
+                    →
+                  </span>
                 </div>
                 <h3 className="font-display font-bold text-xl mt-6 text-white">
                   {t(`landing.card.${c.key}`)}

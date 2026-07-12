@@ -8,6 +8,14 @@ import { requireAdmin } from "../auth.js";
 const router = Router();
 
 const DISCIPLINE_VALUES = Object.keys(DISCIPLINES); // ["CS2", "Dota 2", "Valorant"]
+const NAME_MAX_LEN = 60;
+const NICK_MAX_LEN = 40;
+
+function checkNameLength(name) {
+  if (typeof name === "string" && name.length > NAME_MAX_LEN) {
+    throw new HttpError(400, `Назва команди не може перевищувати ${NAME_MAX_LEN} символів.`);
+  }
+}
 
 // Player.nick/role/rank are non-null String columns — validate shape before
 // handing the array to Prisma's nested create, otherwise a blank/wrong-type
@@ -34,6 +42,9 @@ function validatePlayers(players) {
         400,
         `Гравець #${i + 1}: поля ${wrongType.join(", ")} мають бути рядком.`
       );
+    }
+    if (p.nick.length > NICK_MAX_LEN) {
+      throw new HttpError(400, `Гравець #${i + 1}: нік не може перевищувати ${NICK_MAX_LEN} символів.`);
     }
   });
 }
@@ -98,6 +109,7 @@ router.post(
 
     requireFields(req.body, ["name", "discipline"]);
     requireEnum("discipline", discipline, DISCIPLINE_VALUES);
+    checkNameLength(name);
     validatePlayers(players);
 
     const team = await prisma.team.create({
@@ -135,6 +147,7 @@ router.put(
       req.body ?? {};
 
     if (discipline !== undefined) requireEnum("discipline", discipline, DISCIPLINE_VALUES);
+    if (name !== undefined) checkNameLength(name);
 
     const existing = await prisma.team.findUnique({ where: { id } });
     if (!existing) throw new HttpError(404, "Команду не знайдено.");

@@ -40,7 +40,12 @@ export function Account() {
 
           <p className="text-[#a1a1aa] text-sm mt-5">{t("auth.readOnlyNotice")}</p>
 
-          <Btn variant="ghost" className="w-full mt-6" data-testid="logout-btn" onClick={handleLogout}>
+          <Btn
+            variant="ghost"
+            className="w-full mt-6"
+            data-testid="logout-btn"
+            onClick={handleLogout}
+          >
             {t("auth.signOut")}
           </Btn>
         </Panel>

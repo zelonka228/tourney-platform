@@ -4,13 +4,14 @@ import { motion } from "framer-motion";
 import { useI18n } from "../lib/i18n";
 import { getTeams, getPlayerStats } from "../lib/api";
 import { avgRating, effectivePlayerRank, liveRankFromStats, DISCIPLINES } from "../lib/demo";
-import { Btn, Overline, Panel, Stat } from "../components/arena";
+import { Btn, Overline, Panel, Stat, Input } from "../components/arena";
 import { PlayerStatsWidget } from "../components/PlayerStatsWidget";
 
 export function Profile() {
   const { t } = useI18n();
   const [sel, setSel] = useState(null);
   const [teams, setTeams] = useState([]);
+  const [query, setQuery] = useState("");
   // PlayerRow eager-fetches live stats for any linked player on mount (not
   // just on click, see PlayerRow) so the roster row shows the real rank
   // right away instead of a stale manually-entered one. Once fresh stats
@@ -34,38 +35,55 @@ export function Profile() {
           {t("profile.title")}
         </h1>
         <p className="text-[#a1a1aa] mt-2">{t("profile.sub")}</p>
+        {teams.length > 5 && (
+          <Input
+            value={query}
+            data-testid="profile-search"
+            placeholder={t("hall.search")}
+            onChange={(e) => setQuery(e.target.value)}
+            className="mt-4 max-w-sm"
+          />
+        )}
         <div className="grid sm:grid-cols-2 lg:grid-cols-3 gap-4 mt-8">
-          {teams.map((team, i) => {
-            // Рейтинг — середнє лише основного складу, підстави не враховуються.
-            // Для CS2-гравців з прив'язаним FACEIT — живий ELO замість
-            // застарілого вручну введеного значення (з кешу останнього фетчу).
-            const r = avgRating(
-              team.discipline,
-              team.players.filter((p) => !p.isSubstitute).map((p) => effectivePlayerRank(team.discipline, p))
-            );
-            return (
-              <motion.button
-                key={team.id}
-                data-testid={`team-card-${i}`}
-                onClick={() => setSel(i)}
-                initial={{ opacity: 0, y: 16 }}
-                animate={{ opacity: 1, y: 0 }}
-                transition={{ delay: i * 0.05 }}
-                whileHover={{ y: -4 }}
-                className="text-left"
-              >
-                <Panel clip className="p-5 flex items-center gap-4 hover:border-cyan transition-colors">
-                  <Logo logo={team.logo} className="w-12 h-12" />
-                  <div className="min-w-0">
-                    <h3 className="font-display font-bold text-white truncate">{team.name}</h3>
-                    <p className="text-xs font-mono text-[#a1a1aa] mt-1">
-                      {team.discipline} · {r.label} {t(`unit.${r.unitKey}`)}
-                    </p>
-                  </div>
-                </Panel>
-              </motion.button>
-            );
-          })}
+          {teams
+            .map((team, i) => ({ team, i }))
+            .filter(({ team }) => team.name.toLowerCase().includes(query.trim().toLowerCase()))
+            .map(({ team, i }) => {
+              // Рейтинг — середнє лише основного складу, підстави не враховуються.
+              // Для CS2-гравців з прив'язаним FACEIT — живий ELO замість
+              // застарілого вручну введеного значення (з кешу останнього фетчу).
+              const r = avgRating(
+                team.discipline,
+                team.players
+                  .filter((p) => !p.isSubstitute)
+                  .map((p) => effectivePlayerRank(team.discipline, p))
+              );
+              return (
+                <motion.button
+                  key={team.id}
+                  data-testid={`team-card-${i}`}
+                  onClick={() => setSel(i)}
+                  initial={{ opacity: 0, y: 16 }}
+                  animate={{ opacity: 1, y: 0 }}
+                  transition={{ delay: i * 0.05 }}
+                  whileHover={{ y: -4 }}
+                  className="text-left"
+                >
+                  <Panel
+                    clip
+                    className="p-5 flex items-center gap-4 hover:border-cyan transition-colors"
+                  >
+                    <Logo logo={team.logo} className="w-12 h-12" />
+                    <div className="min-w-0">
+                      <h3 className="font-display font-bold text-white truncate">{team.name}</h3>
+                      <p className="text-xs font-mono text-[#a1a1aa] mt-1">
+                        {team.discipline} · {r.label} {t(`unit.${r.unitKey}`)}
+                      </p>
+                    </div>
+                  </Panel>
+                </motion.button>
+              );
+            })}
         </div>
       </div>
     );
@@ -110,7 +128,9 @@ export function Profile() {
             <Stat value={team.best ?? "—"} label={t("profile.best")} accent="volt" />
           </div>
           <div className="p-5">
-            <Overline>{t("profile.roster")} · {unit}</Overline>
+            <Overline>
+              {t("profile.roster")} · {unit}
+            </Overline>
             <div className="mt-3 divide-y divide-[#27272a]/60">
               {mainPlayers.map((p, i) => (
                 <PlayerRow
@@ -128,7 +148,11 @@ export function Profile() {
                   {team.players
                     .filter((p) => p.isSubstitute)
                     .map((p, i) => (
-                      <PlayerRow key={p.id ?? `sub-${p.nick}-${i}`} p={p} discipline={team.discipline} />
+                      <PlayerRow
+                        key={p.id ?? `sub-${p.nick}-${i}`}
+                        p={p}
+                        discipline={team.discipline}
+                      />
                     ))}
                 </div>
               </>
@@ -140,7 +164,9 @@ export function Profile() {
           <Panel clip className="p-6">
             <Overline>{t("profile.rating")}</Overline>
             <div className="font-mono text-5xl text-cyan mt-4">{rating.label}</div>
-            <div className="overline mt-1">{unit} · {mainPlayers.length} {t("profile.players")}</div>
+            <div className="overline mt-1">
+              {unit} · {mainPlayers.length} {t("profile.players")}
+            </div>
             <p className="text-[#a1a1aa] text-sm mt-4">{t("profile.ratingDesc")}</p>
           </Panel>
           <Panel clip className="p-6">
@@ -226,14 +252,20 @@ function PlayerRow({ p, discipline, onLiveElo }) {
           className={`w-1.5 h-1.5 rotate-45 shrink-0 ${clickable ? "bg-cyan group-hover:shadow-[0_0_6px_#00f0ff]" : "bg-cyan/60"}`}
         />
         <div className="min-w-0">
-          <div className={`text-sm truncate ${clickable ? "text-white group-hover:text-cyan transition-colors" : "text-white"}`}>
+          <div
+            className={`text-sm truncate ${clickable ? "text-white group-hover:text-cyan transition-colors" : "text-white"}`}
+          >
             {p.nick}
           </div>
           <div className="text-[11px] font-mono text-[#a1a1aa]">{p.role}</div>
         </div>
         <span className="ml-auto font-mono text-sm text-cyan">{displayRank}</span>
         {clickable && (
-          <span className={`text-[#52525b] text-xs transition-transform ${open ? "rotate-180" : ""}`}>▾</span>
+          <span
+            className={`text-[#52525b] text-xs transition-transform ${open ? "rotate-180" : ""}`}
+          >
+            ▾
+          </span>
         )}
       </div>
       {open && (
@@ -250,7 +282,9 @@ function PlayerRow({ p, discipline, onLiveElo }) {
 
 function Logo({ logo, className }) {
   return (
-    <div className={`shrink-0 border border-[#27272a] bg-void grid place-items-center overflow-hidden ${className}`}>
+    <div
+      className={`shrink-0 border border-[#27272a] bg-void grid place-items-center overflow-hidden ${className}`}
+    >
       {logo ? (
         <img src={logo} alt="" className="w-full h-full object-cover" />
       ) : (

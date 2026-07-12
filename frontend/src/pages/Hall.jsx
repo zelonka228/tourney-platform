@@ -3,7 +3,7 @@ import { motion } from "framer-motion";
 import { useI18n } from "../lib/i18n";
 import { getTeams } from "../lib/api";
 import { avgRating, effectivePlayerRank } from "../lib/demo";
-import { Overline } from "../components/arena";
+import { Overline, Input } from "../components/arena";
 
 const TABS = ["all", "CS2", "Dota 2", "Valorant"];
 
@@ -11,6 +11,7 @@ export function Hall() {
   const { t } = useI18n();
   const [disc, setDisc] = useState("all");
   const [teams, setTeams] = useState([]);
+  const [query, setQuery] = useState("");
 
   useEffect(() => {
     getTeams().then(setTeams);
@@ -37,10 +38,19 @@ export function Hall() {
       };
     })
     .filter((tm) => disc === "all" || tm.discipline === disc)
-    .sort((a, b) => (a.discipline === b.discipline ? b.sort - a.sort : a.discipline.localeCompare(b.discipline)));
+    .filter((tm) => tm.name.toLowerCase().includes(query.trim().toLowerCase()))
+    .sort((a, b) =>
+      a.discipline === b.discipline ? b.sort - a.sort : a.discipline.localeCompare(b.discipline)
+    );
 
   const rankColor = (i) =>
-    i === 0 ? "text-volt font-black" : i === 1 ? "text-zinc-200" : i === 2 ? "text-amber-500" : "text-[#52525b]";
+    i === 0
+      ? "text-volt font-black"
+      : i === 1
+        ? "text-zinc-200"
+        : i === 2
+          ? "text-amber-500"
+          : "text-[#52525b]";
 
   return (
     <div className="py-10" data-testid="hall-page">
@@ -48,32 +58,52 @@ export function Hall() {
         {t("hall.title")}
       </h1>
 
-      <div className="flex flex-wrap gap-2 mt-6">
-        {TABS.map((d) => (
-          <button
-            key={d}
-            data-testid={`hall-tab-${d}`}
-            onClick={() => setDisc(d)}
-            className={`px-4 py-2 text-xs font-mono uppercase tracking-widest rounded-sm border transition-colors ${
-              disc === d ? "border-cyan text-cyan bg-cyan/10" : "border-[#27272a] text-[#a1a1aa] hover:text-white"
-            }`}
-          >
-            {d === "all" ? t("hall.all") : d}
-          </button>
-        ))}
+      <div className="flex flex-wrap items-center gap-3 mt-6">
+        <div className="flex flex-wrap gap-2">
+          {TABS.map((d) => (
+            <button
+              key={d}
+              data-testid={`hall-tab-${d}`}
+              onClick={() => setDisc(d)}
+              className={`px-4 py-2 text-xs font-mono uppercase tracking-widest rounded-sm border transition-colors ${
+                disc === d
+                  ? "border-cyan text-cyan bg-cyan/10"
+                  : "border-[#27272a] text-[#a1a1aa] hover:text-white"
+              }`}
+            >
+              {d === "all" ? t("hall.all") : d}
+            </button>
+          ))}
+        </div>
+        <Input
+          value={query}
+          data-testid="hall-search"
+          placeholder={t("hall.search")}
+          onChange={(e) => setQuery(e.target.value)}
+          className="sm:ml-auto sm:w-64"
+        />
       </div>
+
+      {rows.length === 0 && teams.length > 0 && (
+        <p className="text-[#52525b] text-sm mt-6">{t("create.noMatch")}</p>
+      )}
 
       <div className="mt-6 border border-[#27272a] clip-corner overflow-x-auto">
         <table className="w-full text-sm min-w-[560px]">
           <thead>
             <tr className="text-left">
-              {["#", t("hall.col.team"), t("hall.col.discipline"), t("hall.col.rating"), t("hall.col.winrate"), t("hall.col.tournaments")].map(
-                (h) => (
-                  <th key={h} className="overline px-4 py-3 border-b border-[#27272a]">
-                    {h}
-                  </th>
-                )
-              )}
+              {[
+                "#",
+                t("hall.col.team"),
+                t("hall.col.discipline"),
+                t("hall.col.rating"),
+                t("hall.col.winrate"),
+                t("hall.col.tournaments"),
+              ].map((h) => (
+                <th key={h} className="overline px-4 py-3 border-b border-[#27272a]">
+                  {h}
+                </th>
+              ))}
             </tr>
           </thead>
           <tbody>
