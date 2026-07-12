@@ -9,10 +9,17 @@ import {
   liveRankFromStats,
   liveNickFromStats,
   DISCIPLINES,
+  VALORANT_RANKS,
 } from "../lib/demo";
 import { Btn, Overline, Panel, Stat, Input } from "../components/arena";
 import { PlayerStatsWidget } from "../components/PlayerStatsWidget";
-import { Reveal } from "../components/motion";
+import { Reveal, AnimatedNumber } from "../components/motion";
+
+// Ranks (Valorant) don't have a natural "count up" — but avgRating already
+// resolves them to a numeric VALORANT_RANKS index under the hood, so the
+// same AnimatedNumber component can tick through rank names instead of
+// digits. Numeric disciplines (CS2/Dota) need no formatter at all.
+const rankFormat = (v) => VALORANT_RANKS[Math.max(0, Math.min(Math.round(v), VALORANT_RANKS.length - 1))];
 
 export function Profile() {
   const { t } = useI18n();
@@ -101,6 +108,7 @@ export function Profile() {
   const unit = t(`unit.${DISCIPLINES[team.discipline].unitKey}`);
   const rankFor = (p) => liveElo[p.id] ?? effectivePlayerRank(team.discipline, p);
   const rating = avgRating(team.discipline, mainPlayers.map(rankFor));
+  const isRankKind = DISCIPLINES[team.discipline].kind === "rank";
 
   return (
     <div className="py-10" data-testid="profile-detail">
@@ -171,7 +179,13 @@ export function Profile() {
         <div className="space-y-4">
           <Panel clip className="p-6">
             <Overline>{t("profile.rating")}</Overline>
-            <div className="font-mono text-5xl text-cyan mt-4">{rating.label}</div>
+            <div className="font-mono text-5xl text-cyan mt-4">
+              <AnimatedNumber
+                value={rating.value ?? rating.label}
+                format={isRankKind ? rankFormat : undefined}
+                immediate
+              />
+            </div>
             <div className="overline mt-1">
               {unit} · {mainPlayers.length} {t("profile.players")}
             </div>

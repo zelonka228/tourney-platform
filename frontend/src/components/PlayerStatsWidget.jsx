@@ -2,6 +2,7 @@ import { useState } from "react";
 import { motion } from "framer-motion";
 import { useI18n } from "../lib/i18n";
 import { Panel } from "./arena";
+import { AnimatedNumber } from "./motion";
 
 // Neon platform badge that links out to the external profile. Deliberately
 // NOT the real FACEIT/tracker.gg logos — those are trademarked assets in
@@ -123,7 +124,11 @@ export function PlayerStatsWidget({ status, data, error, onRetry }) {
           </div>
           {eloOrMmr != null && (
             <div className="text-right shrink-0">
-              <div className="font-mono text-2xl text-cyan leading-none">{eloOrMmr}</div>
+              <AnimatedNumber
+                value={eloOrMmr}
+                className="font-mono text-2xl text-cyan leading-none"
+                immediate
+              />
             </div>
           )}
         </div>

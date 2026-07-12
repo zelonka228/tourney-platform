@@ -5,19 +5,33 @@
 import { useEffect, useRef } from "react";
 import { motion, useInView, useMotionValue, useSpring, useTransform } from "framer-motion";
 
-// Counts up to `value` once it scrolls into view. Non-numeric values (e.g.
-// the "—" placeholder shown before live stats load) render as plain text —
-// there's nothing to animate towards.
-export function AnimatedNumber({ value, className = "" }) {
+// Counts up to `value`. Non-numeric values (e.g. the "—" placeholder shown
+// before live stats load) render as plain text — there's nothing to animate
+// towards. `format` overrides how each animated frame is rendered — e.g.
+// Valorant's rank isn't a number at all, but the average rating still
+// resolves to a numeric VALORANT_RANKS index, so passing
+// `format={(v) => VALORANT_RANKS[Math.round(v)]}` turns the same count-up
+// into a rank ticking upward (Iron → ... → Immortal) instead of raw digits,
+// while CS2/Dota's plain integer rating needs no formatter.
+//
+// By default the count-up waits until scrolled into view (`immediate:
+// false`) — right for stuff below the fold, like Landing's stats row. Pass
+// `immediate` for a value that's already on-screen the moment it mounts
+// (a freshly-opened team detail view, a widget that just expanded): the
+// scroll-gated version has no fallback if that element is never actually
+// scrolled past — e.g. the page was already scrolled down when the detail
+// view mounted — leaving it stuck at 0 forever instead of showing the real
+// number.
+export function AnimatedNumber({ value, className = "", format, immediate = false }) {
   const ref = useRef(null);
   const inView = useInView(ref, { once: true, margin: "-10% 0px" });
   const motionValue = useMotionValue(0);
   const spring = useSpring(motionValue, { stiffness: 60, damping: 18 });
-  const display = useTransform(spring, (v) => Math.round(v).toLocaleString());
+  const display = useTransform(spring, (v) => (format ? format(v) : Math.round(v).toLocaleString()));
 
   useEffect(() => {
-    if (inView && typeof value === "number") motionValue.set(value);
-  }, [inView, value]);
+    if ((immediate || inView) && typeof value === "number") motionValue.set(value);
+  }, [immediate, inView, value]);
 
   if (typeof value !== "number") {
     return (
