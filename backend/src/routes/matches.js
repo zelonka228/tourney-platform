@@ -112,4 +112,74 @@ router.put(
   })
 );
 
+// POST /api/matches/:id/reset → undo a submitted result (misclick recovery).
+// Only allowed when the winner hasn't gone on to decide anything further:
+// if it already advanced into a next-round match that's ALSO done, that
+// match must be reset first (walk the chain backwards one step at a time —
+// deliberately not a recursive cascade, so each undo is a single, obviously
+// reversible step instead of silently unwinding an arbitrary depth of the
+// bracket). Byes can't be reset here — they're auto-resolved, not a real
+// submitted result, and un-resolving one would require re-deriving the bye
+// from bracket shape rather than just clearing a score.
+router.post(
+  "/:id/reset",
+  requireAdmin,
+  asyncHandler(async (req, res) => {
+    const id = parseId(req.params.id);
+    const match = await prisma.match.findUnique({ where: { id }, include: { tournament: true } });
+    if (!match) throw new HttpError(404, "Матч не знайдено.");
+    if (match.status === "bye") throw new HttpError(400, "Бай-матч не можна скасувати вручну.");
+    if (match.status !== "done") throw new HttpError(400, "Цей матч ще не зіграно.");
+
+    const winnerId = match.scoreA > match.scoreB ? match.teamAId : match.teamBId;
+    const nextPosition = Math.floor(match.position / 2);
+    const nextMatch = await prisma.match.findFirst({
+      where: { tournamentId: match.tournamentId, round: match.round + 1, position: nextPosition },
+    });
+
+    let updatedNext = null;
+    if (nextMatch) {
+      if (nextMatch.status !== "pending") {
+        throw new HttpError(
+          409,
+          "Переможець уже пройшов далі, і той матч теж зіграно — спершу скасуйте результат наступного матчу."
+        );
+      }
+      const slot = match.position % 2 === 0 ? "teamAId" : "teamBId";
+      updatedNext = await prisma.match.update({ where: { id: nextMatch.id }, data: { [slot]: null } });
+    } else {
+      // This was the final — also roll back the champion bookkeeping it wrote.
+      const champTeam = await prisma.team.findUnique({ where: { id: winnerId } });
+      const streakMatch = /^1 місце ×(\d+)$/.exec(champTeam.best ?? "");
+      const n = streakMatch ? Number(streakMatch[1]) : 1;
+      await prisma.team.update({
+        where: { id: winnerId },
+        data: {
+          tournaments: { decrement: 1 },
+          best: n > 1 ? `1 місце ×${n - 1}` : null,
+        },
+      });
+      await prisma.tournament.update({ where: { id: match.tournamentId }, data: { status: "draft" } });
+    }
+
+    await prisma.ratingHistory.deleteMany({ where: { matchId: id } });
+    const updated = await prisma.match.update({
+      where: { id },
+      data: { scoreA: null, scoreB: null, status: "pending" },
+    });
+
+    const io = req.app.get("io");
+    if (io) {
+      io.to(`tournament:${match.tournamentId}`).emit("match:updated", {
+        tournamentId: match.tournamentId,
+        match: updated,
+        advanced: updatedNext,
+        champion: null,
+      });
+    }
+
+    res.json({ match: updated, nextMatch: updatedNext });
+  })
+);
+
 export default router;

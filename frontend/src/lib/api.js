@@ -185,6 +185,10 @@ export async function submitMatchScore(matchId, scoreA, scoreB) {
   });
 }
 
+export async function resetMatch(matchId) {
+  return request(`/api/matches/${matchId}/reset`, { method: "POST" });
+}
+
 // --- Автентифікація ---
 
 // Без demo-фолбеку — логін без бекенду не має сенсу, помилка має дійти до UI.
