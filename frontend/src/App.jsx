@@ -2,6 +2,7 @@ import { BrowserRouter, NavLink, Route, Routes, useNavigate, useLocation } from 
 import { AnimatePresence, motion, MotionConfig } from "framer-motion";
 import { I18nProvider, useI18n } from "./lib/i18n";
 import { AuthProvider, useAuth } from "./lib/auth";
+import { ToastProvider } from "./lib/toast";
 import { Landing } from "./pages/Landing";
 import { Create } from "./pages/Create";
 import { Team } from "./pages/Team";
@@ -180,9 +181,11 @@ export default function App() {
     <I18nProvider>
       <AuthProvider>
         <MotionConfig reducedMotion="user">
-          <BrowserRouter>
-            <Shell />
-          </BrowserRouter>
+          <ToastProvider>
+            <BrowserRouter>
+              <Shell />
+            </BrowserRouter>
+          </ToastProvider>
         </MotionConfig>
       </AuthProvider>
     </I18nProvider>

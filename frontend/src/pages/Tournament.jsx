@@ -18,6 +18,8 @@ import {
 import { validScorelines, BEST_OF, winTarget } from "../lib/demo";
 import { Btn, Field, Input, Overline, Panel, Select } from "../components/arena";
 import { Reveal } from "../components/motion";
+import { ConfettiBurst } from "../components/Confetti";
+import { useToast } from "../lib/toast";
 
 const SOCKET_URL = import.meta.env.VITE_API_URL ?? "http://localhost:4000";
 
@@ -218,6 +220,7 @@ export function Tournament() {
   const nav = useNavigate();
   const { t } = useI18n();
   const { isAdmin } = useAuth();
+  const toast = useToast();
   const roundLabel = useRoundLabel();
   const [tournament, setTournament] = useState(null);
   const [notFound, setNotFound] = useState(false);
@@ -519,6 +522,7 @@ export function Tournament() {
       // matches array, not this top-level field).
       if (!res.nextMatch) setTournament((prev) => (prev ? { ...prev, status: "draft" } : prev));
       setEdit(null);
+      toast.success(t("toast.matchReset"));
     } catch (e) {
       setScoreError(e.message);
     } finally {
@@ -543,6 +547,7 @@ export function Tournament() {
       if (matches.length === 0) payload.matchFormat = infoForm.matchFormat;
       setTournament(await updateTournament(id, payload));
       setInfoForm(null);
+      toast.success(t("toast.infoSaved"));
     } catch (e) {
       setInfoError(e.message);
     } finally {
@@ -554,6 +559,7 @@ export function Tournament() {
     setRemoveError(null);
     try {
       setTournament(await unregisterTeam(id, teamId));
+      toast.success(t("toast.teamRemoved"));
     } catch (e) {
       setRemoveError(e.message);
     } finally {
@@ -564,6 +570,7 @@ export function Tournament() {
     setGenerating(true);
     try {
       setTournament(await generateBracket(id));
+      toast.success(t("toast.bracketGenerated"));
     } catch (e) {
       setScoreError(e.message);
     } finally {
@@ -773,9 +780,10 @@ export function Tournament() {
               <motion.div
                 initial={{ opacity: 0, scale: 0.96 }}
                 animate={{ opacity: 1, scale: 1 }}
-                className="flex items-center gap-4 mb-6 px-5 py-4 border border-volt bg-volt/10 rounded-sm clip-corner"
+                className="relative flex items-center gap-4 mb-6 px-5 py-4 border border-volt bg-volt/10 rounded-sm clip-corner"
                 data-testid="champion-banner"
               >
+                <ConfettiBurst fire={Boolean(champion)} />
                 <span className="overline text-volt">{t("tour.champion")}</span>
                 <span className="font-display font-black text-2xl text-white">{champion}</span>
                 <span className="ml-auto text-volt text-2xl">★</span>
