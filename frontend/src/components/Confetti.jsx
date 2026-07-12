@@ -1,43 +1,38 @@
-import { useEffect, useRef, useState } from "react";
+import { useMemo } from "react";
 import { motion } from "framer-motion";
 
 const COLORS = ["#00f0ff", "#dfff00", "#ff0055"];
-const COUNT = 28;
+const COUNT = 22;
 
 function makeParticles() {
   return Array.from({ length: COUNT }, (_, i) => {
     const angle = (Math.PI * 2 * i) / COUNT + (Math.random() - 0.5) * 0.6;
-    const distance = 90 + Math.random() * 90;
+    const distance = 70 + Math.random() * 80;
     return {
       id: i,
       color: COLORS[i % COLORS.length],
       x: Math.cos(angle) * distance,
-      y: Math.sin(angle) * distance - 30,
-      rotate: Math.random() * 360,
+      y: Math.sin(angle) * distance - 20,
+      rotate: 180 + Math.random() * 180,
       size: 5 + Math.random() * 4,
-      delay: Math.random() * 0.08,
+      duration: 2.6 + Math.random() * 1.4,
+      delay: Math.random() * 1.2,
     };
   });
 }
 
-// One-shot particle burst reusing the site's own diamond bullet motif
-// (see the rotate-45 squares used for roster bullets/logo mark elsewhere)
-// instead of introducing generic confetti shapes. Fires once whenever
-// `fire` flips from falsy to truthy — a ref (not state) tracks whether this
-// mount has already celebrated, so a socket update that merely re-confirms
-// the same champion doesn't replay the burst on every re-render.
+// Ambient particle drift around the champion banner, reusing the site's own
+// diamond bullet motif (the rotate-45 squares used for roster bullets/logo
+// mark elsewhere) instead of generic confetti shapes. Unlike a one-shot
+// burst — which read as "gone in a blink" — each particle drifts out and
+// gently back in an infinite mirrored loop (`repeatType: "mirror"`), so the
+// celebration stays visible the whole time a champion is showing rather
+// than flashing once. Particles are generated once via useMemo (not on
+// every render) so the loop stays stable instead of restarting on
+// unrelated re-renders (e.g. a socket update re-confirming the same
+// champion).
 export function ConfettiBurst({ fire }) {
-  const [particles, setParticles] = useState(null);
-  const firedRef = useRef(false);
-
-  useEffect(() => {
-    if (fire && !firedRef.current) {
-      firedRef.current = true;
-      setParticles(makeParticles());
-      const timeout = window.setTimeout(() => setParticles(null), 1100);
-      return () => window.clearTimeout(timeout);
-    }
-  }, [fire]);
+  const particles = useMemo(() => (fire ? makeParticles() : null), [fire]);
 
   if (!particles) return null;
 
@@ -46,9 +41,15 @@ export function ConfettiBurst({ fire }) {
       {particles.map((p) => (
         <motion.span
           key={p.id}
-          initial={{ opacity: 1, x: 0, y: 0, rotate: 0 }}
-          animate={{ opacity: 0, x: p.x, y: p.y, rotate: p.rotate }}
-          transition={{ duration: 0.9, delay: p.delay, ease: [0.16, 1, 0.3, 1] }}
+          initial={{ opacity: 0, x: 0, y: 0, rotate: 0 }}
+          animate={{ opacity: [0, 1, 1, 0], x: p.x, y: p.y, rotate: p.rotate }}
+          transition={{
+            duration: p.duration,
+            delay: p.delay,
+            ease: "easeInOut",
+            repeat: Infinity,
+            repeatType: "mirror",
+          }}
           className="absolute left-1/2 top-1/2"
           style={{
             width: p.size,
