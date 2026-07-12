@@ -5,7 +5,7 @@ import { io } from "socket.io-client";
 import { useI18n } from "../lib/i18n";
 import { useAuth } from "../lib/auth";
 import {
-  getTournament, getTournaments, submitMatchScore, generateBracket, deleteTournament, reorderTournamentTeams,
+  getTournament, getTournaments, submitMatchScore, resetMatch, generateBracket, deleteTournament, reorderTournamentTeams,
 } from "../lib/api";
 import { validScorelines } from "../lib/demo";
 import { Btn, Overline, Panel } from "../components/arena";
@@ -24,7 +24,7 @@ function useRoundLabel() {
   };
 }
 
-function MatchCard({ m, teamName, openEdit, cardRef, enterScoreLabel, byeLabel, isAdmin }) {
+function MatchCard({ m, teamName, openEdit, cardRef, enterScoreLabel, byeLabel, editLabel, isAdmin }) {
   const a = teamName(m.teamAId);
   const b = teamName(m.teamBId);
   const isBye = m.status === "bye";
@@ -33,7 +33,11 @@ function MatchCard({ m, teamName, openEdit, cardRef, enterScoreLabel, byeLabel, 
     ? (m.teamAId ?? m.teamBId)
     : m.status === "done" ? (m.scoreA > m.scoreB ? m.teamAId : m.teamBId) : null;
   const todo = a && b && m.status === "pending";
-  const clickable = isAdmin && todo;
+  // A done match stays clickable for admins too -- opens the reset flow
+  // instead of the score picker (see openEdit) so a misclick isn't a
+  // dead end that forces recreating the whole tournament.
+  const editable = isAdmin && m.status === "done";
+  const clickable = isAdmin && (todo || editable);
   const pending = (!a || !b) && !isBye;
 
   return (
@@ -93,6 +97,11 @@ function MatchCard({ m, teamName, openEdit, cardRef, enterScoreLabel, byeLabel, 
         })}
         {todo && <div className="text-center py-1 bg-cyan text-void text-[10px] font-mono uppercase tracking-widest">{enterScoreLabel}</div>}
         {isBye && <div className="text-center py-1 bg-[#3f3f46] text-[#d4d4d8] text-[10px] font-mono uppercase tracking-widest">{byeLabel}</div>}
+        {editable && (
+          <div className="text-center py-1 border-t border-[#27272a] text-[#52525b] text-[10px] font-mono uppercase tracking-widest hover:text-[#ff0055] transition-colors">
+            {editLabel}
+          </div>
+        )}
       </motion.div>
     </div>
   );
@@ -141,6 +150,7 @@ export function Tournament() {
   const [tab, setTab] = useState("grid");
   const [edit, setEdit] = useState(null);
   const [scoreError, setScoreError] = useState(null);
+  const [resetting, setResetting] = useState(false);
   const [generating, setGenerating] = useState(false);
   const [deleteError, setDeleteError] = useState(null);
   const [reordering, setReordering] = useState(false);
@@ -336,14 +346,35 @@ export function Tournament() {
   }, [matches, totalRounds]);
 
   function openEdit(m) {
-    if (isAdmin && m.teamAId && m.teamBId && m.status === "pending") {
-      setEdit({ matchId: m.id, a: teamName(m.teamAId), b: teamName(m.teamBId) });
+    if (!isAdmin) return;
+    if (m.teamAId && m.teamBId && m.status === "pending") {
+      setEdit({ matchId: m.id, mode: "score", a: teamName(m.teamAId), b: teamName(m.teamBId) });
+      setScoreError(null);
+    } else if (m.status === "done") {
+      setEdit({
+        matchId: m.id, mode: "reset",
+        a: teamName(m.teamAId), b: teamName(m.teamBId), scoreA: m.scoreA, scoreB: m.scoreB,
+      });
       setScoreError(null);
     }
   }
   async function saveScore(sa, sb) {
     try { const res = await submitMatchScore(edit.matchId, sa, sb); mergeMatches(res.match, res.advanced); setEdit(null); }
     catch (e) { setScoreError(e.message); }
+  }
+  async function handleReset() {
+    setResetting(true);
+    try {
+      const res = await resetMatch(edit.matchId);
+      mergeMatches(res.match, res.nextMatch);
+      // resetMatch response has no `nextMatch` only when the reset match was
+      // the final -- that's exactly when the tournament needs to un-flip
+      // from "completed" back to "draft" too (mergeMatches only patches the
+      // matches array, not this top-level field).
+      if (!res.nextMatch) setTournament((prev) => (prev ? { ...prev, status: "draft" } : prev));
+      setEdit(null);
+    } catch (e) { setScoreError(e.message); }
+    finally { setResetting(false); }
   }
   async function handleDelete() {
     if (!window.confirm(t("tour.confirmDelete", { name: tournament.name }))) return;
@@ -470,7 +501,7 @@ export function Tournament() {
                       {rm.map((m) => (
                         <MatchCard key={`${m.id}-${m.status}`} m={m} teamName={teamName} openEdit={openEdit}
                           cardRef={setNodeRef(`m-${m.id}`)} isAdmin={isAdmin}
-                          enterScoreLabel={t("tour.enterScore")} byeLabel={t("tour.bye")} />
+                          enterScoreLabel={t("tour.enterScore")} byeLabel={t("tour.bye")} editLabel={t("tour.editScore")} />
                       ))}
                     </div>
                   </div>
@@ -499,7 +530,7 @@ export function Tournament() {
             </div>
           )}
 
-          {edit && (
+          {edit?.mode === "score" && (
             <Panel clip className="p-6 max-w-md mt-6" data-testid="score-modal">
               <h2 className="font-display font-bold text-lg text-white">{t("tour.scoreTitle")} · BO{bo}</h2>
               <p className="text-[#a1a1aa] text-sm mt-2">{edit.a} vs {edit.b} — {t("tour.scorePick")} {edit.a})</p>
@@ -513,6 +544,23 @@ export function Tournament() {
               </div>
               {scoreError && <p className="text-[#ff0055] text-sm mt-3">{scoreError}</p>}
               <Btn size="sm" variant="ghost" className="mt-4" onClick={() => setEdit(null)}>{t("tour.cancel")}</Btn>
+            </Panel>
+          )}
+
+          {edit?.mode === "reset" && (
+            <Panel clip className="p-6 max-w-md mt-6" data-testid="reset-modal">
+              <h2 className="font-display font-bold text-lg text-white">{t("tour.resetTitle")}</h2>
+              <p className="text-[#a1a1aa] text-sm mt-2">
+                {edit.a} <span className="font-mono text-white">{edit.scoreA}:{edit.scoreB}</span> {edit.b}
+              </p>
+              <p className="text-[#a1a1aa] text-sm mt-2">{t("tour.resetWarning")}</p>
+              {scoreError && <p className="text-[#ff0055] text-sm mt-3">{scoreError}</p>}
+              <div className="flex gap-2 mt-4">
+                <Btn size="sm" variant="danger" data-testid="reset-confirm-btn" onClick={handleReset} disabled={resetting}>
+                  {resetting ? t("tour.resetting") : t("tour.resetConfirm")}
+                </Btn>
+                <Btn size="sm" variant="ghost" onClick={() => setEdit(null)}>{t("tour.cancel")}</Btn>
+              </div>
             </Panel>
           )}
         </div>
