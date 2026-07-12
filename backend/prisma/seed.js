@@ -12,15 +12,23 @@ const USERS = [
   { username: "User", password: "user", role: "user" },
 ];
 
-// Пробні лого команд — inline SVG data URI (квадрат з ініціалами), той самий
-// формат data URL, що продукує завантаження лого через Team.jsx (canvas →
-// base64), тож рендериться однаково в Profile.jsx/Team.jsx без жодних змін.
-function svgLogo(bg, text) {
+// Лого команд — inline SVG data URI, геометрична емблема під назву команди
+// в неоновій палітрі сайту (cyan/volt/danger), той самий формат data URL,
+// що продукує завантаження лого через Team.jsx (canvas → base64), тож
+// рендериться однаково в Profile.jsx/Team.jsx без жодних змін. Раніше тут
+// був суто кольоровий квадрат з ініціалами — замінено на тематичні
+// геометричні значки, погоджені з користувачем через прев'ю перед записом.
+function emblemLogo(color, paths) {
   const svg =
-    `<svg xmlns="http://www.w3.org/2000/svg" width="256" height="256">` +
-    `<rect width="256" height="256" fill="${bg}"/>` +
-    `<text x="128" y="128" font-family="Arial, sans-serif" font-size="96" font-weight="700" ` +
-    `fill="#fff" text-anchor="middle" dominant-baseline="central">${text}</text></svg>`;
+    `<svg xmlns="http://www.w3.org/2000/svg" width="256" height="256" viewBox="0 0 256 256">` +
+    `<defs><filter id="g" x="-50%" y="-50%" width="200%" height="200%">` +
+    `<feGaussianBlur stdDeviation="4" result="b"/>` +
+    `<feMerge><feMergeNode in="b"/><feMergeNode in="SourceGraphic"/></feMerge>` +
+    `</filter></defs>` +
+    `<rect width="256" height="256" fill="#09090B"/>` +
+    `<rect x="1" y="1" width="254" height="254" fill="none" stroke="#27272A" stroke-width="2"/>` +
+    `<g stroke="${color}" stroke-width="5" fill="none" stroke-linejoin="round" stroke-linecap="round" filter="url(#g)">${paths}</g>` +
+    `</svg>`;
   return `data:image/svg+xml;utf8,${encodeURIComponent(svg)}`;
 }
 
@@ -29,7 +37,12 @@ const TEAMS = [
   {
     name: "Night Wolves",
     discipline: "CS2",
-    logo: svgLogo("#1f2430", "NW"),
+    // Wolf head: two ear triangles over a snout triangle.
+    logo: emblemLogo(
+      "#00F0FF",
+      '<path d="M90 110 L120 60 L140 110 M150 110 L180 60 L200 110"/>' +
+        '<path d="M80 120 L144 200 L208 120 Z"/>'
+    ),
     winrate: "71%",
     streak: "5 W",
     tournaments: 12,
@@ -45,7 +58,11 @@ const TEAMS = [
   {
     name: "Iron Hawks",
     discipline: "CS2",
-    logo: svgLogo("#4a5568", "IH"),
+    // Diving hawk: angular wing silhouette.
+    logo: emblemLogo(
+      "#00F0FF",
+      '<path d="M70 160 L130 60 L150 90 L190 50 L170 110 L230 130 L150 140 L110 180 Z"/>'
+    ),
     winrate: "61%",
     streak: "2 L",
     tournaments: 14,
@@ -61,7 +78,11 @@ const TEAMS = [
   {
     name: "Void Runners",
     discipline: "Dota 2",
-    logo: svgLogo("#7c3aed", "VR"),
+    // Void portal: concentric rings.
+    logo: emblemLogo(
+      "#00F0FF",
+      '<circle cx="128" cy="128" r="70"/><circle cx="128" cy="128" r="44"/><circle cx="128" cy="128" r="16"/>'
+    ),
     winrate: "66%",
     streak: "3 W",
     tournaments: 9,
@@ -77,7 +98,8 @@ const TEAMS = [
   {
     name: "Storm Breakers",
     discipline: "Dota 2",
-    logo: svgLogo("#0f766e", "SB"),
+    // Lightning bolt.
+    logo: emblemLogo("#DFFF00", '<path d="M160 50 L90 140 L130 140 L80 210 L170 110 L124 110 Z"/>'),
     winrate: "39%",
     streak: "1 L",
     tournaments: 3,
@@ -93,7 +115,12 @@ const TEAMS = [
   {
     name: "Red Phoenix",
     discipline: "Valorant",
-    logo: svgLogo("#dc2626", "RP"),
+    // Rising flame.
+    logo: emblemLogo(
+      "#FF0055",
+      '<path d="M130 50 C100 100 90 140 130 200 C170 140 160 100 130 50 Z"/>' +
+        '<path d="M130 100 C116 130 116 154 130 180"/>'
+    ),
     winrate: "57%",
     streak: "2 W",
     tournaments: 8,
@@ -109,7 +136,13 @@ const TEAMS = [
   {
     name: "Cyber Lynx",
     discipline: "Valorant",
-    logo: svgLogo("#0891b2", "CL"),
+    // Lynx face: ear tufts + circuit accent lines.
+    logo: emblemLogo(
+      "#DFFF00",
+      '<path d="M80 100 L104 40 L124 100 M136 100 L156 40 L180 100"/>' +
+        '<path d="M74 110 L186 110 L150 170 L110 170 Z"/>' +
+        '<path d="M40 130 L74 130 M186 130 L220 130"/>'
+    ),
     winrate: "52%",
     streak: "1 W",
     tournaments: 6,
@@ -125,7 +158,11 @@ const TEAMS = [
   {
     name: "Frost Giants",
     discipline: "CS2",
-    logo: svgLogo("#60a5fa", "FG"),
+    // Ice peak with a crystal facet line.
+    logo: emblemLogo(
+      "#00F0FF",
+      '<path d="M60 180 L130 40 L200 180 Z"/><path d="M100 110 L130 150 L170 90"/>'
+    ),
     winrate: "48%",
     streak: "1 W",
     tournaments: 5,
@@ -141,7 +178,12 @@ const TEAMS = [
   {
     name: "Shadow Pact",
     discipline: "Valorant",
-    logo: svgLogo("#1e1b4b", "SP"),
+    // Hooded hex silhouette with a cut-out "face".
+    logo: emblemLogo(
+      "#DFFF00",
+      '<path d="M130 40 L190 80 L190 160 L130 200 L70 160 L70 80 Z"/>' +
+        '<path d="M100 110 L130 150 L160 110 Z" fill="#09090B"/>'
+    ),
     winrate: "44%",
     streak: "2 L",
     tournaments: 4,
