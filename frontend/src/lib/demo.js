@@ -21,8 +21,15 @@ export const ROLES_BY_GAME = {
 
 // Звання Valorant за зростанням (для усереднення).
 export const VALORANT_RANKS = [
-  "Iron", "Bronze", "Silver", "Gold", "Platinum",
-  "Diamond", "Ascendant", "Immortal", "Radiant",
+  "Iron",
+  "Bronze",
+  "Silver",
+  "Gold",
+  "Platinum",
+  "Diamond",
+  "Ascendant",
+  "Immortal",
+  "Radiant",
 ];
 
 export const BEST_OF = [1, 3, 5];
@@ -74,7 +81,8 @@ export function seedPositions(size) {
 // Середній рейтинг команди в одиниці її дисципліни.
 export function avgRating(discipline, ranks) {
   const def = DISCIPLINES[discipline];
-  if (!def || !ranks?.length) return { value: null, label: "—", unit: def?.unit ?? "", unitKey: def?.unitKey ?? "elo" };
+  if (!def || !ranks?.length)
+    return { value: null, label: "—", unit: def?.unit ?? "", unitKey: def?.unitKey ?? "elo" };
   if (def.kind === "rank") {
     const idxs = ranks.map((r) => Math.max(VALORANT_RANKS.indexOf(r), 0));
     const avg = Math.round(idxs.reduce((a, b) => a + b, 0) / idxs.length);

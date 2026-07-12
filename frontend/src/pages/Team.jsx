@@ -4,7 +4,11 @@ import { useI18n } from "../lib/i18n";
 import { useAuth } from "../lib/auth";
 import { getTeam, createTeam, updateTeam } from "../lib/api";
 import {
-  DISCIPLINE_LIST, DISCIPLINES, ROLES_BY_GAME, VALORANT_RANKS, avgRating,
+  DISCIPLINE_LIST,
+  DISCIPLINES,
+  ROLES_BY_GAME,
+  VALORANT_RANKS,
+  avgRating,
 } from "../lib/demo";
 import { Btn, Field, Input, Overline, Panel, Select } from "../components/arena";
 import { Reveal } from "../components/motion";
@@ -32,17 +36,22 @@ function readLogoFile(file) {
     const url = URL.createObjectURL(file);
     img.onload = () => {
       const c = document.createElement("canvas");
-      c.width = LOGO_SIZE; c.height = LOGO_SIZE;
+      c.width = LOGO_SIZE;
+      c.height = LOGO_SIZE;
       const ctx = c.getContext("2d");
       const scale = Math.max(LOGO_SIZE / img.width, LOGO_SIZE / img.height);
-      const w = img.width * scale, h = img.height * scale;
+      const w = img.width * scale,
+        h = img.height * scale;
       ctx.drawImage(img, (LOGO_SIZE - w) / 2, (LOGO_SIZE - h) / 2, w, h);
       URL.revokeObjectURL(url);
       const data = c.toDataURL("image/jpeg", 0.85);
       if (data.length > LOGO_MAX_BYTES) return reject(new Error("Image too large."));
       resolve(data);
     };
-    img.onerror = () => { URL.revokeObjectURL(url); reject(new Error("Could not read image.")); };
+    img.onerror = () => {
+      URL.revokeObjectURL(url);
+      reject(new Error("Could not read image."));
+    };
     img.src = url;
   });
 }
@@ -71,16 +80,33 @@ export function Team() {
   useEffect(() => {
     setNotFound(false);
     if (!id) {
-      setName(DEFAULT_NAME); setDiscipline(DEFAULT_DISCIPLINE); setLogo(null);
-      setPlayers(defaultPlayers()); setSubs(defaultSubs());
+      setName(DEFAULT_NAME);
+      setDiscipline(DEFAULT_DISCIPLINE);
+      setLogo(null);
+      setPlayers(defaultPlayers());
+      setSubs(defaultSubs());
       return;
     }
     getTeam(id).then((tm) => {
-      if (!tm) { setNotFound(true); return; }
-      setName(tm.name); setDiscipline(tm.discipline); setLogo(tm.logo ?? null);
-      const map = (sub) => tm.players.filter((p) => !!p.isSubstitute === sub)
-        .map((p) => ({ nick: p.nick, role: p.role, rank: fromDbRank(tm.discipline, p.rank), id: p.id, externalRef: p.externalRef ?? "" }));
-      setPlayers(map(false)); setSubs(map(true));
+      if (!tm) {
+        setNotFound(true);
+        return;
+      }
+      setName(tm.name);
+      setDiscipline(tm.discipline);
+      setLogo(tm.logo ?? null);
+      const map = (sub) =>
+        tm.players
+          .filter((p) => !!p.isSubstitute === sub)
+          .map((p) => ({
+            nick: p.nick,
+            role: p.role,
+            rank: fromDbRank(tm.discipline, p.rank),
+            id: p.id,
+            externalRef: p.externalRef ?? "",
+          }));
+      setPlayers(map(false));
+      setSubs(map(true));
     });
   }, [id]);
 
@@ -88,21 +114,32 @@ export function Team() {
     const nr = ROLES_BY_GAME[d];
     const isRank = DISCIPLINES[d].kind === "rank";
     const valid = (v) => (isRank ? VALORANT_RANKS.includes(v) : typeof v === "number");
-    const remap = (list) => list.map((p, i) => ({
-      ...p, role: nr.includes(p.role) ? p.role : nr[i % nr.length],
-      rank: valid(p.rank) ? p.rank : DEFAULT_RANK[d],
-    }));
-    setPlayers(remap); setSubs(remap); setDiscipline(d);
+    const remap = (list) =>
+      list.map((p, i) => ({
+        ...p,
+        role: nr.includes(p.role) ? p.role : nr[i % nr.length],
+        rank: valid(p.rank) ? p.rank : DEFAULT_RANK[d],
+      }));
+    setPlayers(remap);
+    setSubs(remap);
+    setDiscipline(d);
   }
 
-  const teamRating = avgRating(discipline, players.map((p) => p.rank));
+  const teamRating = avgRating(
+    discipline,
+    players.map((p) => p.rank)
+  );
 
   async function handleLogoChange(e) {
     const file = e.target.files?.[0];
     e.target.value = "";
     if (!file) return;
     setLogoError(null);
-    try { setLogo(await readLogoFile(file)); } catch (err) { setLogoError(err.message); }
+    try {
+      setLogo(await readLogoFile(file));
+    } catch (err) {
+      setLogoError(err.message);
+    }
   }
 
   // Навігація лише після підтвердженого успіху — на реальній помилці бекенду
@@ -111,22 +148,41 @@ export function Team() {
   async function save() {
     setSaveError(null);
     const payload = {
-      name, discipline, logo,
+      name,
+      discipline,
+      logo,
       players: [
-        ...players.map((p) => ({ nick: p.nick, role: p.role, rank: String(p.rank), isSubstitute: false, externalRef: p.externalRef || null })),
-        ...subs.map((p) => ({ nick: p.nick, role: p.role, rank: String(p.rank), isSubstitute: true, externalRef: p.externalRef || null })),
+        ...players.map((p) => ({
+          nick: p.nick,
+          role: p.role,
+          rank: String(p.rank),
+          isSubstitute: false,
+          externalRef: p.externalRef || null,
+        })),
+        ...subs.map((p) => ({
+          nick: p.nick,
+          role: p.role,
+          rank: String(p.rank),
+          isSubstitute: true,
+          externalRef: p.externalRef || null,
+        })),
       ],
     };
     try {
-      if (id) await updateTeam(id, payload); else await createTeam(payload);
+      if (id) await updateTeam(id, payload);
+      else await createTeam(payload);
       nav("/profile");
-    } catch (err) { setSaveError(err.message); }
+    } catch (err) {
+      setSaveError(err.message);
+    }
   }
 
   const rankField = (p, onChange) =>
     def.kind === "rank" ? (
       <Select value={p.rank} onChange={(e) => onChange(e.target.value)}>
-        {VALORANT_RANKS.map((r) => <option key={r}>{r}</option>)}
+        {VALORANT_RANKS.map((r) => (
+          <option key={r}>{r}</option>
+        ))}
       </Select>
     ) : (
       <Input type="number" value={p.rank} onChange={(e) => onChange(+e.target.value)} />
@@ -136,37 +192,66 @@ export function Team() {
     <div data-testid={testid}>
       <div className="grid grid-cols-[24px_1fr_1fr_110px_36px] gap-2 items-center mb-2">
         {["#", t("team.col.nick"), t("team.col.role"), t(`unit.${def.unitKey}`), ""].map((h, i) => (
-          <span key={i} className="overline">{h}</span>
+          <span key={i} className="overline">
+            {h}
+          </span>
         ))}
       </div>
       {list.map((p, i) => (
         <Reveal key={i} index={i} y={10} className="mb-2">
           <div className="grid grid-cols-[24px_1fr_1fr_110px_36px] gap-2 items-center">
             <span className="font-mono text-xs text-[#52525b]">{i + 1}</span>
-            <Input value={p.nick} onChange={(e) => setList((l) => l.map((x, idx) => idx === i ? { ...x, nick: e.target.value } : x))} />
-            <Select value={p.role} onChange={(e) => setList((l) => l.map((x, idx) => idx === i ? { ...x, role: e.target.value } : x))}>
-              {roles.map((r) => <option key={r}>{r}</option>)}
+            <Input
+              value={p.nick}
+              onChange={(e) =>
+                setList((l) => l.map((x, idx) => (idx === i ? { ...x, nick: e.target.value } : x)))
+              }
+            />
+            <Select
+              value={p.role}
+              onChange={(e) =>
+                setList((l) => l.map((x, idx) => (idx === i ? { ...x, role: e.target.value } : x)))
+              }
+            >
+              {roles.map((r) => (
+                <option key={r}>{r}</option>
+              ))}
             </Select>
-            {rankField(p, (v) => setList((l) => l.map((x, idx) => idx === i ? { ...x, rank: v } : x)))}
+            {rankField(p, (v) =>
+              setList((l) => l.map((x, idx) => (idx === i ? { ...x, rank: v } : x)))
+            )}
             <button
               onClick={() => setList((l) => l.filter((_, idx) => idx !== i))}
               className="h-[42px] border border-[#27272a] rounded-sm text-[#a1a1aa] hover:border-[#ff0055] hover:text-[#ff0055] transition-colors"
-            >×</button>
+            >
+              ×
+            </button>
           </div>
           {LINK_HINT_KEY[discipline] && (
             <input
               type="text"
               value={p.externalRef ?? ""}
               data-testid={`player-external-ref-${i}`}
-              onChange={(e) => setList((l) => l.map((x, idx) => idx === i ? { ...x, externalRef: e.target.value } : x))}
+              onChange={(e) =>
+                setList((l) =>
+                  l.map((x, idx) => (idx === i ? { ...x, externalRef: e.target.value } : x))
+                )
+              }
               placeholder={t(LINK_HINT_KEY[discipline])}
               className="w-[calc(100%-58px)] ml-[32px] mt-1 bg-void border border-[#27272a] rounded-sm px-2 py-1 text-xs text-[#a1a1aa] placeholder:text-[#3f3f46] focus:outline-none focus:border-cyan transition-colors"
             />
           )}
         </Reveal>
       ))}
-      <Btn size="sm" variant="ghost" disabled={list.length >= max} className="mt-2"
-        onClick={() => setList((l) => [...l, { nick: "", role: roles[0], rank: DEFAULT_RANK[discipline] }])}>
+      <Btn
+        size="sm"
+        variant="ghost"
+        disabled={list.length >= max}
+        className="mt-2"
+        onClick={() =>
+          setList((l) => [...l, { nick: "", role: roles[0], rank: DEFAULT_RANK[discipline] }])
+        }
+      >
         {addLabel}
       </Btn>
     </div>
@@ -181,7 +266,9 @@ export function Team() {
         </h1>
         <p className="text-[#a1a1aa] mt-4">
           {t("team.notFound")}{" "}
-          <Link to="/profile" className="text-cyan hover:underline">{t("team.allTeams")}</Link>
+          <Link to="/profile" className="text-cyan hover:underline">
+            {t("team.allTeams")}
+          </Link>
         </p>
       </div>
     );
@@ -215,17 +302,31 @@ export function Team() {
         <Panel clip className="p-5">
           <Overline>{t("team.logo")}</Overline>
           <div className="mt-3 aspect-square border border-[#27272a] bg-void grid place-items-center overflow-hidden">
-            {logo ? <img src={logo} alt="" className="w-full h-full object-cover" />
-              : <span className="w-8 h-8 border border-cyan/30 rotate-45" />}
+            {logo ? (
+              <img src={logo} alt="" className="w-full h-full object-cover" />
+            ) : (
+              <span className="w-8 h-8 border border-cyan/30 rotate-45" />
+            )}
           </div>
-          <input type="file" accept="image/*" id="logo-input" className="sr-only" onChange={handleLogoChange} />
-          <label htmlFor="logo-input" data-testid="team-logo-upload"
-            className="mt-3 block text-center px-4 py-2 text-xs font-sans uppercase tracking-wider border border-[#3f3f46] rounded-sm cursor-pointer hover:border-cyan hover:text-cyan transition-colors">
+          <input
+            type="file"
+            accept="image/*"
+            id="logo-input"
+            className="sr-only"
+            onChange={handleLogoChange}
+          />
+          <label
+            htmlFor="logo-input"
+            data-testid="team-logo-upload"
+            className="mt-3 block text-center px-4 py-2 text-xs font-sans uppercase tracking-wider border border-[#3f3f46] rounded-sm cursor-pointer hover:border-cyan hover:text-cyan transition-colors"
+          >
             {logo ? t("team.change") : t("team.upload")}
           </label>
           {logo && (
-            <button onClick={() => setLogo(null)}
-              className="mt-2 w-full text-center px-4 py-2 text-xs uppercase tracking-wider text-[#ff0055] border border-[#ff0055]/30 rounded-sm hover:bg-[#ff0055]/10 transition-colors">
+            <button
+              onClick={() => setLogo(null)}
+              className="mt-2 w-full text-center px-4 py-2 text-xs uppercase tracking-wider text-[#ff0055] border border-[#ff0055]/30 rounded-sm hover:bg-[#ff0055]/10 transition-colors"
+            >
               {t("team.removeLogo")}
             </button>
           )}
@@ -235,18 +336,30 @@ export function Team() {
         <Panel clip className="p-6">
           <div className="grid sm:grid-cols-2 gap-x-4">
             <Field label={t("team.name")}>
-              <Input value={name} data-testid="team-name-input" onChange={(e) => setName(e.target.value)} />
+              <Input
+                value={name}
+                data-testid="team-name-input"
+                onChange={(e) => setName(e.target.value)}
+              />
             </Field>
             <Field label={t("team.discipline")}>
-              <Select value={discipline} data-testid="team-discipline-select" onChange={(e) => changeDiscipline(e.target.value)}>
-                {DISCIPLINE_LIST.map((d) => <option key={d}>{d}</option>)}
+              <Select
+                value={discipline}
+                data-testid="team-discipline-select"
+                onChange={(e) => changeDiscipline(e.target.value)}
+              >
+                {DISCIPLINE_LIST.map((d) => (
+                  <option key={d}>{d}</option>
+                ))}
               </Select>
             </Field>
           </div>
 
           <div className="flex items-center gap-4 p-4 mb-6 border border-cyan/30 bg-cyan/5 rounded-sm">
             <div>
-              <div className="overline text-cyan">{t("team.avg")} {t(`unit.${teamRating.unitKey}`)}</div>
+              <div className="overline text-cyan">
+                {t("team.avg")} {t(`unit.${teamRating.unitKey}`)}
+              </div>
               <div className="font-mono text-3xl text-cyan mt-1">{teamRating.label}</div>
             </div>
             <span className="ml-auto text-xs font-mono text-[#a1a1aa]">
@@ -261,7 +374,9 @@ export function Team() {
           {editor(subs, setSubs, 5, t("team.addSub"), "team-subs-editor")}
 
           <div className="mt-8">
-            <Btn variant="primary" data-testid="team-save-btn" onClick={save}>{t("team.save")}</Btn>
+            <Btn variant="primary" data-testid="team-save-btn" onClick={save}>
+              {t("team.save")}
+            </Btn>
             {saveError && <p className="text-[#ff0055] text-sm mt-3">{saveError}</p>}
           </div>
         </Panel>

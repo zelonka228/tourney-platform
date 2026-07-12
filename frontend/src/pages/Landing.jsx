@@ -22,7 +22,14 @@ function AmbientGlow() {
         <motion.div
           key={i}
           className="absolute rounded-full"
-          style={{ width: o.size, height: o.size, top: o.top, left: o.left, background: o.color, filter: "blur(70px)" }}
+          style={{
+            width: o.size,
+            height: o.size,
+            top: o.top,
+            left: o.left,
+            background: o.color,
+            filter: "blur(70px)",
+          }}
           animate={{ y: [0, -22, 0], opacity: [0.08, 0.16, 0.08] }}
           transition={{ duration: 8, repeat: Infinity, ease: "easeInOut", delay: o.delay }}
         />
@@ -126,7 +133,10 @@ export function Landing() {
       <div className="grid grid-cols-3 border-x border-b border-[#27272a] divide-x divide-[#27272a]">
         {statRow.map((s) => (
           <div key={s.key} className="px-4 sm:px-8 py-6">
-            <AnimatedNumber value={s.v} className="block font-mono text-3xl sm:text-4xl text-cyan leading-none" />
+            <AnimatedNumber
+              value={s.v}
+              className="block font-mono text-3xl sm:text-4xl text-cyan leading-none"
+            />
             <div className="overline mt-2">{t(s.key)}</div>
           </div>
         ))}
@@ -151,7 +161,9 @@ export function Landing() {
               <Panel clip className="p-6 h-full hover:border-cyan transition-colors">
                 <div className="flex items-center justify-between">
                   <span className="font-mono text-cyan text-xs">{c.tag}</span>
-                  <span className="text-cyan opacity-0 group-hover:opacity-100 transition-opacity">→</span>
+                  <span className="text-cyan opacity-0 group-hover:opacity-100 transition-opacity">
+                    →
+                  </span>
                 </div>
                 <h3 className="font-display font-bold text-xl mt-6 text-white">
                   {t(`landing.card.${c.key}`)}

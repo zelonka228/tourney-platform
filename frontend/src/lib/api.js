@@ -139,6 +139,18 @@ export async function createTournament(data) {
   }
 }
 
+// Без demo-фолбеку — редагування без бекенду не зберегти.
+export async function updateTournament(id, data) {
+  return request(`/api/tournaments/${id}`, {
+    method: "PUT",
+    body: JSON.stringify(data),
+  });
+}
+
+export async function unregisterTeam(tournamentId, teamId) {
+  return request(`/api/tournaments/${tournamentId}/teams/${teamId}`, { method: "DELETE" });
+}
+
 export async function registerTeam(tournamentId, teamId) {
   try {
     return await request(`/api/tournaments/${tournamentId}/register`, {

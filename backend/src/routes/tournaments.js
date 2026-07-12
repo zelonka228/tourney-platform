@@ -12,6 +12,13 @@ const router = Router();
 const DISCIPLINE_VALUES = Object.keys(DISCIPLINES); // ["CS2", "Dota 2", "Valorant"]
 const BRACKET_TYPES = ["single", "double"];
 const MATCH_FORMATS = [1, 3, 5];
+const NAME_MAX_LEN = 60;
+
+function checkNameLength(name) {
+  if (typeof name === "string" && name.length > NAME_MAX_LEN) {
+    throw new HttpError(400, `Назва не може перевищувати ${NAME_MAX_LEN} символів.`);
+  }
+}
 
 // Every response nests the actual Team (name, logo, ...) under each
 // TournamentTeam row — the frontend needs names to render the bracket, not
@@ -57,6 +64,7 @@ router.post(
     requireEnum("discipline", discipline, DISCIPLINE_VALUES);
     requireEnum("bracketType", bracketType, BRACKET_TYPES);
     requireEnum("matchFormat", Number(matchFormat), MATCH_FORMATS);
+    checkNameLength(name);
 
     const hasTeams = Array.isArray(teamIds) && teamIds.length > 0;
     if (hasTeams && bracketType === "double") {
@@ -192,6 +200,10 @@ router.put(
     if (discipline !== undefined) requireEnum("discipline", discipline, DISCIPLINE_VALUES);
     if (bracketType !== undefined) requireEnum("bracketType", bracketType, BRACKET_TYPES);
     if (matchFormat !== undefined) requireEnum("matchFormat", Number(matchFormat), MATCH_FORMATS);
+    if (name !== undefined) {
+      if (name.trim() === "") throw new HttpError(400, "Назва не може бути порожньою.");
+      checkNameLength(name);
+    }
 
     const existing = await prisma.tournament.findUnique({ where: { id } });
     if (!existing) throw new HttpError(404, "Турнір не знайдено.");
@@ -270,6 +282,42 @@ router.post(
 
     const teams = await prisma.tournamentTeam.findMany({ where: { tournamentId: id } });
     res.status(201).json(teams);
+  })
+);
+
+// DELETE /api/tournaments/:id/teams/:teamId → unregister a team before the
+// bracket exists (e.g. wrong team picked during manual seeding). Blocked
+// once matches are generated — removing a team after that would leave a
+// Match pointing at a team no longer in the tournament. Re-sequences the
+// remaining teams' seeds to stay contiguous (1..n), same as reorder.
+router.delete(
+  "/:id/teams/:teamId",
+  requireAdmin,
+  asyncHandler(async (req, res) => {
+    const id = parseId(req.params.id);
+    const teamId = parseId(req.params.teamId);
+
+    const tournament = await prisma.tournament.findUnique({
+      where: { id },
+      include: { teams: { orderBy: { seed: "asc" } }, _count: { select: { matches: true } } },
+    });
+    if (!tournament) throw new HttpError(404, "Турнір не знайдено.");
+    if (tournament._count.matches > 0) {
+      throw new HttpError(409, "Сітку вже згенеровано, склад учасників більше не можна змінити.");
+    }
+    const entry = tournament.teams.find((t) => t.teamId === teamId);
+    if (!entry) throw new HttpError(404, "Команда не зареєстрована в цьому турнірі.");
+
+    const remaining = tournament.teams.filter((t) => t.teamId !== teamId);
+    await prisma.$transaction([
+      prisma.tournamentTeam.delete({ where: { tournamentId_teamId: { tournamentId: id, teamId } } }),
+      ...remaining.map((t, i) =>
+        prisma.tournamentTeam.update({ where: { id: t.id }, data: { seed: i + 1 } })
+      ),
+    ]);
+
+    const updated = await prisma.tournament.findUnique({ where: { id }, include: { teams: TEAMS_WITH_TEAM } });
+    res.json(updated);
   })
 );
 
