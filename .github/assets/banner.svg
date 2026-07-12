@@ -1,0 +1,59 @@
+<svg width="1200" height="340" viewBox="0 0 1200 340" xmlns="http://www.w3.org/2000/svg">
+  <defs>
+    <pattern id="scan" width="4" height="4" patternUnits="userSpaceOnUse">
+      <rect width="4" height="1" fill="#00F0FF" opacity="0.05"/>
+    </pattern>
+    <filter id="glow" x="-60%" y="-60%" width="220%" height="220%">
+      <feGaussianBlur stdDeviation="3.2" result="blur"/>
+      <feMerge>
+        <feMergeNode in="blur"/>
+        <feMergeNode in="SourceGraphic"/>
+      </feMerge>
+    </filter>
+    <linearGradient id="fade" x1="0" y1="0" x2="1" y2="0">
+      <stop offset="0%" stop-color="#09090B" stop-opacity="0"/>
+      <stop offset="100%" stop-color="#09090B" stop-opacity="0.9"/>
+    </linearGradient>
+  </defs>
+
+  <rect width="1200" height="340" fill="#09090B"/>
+  <rect width="1200" height="340" fill="url(#scan)"/>
+
+  <!-- abstract bracket tree, right side -->
+  <g stroke="#27272A" stroke-width="1.5" fill="none">
+    <path d="M760 60 H820 V95 H880" />
+    <path d="M760 130 H820 V95" />
+    <path d="M760 165 H820 V225 H880" />
+    <path d="M760 235 H820" />
+    <path d="M760 260 H820 V225" />
+    <path d="M880 95 V160 H940" />
+    <path d="M880 225 V160" />
+  </g>
+  <g stroke="#00F0FF" stroke-width="2" fill="none" filter="url(#glow)">
+    <path d="M760 165 H820 V225 H880" />
+    <path d="M880 95 V160 H940" opacity="0.55"/>
+  </g>
+  <g fill="#18181B" stroke="#27272A">
+    <rect x="700" y="52" width="60" height="16" rx="2"/>
+    <rect x="700" y="122" width="60" height="16" rx="2"/>
+    <rect x="700" y="157" width="60" height="16" rx="2"/>
+    <rect x="700" y="227" width="60" height="16" rx="2"/>
+    <rect x="700" y="252" width="60" height="16" rx="2"/>
+    <rect x="820" y="87" width="60" height="16" rx="2"/>
+    <rect x="820" y="217" width="60" height="16" rx="2"/>
+  </g>
+  <g fill="#18181B" stroke="#DFFF00">
+    <rect x="940" y="152" width="70" height="16" rx="2"/>
+  </g>
+  <circle cx="1010" cy="160" r="3" fill="#DFFF00" filter="url(#glow)"/>
+
+  <rect width="1200" height="340" fill="url(#fade)"/>
+
+  <!-- wordmark, left side -->
+  <g transform="translate(70,150)">
+    <rect x="0" y="-14" width="20" height="20" fill="#00F0FF" transform="rotate(45 10 -4)" filter="url(#glow)"/>
+    <text x="40" y="4" font-family="Arial, sans-serif" font-size="46" font-weight="900" fill="#FAFAFA" letter-spacing="1">ARENA</text>
+  </g>
+  <text x="70" y="195" font-family="'Courier New', monospace" font-size="15" fill="#00F0FF" letter-spacing="2">// TOURNEYFORGE</text>
+  <text x="70" y="225" font-family="Arial, sans-serif" font-size="16" fill="#A1A1AA">Турніри та LAN-вечірки з живою сіткою й RPG-картками команд</text>
+</svg>
