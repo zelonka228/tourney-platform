@@ -3,7 +3,13 @@ import { Link } from "react-router-dom";
 import { motion } from "framer-motion";
 import { useI18n } from "../lib/i18n";
 import { getTeams, getPlayerStats } from "../lib/api";
-import { avgRating, effectivePlayerRank, liveRankFromStats, DISCIPLINES } from "../lib/demo";
+import {
+  avgRating,
+  effectivePlayerRank,
+  liveRankFromStats,
+  liveNickFromStats,
+  DISCIPLINES,
+} from "../lib/demo";
 import { Btn, Overline, Panel, Stat, Input } from "../components/arena";
 import { PlayerStatsWidget } from "../components/PlayerStatsWidget";
 import { Reveal } from "../components/motion";
@@ -241,6 +247,7 @@ function PlayerRow({ p, discipline, onLiveElo }) {
   }
 
   const displayRank = (data && liveRankFromStats(discipline, data)) ?? p.rank;
+  const displayNick = (data && liveNickFromStats(discipline, data)) ?? p.nick;
 
   return (
     <div className="py-2.5">
@@ -257,7 +264,7 @@ function PlayerRow({ p, discipline, onLiveElo }) {
           <div
             className={`text-sm truncate ${clickable ? "text-white group-hover:text-cyan transition-colors" : "text-white"}`}
           >
-            {p.nick}
+            {displayNick}
           </div>
           <div className="text-[11px] font-mono text-[#a1a1aa]">{p.role}</div>
         </div>

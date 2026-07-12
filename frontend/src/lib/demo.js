@@ -136,6 +136,29 @@ export function effectivePlayerRank(discipline, player) {
   return player.rank;
 }
 
+// Same idea as liveRankFromStats, but for the display name. FACEIT's
+// displayName is already a plain nickname; Valorant's is the full Riot ID
+// ("name#tag") since the tag disambiguates accounts inside the widget's own
+// header — strip it back down to just the name for the roster row, where
+// it reads as a nickname alongside every other discipline's.
+export function liveNickFromStats(discipline, stats) {
+  if (!stats?.displayName) return null;
+  if (discipline === "Valorant") return stats.displayName.split("#")[0];
+  return stats.displayName;
+}
+
+export function effectivePlayerNick(discipline, player) {
+  if (player.externalStats) {
+    try {
+      const live = liveNickFromStats(discipline, JSON.parse(player.externalStats));
+      if (live) return live;
+    } catch {
+      // Malformed cache — fall through to the manual nick.
+    }
+  }
+  return player.nick;
+}
+
 // Демо-команди для м'якого фолбеку в lib/api.js, коли бекенд недоступний.
 export const TEAMS = [
   {
