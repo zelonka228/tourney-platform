@@ -214,7 +214,7 @@ async function main() {
   await call("DELETE", `/api/tournaments/${b3.data.id}`);
   for (const id of byeTeamIds) await call("DELETE", `/api/teams/${id}`);
 
-  // --- Double elimination not yet supported ---
+  // --- Double elimination: only power-of-two team counts are supported ---
   const doubleTeam = await call("POST", "/api/teams", { name: "Double Team", discipline: "CS2" });
   const doubleAttempt = await call("POST", "/api/tournaments", {
     name: "DoubleCup",
@@ -223,8 +223,205 @@ async function main() {
     matchFormat: 1,
     teamIds: [doubleTeam.data.id],
   });
-  ok(doubleAttempt.status === 400, "POST /api/tournaments double-elim with teamIds → 400");
+  ok(doubleAttempt.status === 400, "POST /api/tournaments double-elim with 1 team (not pow2) → 400");
   await call("DELETE", `/api/teams/${doubleTeam.data.id}`);
+
+  // --- Double elimination: 4 teams, full run, WB champion wins the final ---
+  function matchAt(matches, bracket, round, position) {
+    return matches.find((m) => m.bracket === bracket && m.round === round && m.position === position);
+  }
+
+  {
+    const teamIds = [];
+    for (let i = 0; i < 4; i++) {
+      const t = await call("POST", "/api/teams", { name: `DE Team ${i}`, discipline: "CS2" });
+      teamIds.push(t.data.id);
+    }
+    const de = await call("POST", "/api/tournaments", {
+      name: "DE4",
+      discipline: "CS2",
+      bracketType: "double",
+      matchFormat: 1,
+      teamIds,
+    });
+    ok(
+      de.status === 201 && de.data?.matches?.length === 6,
+      "POST /api/tournaments double-elim, 4 teams → 201, 6 matches (3 WB + 2 LB + 1 final)"
+    );
+    const deId = de.data.id;
+    const m = de.data.matches;
+
+    const wb0a = matchAt(m, "winners", 0, 0);
+    const wb0b = matchAt(m, "winners", 0, 1);
+
+    const r1 = await call("PUT", `/api/matches/${wb0a.id}/score`, { scoreA: 1, scoreB: 0 });
+    ok(
+      r1.status === 200 && r1.data.advancedLoser != null,
+      "double-elim: WB round0 match win → loser routed into losers bracket"
+    );
+    const wb0aLoser = wb0a.teamBId;
+    ok(
+      r1.data.advancedLoser.teamAId === wb0aLoser || r1.data.advancedLoser.teamBId === wb0aLoser,
+      "the actual loser team landed in the losers-bracket slot"
+    );
+
+    const r2 = await call("PUT", `/api/matches/${wb0b.id}/score`, { scoreA: 1, scoreB: 0 });
+    ok(r2.status === 200 && r2.data.advancedLoser != null, "double-elim: WB round0 match1 win → loser routed too");
+
+    // Losers-bracket round 0 should now have both round-0 losers seated.
+    const afterWb0 = await call("GET", `/api/tournaments/${deId}`);
+    const lb0 = matchAt(afterWb0.data.matches, "losers", 0, 0);
+    ok(lb0.teamAId != null && lb0.teamBId != null, "losers-bracket round0 match got both WB round0 losers");
+
+    const lbWinner = lb0.teamAId;
+    const rLb0 = await call("PUT", `/api/matches/${lb0.id}/score`, { scoreA: 1, scoreB: 0 });
+    ok(rLb0.status === 200 && rLb0.data.advanced != null, "losers-bracket round0 win → advances within LB");
+
+    const wbFinal = matchAt(afterWb0.data.matches, "winners", 1, 0);
+    const rWbFinal = await call("PUT", `/api/matches/${wbFinal.id}/score`, { scoreA: 1, scoreB: 0 });
+    const wbChampion = rWbFinal.data.match.scoreA > rWbFinal.data.match.scoreB ? wbFinal.teamAId : wbFinal.teamBId;
+    ok(
+      rWbFinal.status === 200 && rWbFinal.data.advanced?.bracket === "final" && rWbFinal.data.advanced?.round === 0,
+      "WB final win → advances into the grand final (round 0), not a nonexistent WB round 2"
+    );
+    ok(
+      rWbFinal.data.advancedLoser != null,
+      "WB final loser also drops into the losers bracket's last round"
+    );
+
+    const afterWbFinal = await call("GET", `/api/tournaments/${deId}`);
+    const lb1 = matchAt(afterWbFinal.data.matches, "losers", 1, 0);
+    ok(lb1.teamAId === lbWinner && lb1.teamBId != null, "losers-bracket last round has LB survivor + WB final loser");
+
+    const rLb1 = await call("PUT", `/api/matches/${lb1.id}/score`, { scoreA: 1, scoreB: 0 });
+    ok(
+      rLb1.status === 200 && rLb1.data.advanced?.bracket === "final" && rLb1.data.advanced?.round === 0,
+      "losers-bracket champion advances into the grand final's teamB slot"
+    );
+
+    const afterLbFinal = await call("GET", `/api/tournaments/${deId}`);
+    const gf0 = matchAt(afterLbFinal.data.matches, "final", 0, 0);
+    ok(
+      gf0.teamAId === wbChampion && gf0.teamBId != null,
+      "grand final round0 has the WB champion (teamA) and the LB champion (teamB)"
+    );
+
+    // WB champion (teamA) wins the grand final → tournament done, one match.
+    const rGf = await call("PUT", `/api/matches/${gf0.id}/score`, { scoreA: 1, scoreB: 0 });
+    ok(
+      rGf.status === 200 && rGf.data.champion === wbChampion && rGf.data.advanced == null,
+      "grand final won by the WB champion → tournament decided outright"
+    );
+    const doneCheck = await call("GET", `/api/tournaments/${deId}`);
+    ok(doneCheck.data.status === "completed", "tournament status → completed after grand final");
+
+    await call("DELETE", `/api/tournaments/${deId}`);
+    for (const id of teamIds) await call("DELETE", `/api/teams/${id}`);
+  }
+
+  // --- Double elimination: 4 teams, the LB champion wins the final outright ---
+  // (no bracket reset — one grand-final match decides it either way).
+  {
+    const teamIds = [];
+    for (let i = 0; i < 4; i++) {
+      const t = await call("POST", "/api/teams", { name: `DE LB Champ Team ${i}`, discipline: "CS2" });
+      teamIds.push(t.data.id);
+    }
+    const de = await call("POST", "/api/tournaments", {
+      name: "DE4LbWins",
+      discipline: "CS2",
+      bracketType: "double",
+      matchFormat: 1,
+      teamIds,
+    });
+    const deId = de.data.id;
+    const m = de.data.matches;
+    const wb0a = matchAt(m, "winners", 0, 0);
+    const wb0b = matchAt(m, "winners", 0, 1);
+
+    await call("PUT", `/api/matches/${wb0a.id}/score`, { scoreA: 1, scoreB: 0 });
+    await call("PUT", `/api/matches/${wb0b.id}/score`, { scoreA: 1, scoreB: 0 });
+    let cur = await call("GET", `/api/tournaments/${deId}`);
+    const lb0 = matchAt(cur.data.matches, "losers", 0, 0);
+    await call("PUT", `/api/matches/${lb0.id}/score`, { scoreA: 1, scoreB: 0 });
+    const wbFinal = matchAt(cur.data.matches, "winners", 1, 0);
+    const rWbFinal = await call("PUT", `/api/matches/${wbFinal.id}/score`, { scoreA: 1, scoreB: 0 });
+    const wbChampion = rWbFinal.data.match.scoreA > rWbFinal.data.match.scoreB ? wbFinal.teamAId : wbFinal.teamBId;
+    cur = await call("GET", `/api/tournaments/${deId}`);
+    const lb1 = matchAt(cur.data.matches, "losers", 1, 0);
+    const rLb1 = await call("PUT", `/api/matches/${lb1.id}/score`, { scoreA: 1, scoreB: 0 });
+    const lbChampion = rLb1.data.match.scoreA > rLb1.data.match.scoreB ? lb1.teamAId : lb1.teamBId;
+    ok(lbChampion !== wbChampion, "sanity: WB and LB champions are different teams");
+
+    cur = await call("GET", `/api/tournaments/${deId}`);
+    const gf0 = matchAt(cur.data.matches, "final", 0, 0);
+    ok(gf0.teamAId === wbChampion && gf0.teamBId === lbChampion, "grand final seated as expected");
+
+    // LB champion (teamB) wins the one and only grand-final match →
+    // tournament is decided immediately, no reset/second match.
+    const rGf0 = await call("PUT", `/api/matches/${gf0.id}/score`, { scoreA: 0, scoreB: 1 });
+    ok(
+      rGf0.status === 200 && rGf0.data.champion === lbChampion && rGf0.data.advanced == null,
+      "LB champion wins the grand final → tournament decided outright, no reset match"
+    );
+    const doneCheck = await call("GET", `/api/tournaments/${deId}`);
+    ok(doneCheck.data.status === "completed", "tournament status → completed after the LB champion wins");
+
+    await call("DELETE", `/api/tournaments/${deId}`);
+    for (const id of teamIds) await call("DELETE", `/api/teams/${id}`);
+  }
+
+  // --- Double elimination: resetting a WB match also un-drops its loser ---
+  {
+    const teamIds = [];
+    for (let i = 0; i < 4; i++) {
+      const t = await call("POST", "/api/teams", { name: `DE Undo Team ${i}`, discipline: "CS2" });
+      teamIds.push(t.data.id);
+    }
+    const de = await call("POST", "/api/tournaments", {
+      name: "DE4Undo",
+      discipline: "CS2",
+      bracketType: "double",
+      matchFormat: 1,
+      teamIds,
+    });
+    const deId = de.data.id;
+    const wb0a = matchAt(de.data.matches, "winners", 0, 0);
+
+    const played = await call("PUT", `/api/matches/${wb0a.id}/score`, { scoreA: 1, scoreB: 0 });
+    const lb0Id = played.data.advancedLoser.id;
+
+    const resetResult = await call("POST", `/api/matches/${wb0a.id}/reset`);
+    ok(
+      resetResult.status === 200 && resetResult.data.match.status === "pending",
+      "resetting a WB match → 200, match back to pending"
+    );
+    ok(
+      resetResult.data.loserMatch?.id === lb0Id &&
+        resetResult.data.loserMatch.teamAId == null &&
+        resetResult.data.loserMatch.teamBId == null,
+      "resetting a WB match also clears the losers-bracket slot the loser had dropped into"
+    );
+
+    // Play it again, then also finish the losers-bracket match it feeds —
+    // now resetting the WB match should be BLOCKED, since the loser already
+    // played on in the losers bracket.
+    await call("PUT", `/api/matches/${wb0a.id}/score`, { scoreA: 1, scoreB: 0 });
+    const wb0b = de.data.matches.find((m2) => m2.bracket === "winners" && m2.round === 0 && m2.position === 1);
+    await call("PUT", `/api/matches/${wb0b.id}/score`, { scoreA: 1, scoreB: 0 });
+    const afterBoth = await call("GET", `/api/tournaments/${deId}`);
+    const lb0 = matchAt(afterBoth.data.matches, "losers", 0, 0);
+    await call("PUT", `/api/matches/${lb0.id}/score`, { scoreA: 1, scoreB: 0 });
+
+    const blockedReset = await call("POST", `/api/matches/${wb0a.id}/reset`);
+    ok(
+      blockedReset.status === 409,
+      "resetting a WB match is blocked once its loser already played on in the losers bracket"
+    );
+
+    await call("DELETE", `/api/tournaments/${deId}`);
+    for (const id of teamIds) await call("DELETE", `/api/teams/${id}`);
+  }
 
   // --- Cleanup ---
   const delTour = await call("DELETE", `/api/tournaments/${tourId}`);

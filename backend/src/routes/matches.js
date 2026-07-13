@@ -2,7 +2,7 @@
 import { Router } from "express";
 import prisma from "../db.js";
 import { isValidScore } from "../bracket.js";
-import { advanceWinner } from "../advance.js";
+import { advanceWinner, advanceLoser, locateWinnerTarget, locateLoserTarget } from "../advance.js";
 import { avgRating } from "../rating.js";
 import { asyncHandler, requireFields, HttpError, parseId } from "../http.js";
 import { requireAdmin } from "../auth.js";
@@ -80,6 +80,8 @@ router.put(
 
     let champion = null;
     const advanced = await advanceWinner(prisma, match, winnerId);
+    const loserId = winnerId === match.teamAId ? match.teamBId : match.teamAId;
+    const advancedLoser = await advanceLoser(prisma, match, loserId);
 
     if (!advanced) {
       // No next round → this was the final.
@@ -104,51 +106,62 @@ router.put(
         tournamentId: match.tournamentId,
         match: updated,
         advanced,
+        advancedLoser,
         champion,
       });
     }
 
-    res.json({ match: updated, advanced, champion });
+    res.json({ match: updated, advanced, advancedLoser, champion });
   })
 );
 
 // POST /api/matches/:id/reset → undo a submitted result (misclick recovery).
-// Only allowed when the winner hasn't gone on to decide anything further:
-// if it already advanced into a next-round match that's ALSO done, that
-// match must be reset first (walk the chain backwards one step at a time —
-// deliberately not a recursive cascade, so each undo is a single, obviously
-// reversible step instead of silently unwinding an arbitrary depth of the
-// bracket). Byes can't be reset here — they're auto-resolved, not a real
-// submitted result, and un-resolving one would require re-deriving the bye
-// from bracket shape rather than just clearing a score.
+// Only allowed when the winner hasn't gone on to decide anything further —
+// in a single-elimination tournament that just means "the next round". In a
+// double-elimination one, TWO things may already have happened: the winner
+// advanced (winners/losers bracket, or the grand final), AND the loser
+// dropped into the losers bracket. Both must still be undoable (their own
+// target match must still be "pending") before this reset is allowed — walk
+// the chain backwards one step at a time (not a recursive cascade), same
+// rule as before, just checked on both branches now. Byes can't be reset
+// here — they're auto-resolved, not a real submitted result.
 router.post(
   "/:id/reset",
   requireAdmin,
   asyncHandler(async (req, res) => {
     const id = parseId(req.params.id);
-    const match = await prisma.match.findUnique({ where: { id }, include: { tournament: true } });
+    const match = await prisma.match.findUnique({ where: { id } });
     if (!match) throw new HttpError(404, "Матч не знайдено.");
     if (match.status === "bye") throw new HttpError(400, "Бай-матч не можна скасувати вручну.");
     if (match.status !== "done") throw new HttpError(400, "Цей матч ще не зіграно.");
 
     const winnerId = match.scoreA > match.scoreB ? match.teamAId : match.teamBId;
-    const nextPosition = Math.floor(match.position / 2);
-    const nextMatch = await prisma.match.findFirst({
-      where: { tournamentId: match.tournamentId, round: match.round + 1, position: nextPosition },
-    });
+
+    const winnerTarget = await locateWinnerTarget(prisma, match);
+    const loserTarget = await locateLoserTarget(prisma, match);
+
+    if (winnerTarget && winnerTarget.match.status !== "pending") {
+      throw new HttpError(
+        409,
+        "Переможець уже пройшов далі, і той матч теж зіграно — спершу скасуйте результат наступного матчу."
+      );
+    }
+    if (loserTarget && loserTarget.match.status !== "pending") {
+      throw new HttpError(
+        409,
+        "Команда, що вибула, уже зіграла в сітці невдах — спершу скасуйте результат того матчу."
+      );
+    }
 
     let updatedNext = null;
-    if (nextMatch) {
-      if (nextMatch.status !== "pending") {
-        throw new HttpError(
-          409,
-          "Переможець уже пройшов далі, і той матч теж зіграно — спершу скасуйте результат наступного матчу."
-        );
-      }
-      const slot = match.position % 2 === 0 ? "teamAId" : "teamBId";
-      updatedNext = await prisma.match.update({ where: { id: nextMatch.id }, data: { [slot]: null } });
+    if (winnerTarget) {
+      updatedNext = await prisma.match.update({
+        where: { id: winnerTarget.match.id },
+        data: { [winnerTarget.slot]: null },
+      });
     } else {
-      // This was the final — also roll back the champion bookkeeping it wrote.
+      // Terminal match (single-elimination final, or the grand final) —
+      // roll back the champion bookkeeping it wrote.
       const champTeam = await prisma.team.findUnique({ where: { id: winnerId } });
       const streakMatch = /^1 місце ×(\d+)$/.exec(champTeam.best ?? "");
       const n = streakMatch ? Number(streakMatch[1]) : 1;
@@ -160,6 +173,14 @@ router.post(
         },
       });
       await prisma.tournament.update({ where: { id: match.tournamentId }, data: { status: "draft" } });
+    }
+
+    let updatedLoser = null;
+    if (loserTarget) {
+      updatedLoser = await prisma.match.update({
+        where: { id: loserTarget.match.id },
+        data: { [loserTarget.slot]: null },
+      });
     }
 
     await prisma.ratingHistory.deleteMany({ where: { matchId: id } });
@@ -174,11 +195,12 @@ router.post(
         tournamentId: match.tournamentId,
         match: updated,
         advanced: updatedNext,
+        advancedLoser: updatedLoser,
         champion: null,
       });
     }
 
-    res.json({ match: updated, nextMatch: updatedNext });
+    res.json({ match: updated, nextMatch: updatedNext, loserMatch: updatedLoser });
   })
 );
 

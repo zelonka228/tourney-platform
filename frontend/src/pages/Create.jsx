@@ -11,6 +11,7 @@ import {
   DISCIPLINE_LIST,
   avgRating,
   effectivePlayerRank,
+  isPowerOfTwo,
 } from "../lib/demo";
 import { Btn, Field, Input, Overline, Panel, Select } from "../components/arena";
 
@@ -76,8 +77,10 @@ export function Create() {
     tm.name.toLowerCase().includes(teamQuery.trim().toLowerCase())
   );
   const isDouble = bracket === "double";
+  const doubleBlocked =
+    isDouble && selectedIds.length > 0 && (selectedIds.length < 4 || !isPowerOfTwo(selectedIds.length));
   const plan = bracketPlan(Math.max(selectedIds.length, 1));
-  const canSubmit = !isDouble && selectedIds.length >= 2 && name.trim() !== "" && !submitting;
+  const canSubmit = (!isDouble || !doubleBlocked) && selectedIds.length >= 2 && name.trim() !== "" && !submitting;
 
   async function handleSubmit() {
     setSubmitting(true);
@@ -146,7 +149,7 @@ export function Create() {
                 <option value="single">{t("create.single")}</option>
                 <option value="double">{t("create.double")}</option>
               </Select>
-              {isDouble && (
+              {doubleBlocked && (
                 <span className="block mt-2 text-xs text-[#ff0055]">{t("create.doubleHint")}</span>
               )}
             </Field>
