@@ -31,6 +31,18 @@ function useRoundLabel() {
   };
 }
 
+// Bracket-only label — like the shared `Overline` component, but bigger
+// (13px vs 11px) and lighter (#9a9aa3 vs the site-wide `--faint` #52525b),
+// since round/section labels sitting directly on the near-black bracket
+// background read as too small and too dark to comfortably read. Doesn't
+// bake in a default color — every call site passes its own (gray, volt, or
+// danger) so an override in `className` never has to fight one already set
+// here (two same-specificity Tailwind color classes on one element don't
+// reliably resolve by source order).
+function BracketLabel({ children, className = "" }) {
+  return <div className={`font-mono uppercase tracking-[0.2em] text-[13px] ${className}`}>{children}</div>;
+}
+
 function MatchCard({
   m,
   teamName,
@@ -140,17 +152,17 @@ function MatchCard({
           );
         })}
         {todo && (
-          <div className="text-center py-1 bg-cyan text-void text-[10px] font-mono uppercase tracking-widest">
+          <div className="text-center py-1.5 bg-cyan text-void text-[11px] font-mono uppercase tracking-widest">
             {enterScoreLabel}
           </div>
         )}
         {isBye && (
-          <div className="text-center py-1 bg-[#3f3f46] text-[#d4d4d8] text-[10px] font-mono uppercase tracking-widest">
+          <div className="text-center py-1.5 bg-[#3f3f46] text-[#d4d4d8] text-[11px] font-mono uppercase tracking-widest">
             {byeLabel}
           </div>
         )}
         {editable && (
-          <div className="text-center py-1 border-t border-[#27272a] text-[#52525b] text-[10px] font-mono uppercase tracking-widest hover:text-[#ff0055] transition-colors">
+          <div className="text-center py-1.5 border-t border-[#27272a] text-[#8b8b95] text-[11px] font-mono uppercase tracking-widest hover:text-[#ff0055] transition-colors">
             {editLabel}
           </div>
         )}
@@ -337,7 +349,7 @@ function BracketRow({
         const rm = matches.filter((m) => m.round === r).sort((x, y) => x.position - y.position);
         return (
           <div key={r} className="relative z-[1] flex flex-col min-w-[220px]">
-            <Overline className="mb-1">{labelFor(r, rm.length)}</Overline>
+            <BracketLabel className="mb-1 text-[#9a9aa3]">{labelFor(r, rm.length)}</BracketLabel>
             <div className="flex flex-col justify-around gap-4 flex-1">
               {rm.map((m) => (
                 <MatchCard
@@ -359,7 +371,7 @@ function BracketRow({
 
       {showChampionNode && (
         <div className="relative z-[1] flex flex-col min-w-[220px]">
-          <Overline className="mb-1 text-volt">{championLabel}</Overline>
+          <BracketLabel className="mb-1 text-volt">{championLabel}</BracketLabel>
           <div className="flex flex-col justify-around flex-1">
             <div
               ref={setNodeRef("champion")}
@@ -572,7 +584,7 @@ function DoubleEliminationBracket({
       const rm = list.filter((m) => m.round === r).sort((x, y) => x.position - y.position);
       return (
         <div key={r} className="flex flex-col min-w-[220px]">
-          <Overline className="mb-1">{labelForRound(r, rm.length)}</Overline>
+          <BracketLabel className="mb-1 text-[#9a9aa3]">{labelForRound(r, rm.length)}</BracketLabel>
           <div className="flex flex-col justify-around gap-4 flex-1">
             {rm.map((m) => (
               <MatchCard
@@ -626,20 +638,20 @@ function DoubleEliminationBracket({
       <div className="relative z-[1] flex gap-14">
         <div className="flex flex-col gap-10">
           <div>
-            <Overline className="mb-2">{t("tour.bracket.winners")}</Overline>
+            <BracketLabel className="mb-2 text-[#9a9aa3]">{t("tour.bracket.winners")}</BracketLabel>
             <div className="flex gap-10">{renderRounds(winnersMatches, (r, count) => roundLabel(count))}</div>
           </div>
           <div>
-            <Overline className="mb-2 text-[#ff0055]">{t("tour.bracket.losers")}</Overline>
+            <BracketLabel className="mb-2 text-[#ff0055]">{t("tour.bracket.losers")}</BracketLabel>
             <div className="flex gap-10">{renderRounds(losersMatches, lbRoundLabelFor)}</div>
           </div>
         </div>
         {gf0 && (
           <div className="flex flex-col justify-center min-w-[220px]">
-            <Overline className="mb-2 text-volt">{t("tour.bracket.final")}</Overline>
+            <BracketLabel className="mb-2 text-volt">{t("tour.bracket.final")}</BracketLabel>
             <div className="flex flex-col gap-6">
               <div>
-                <p className="overline mb-1">{roundLabel(1)}</p>
+                <BracketLabel className="mb-1 text-[#9a9aa3]">{roundLabel(1)}</BracketLabel>
                 <MatchCard
                   m={gf0}
                   teamName={teamName}
@@ -653,7 +665,7 @@ function DoubleEliminationBracket({
               </div>
               {gf1 && gf1.teamAId != null && (
                 <div>
-                  <p className="overline mb-1 text-[#ff0055]">{t("tour.bracket.reset")}</p>
+                  <BracketLabel className="mb-1 text-[#ff0055]">{t("tour.bracket.reset")}</BracketLabel>
                   <MatchCard
                     m={gf1}
                     teamName={teamName}
