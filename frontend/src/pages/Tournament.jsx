@@ -15,7 +15,7 @@ import {
   updateTournament,
   unregisterTeam,
 } from "../lib/api";
-import { validScorelines, BEST_OF, winTarget, lbWinnerDestination } from "../lib/demo";
+import { validScorelines, BEST_OF, winTarget, lbWinnerDestination, loserDestination } from "../lib/demo";
 import { Btn, Field, Input, Overline, Panel, Select } from "../components/arena";
 
 const SOCKET_URL = import.meta.env.VITE_API_URL ?? "http://localhost:4000";
@@ -389,6 +389,291 @@ function BracketRow({
   );
 }
 
+// Double elimination's own bracket renderer — unlike BracketRow (used for
+// single elimination, and previously reused 3x here before this existed),
+// this shares ONE coordinate space (one container, one wire SVG, one pulse
+// overlay, one node registry) across winners, losers AND the grand final.
+// That's what makes it possible to actually draw the connections a loss
+// creates — winners round → losers bracket (a second, danger-colored wire
+// off every winners match), and both brackets' champions converging into
+// the grand final — instead of three visually disconnected mini-brackets
+// stacked with dead space between them.
+function DoubleEliminationBracket({
+  winnersMatches,
+  losersMatches,
+  gf0,
+  gf1,
+  teamCount,
+  teamName,
+  openEdit,
+  isAdmin,
+  labels,
+  t,
+}) {
+  const roundLabel = useRoundLabel();
+  const lbRoundLabelFor = (r) => `${t("tour.res.round")} ${r + 1}`;
+
+  const bracketRef = useRef(null);
+  const svgRef = useRef(null);
+  const pulseSvgRef = useRef(null);
+  const nodeRefs = useRef(new Map());
+  const activePulses = useRef(new Set());
+  const decidedIdsRef = useRef(new Set());
+  const [connectors, setConnectors] = useState([]);
+  const [svgSize, setSvgSize] = useState({ w: 0, h: 0 });
+
+  const setNodeRef = (key) => (el) => {
+    if (el) nodeRefs.current.set(key, el);
+    else nodeRefs.current.delete(key);
+  };
+
+  // A winners-bracket match can have TWO outgoing wires (winner AND loser),
+  // both keyed off the same source match id (`data-src="<id>-winner"` /
+  // `"<id>-loser"`) — querying by prefix fires a pulse dot along every wire
+  // that match just decided, whether that's one wire (losers/final matches)
+  // or two (winners matches, once double elimination is in play).
+  function fireConnectorPulse(matchId) {
+    const wireSvg = svgRef.current;
+    const overlay = pulseSvgRef.current;
+    if (!wireSvg || !overlay) return;
+    const paths = wireSvg.querySelectorAll(`path[data-src^="${CSS.escape(String(matchId))}-"]`);
+    paths.forEach((pathEl) => {
+      const length = pathEl.getTotalLength();
+      if (!length) return;
+      const isLoser = pathEl.classList.contains("wire-loser");
+      const color = isLoser ? "#FF0055" : "#00F0FF";
+      const svgNS = "http://www.w3.org/2000/svg";
+      const dot = document.createElementNS(svgNS, "circle");
+      dot.setAttribute("r", "4.5");
+      dot.setAttribute("fill", color);
+      dot.setAttribute("class", "flow-pulse-dot");
+      dot.style.filter = `drop-shadow(0 0 6px ${color}) drop-shadow(0 0 12px ${color}99)`;
+      dot.style.opacity = "0";
+      overlay.appendChild(dot);
+      const controls = animate(0, 1, {
+        duration: 0.9,
+        ease: [0.4, 0, 0.2, 1],
+        onUpdate: (p) => {
+          const pt = pathEl.getPointAtLength(length * p);
+          const fade = p < 0.12 ? p / 0.12 : p > 0.85 ? (1 - p) / 0.15 : 1;
+          dot.setAttribute("cx", pt.x);
+          dot.setAttribute("cy", pt.y);
+          dot.style.opacity = String(fade);
+        },
+        onComplete: () => {
+          dot.remove();
+          activePulses.current.delete(controls);
+        },
+      });
+      activePulses.current.add(controls);
+    });
+  }
+
+  useEffect(
+    () => () => {
+      activePulses.current.forEach((c) => c.stop());
+      activePulses.current.clear();
+      pulseSvgRef.current?.querySelectorAll(".flow-pulse-dot").forEach((d) => d.remove());
+    },
+    []
+  );
+
+  const allMatches = useMemo(
+    () => [...winnersMatches, ...losersMatches, ...(gf0 ? [gf0] : []), ...(gf1 ? [gf1] : [])],
+    [winnersMatches, losersMatches, gf0, gf1]
+  );
+
+  useEffect(() => {
+    for (const m of allMatches) {
+      const dec = m.status === "done" || m.status === "bye";
+      if (dec && !decidedIdsRef.current.has(m.id)) {
+        decidedIdsRef.current.add(m.id);
+        fireConnectorPulse(m.id);
+      }
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [allMatches]);
+
+  function winnerDestOf(m) {
+    if (m.bracket === "winners") {
+      const next = winnersMatches.find(
+        (x) => x.round === m.round + 1 && x.position === Math.floor(m.position / 2)
+      );
+      return next ?? gf0 ?? null;
+    }
+    if (m.bracket === "losers") {
+      const dest = lbWinnerDestination(teamCount, m.round, m.position);
+      if (!dest) return gf0 ?? null;
+      return losersMatches.find((x) => x.round === dest.round && x.position === dest.position) ?? null;
+    }
+    if (m.bracket === "final" && m.round === 0) {
+      return gf1 && gf1.teamAId != null ? gf1 : null;
+    }
+    return null;
+  }
+  function loserDestOf(m) {
+    if (m.bracket !== "winners") return null;
+    const dest = loserDestination(teamCount, m.round, m.position);
+    return losersMatches.find((x) => x.round === dest.round && x.position === dest.position) ?? null;
+  }
+
+  useLayoutEffect(() => {
+    const container = bracketRef.current;
+    if (!container || allMatches.length === 0) return;
+    function recompute() {
+      const cRect = container.getBoundingClientRect();
+      const next = [];
+      function pushWire(source, dest, kind) {
+        if (!dest) return;
+        const a = nodeRefs.current.get(`m-${source.id}`);
+        const b = nodeRefs.current.get(`m-${dest.id}`);
+        if (!a || !b) return;
+        const ar = a.getBoundingClientRect(),
+          br = b.getBoundingClientRect();
+        const x1 = ar.right - cRect.left + container.scrollLeft;
+        const y1 = ar.top + ar.height / 2 - cRect.top + container.scrollTop;
+        const x2 = br.left - cRect.left + container.scrollLeft;
+        const y2 = br.top + br.height / 2 - cRect.top + container.scrollTop;
+        const midX = (x1 + x2) / 2;
+        next.push({
+          key: `${source.id}-${kind}-${dest.id}`,
+          sourceId: `${source.id}-${kind}`,
+          d: `M ${x1} ${y1} H ${midX} V ${y2} H ${x2}`,
+          live: source.status === "done" || source.status === "bye",
+          loser: kind === "loser",
+        });
+      }
+      for (const m of winnersMatches) {
+        pushWire(m, winnerDestOf(m), "winner");
+        pushWire(m, loserDestOf(m), "loser");
+      }
+      for (const m of losersMatches) {
+        pushWire(m, winnerDestOf(m), "winner");
+      }
+      if (gf0) pushWire(gf0, winnerDestOf(gf0), "winner");
+      next.sort((a, b) => (a.loser === b.loser ? 0 : a.loser ? -1 : 1)); // winner wires drawn on top
+      setConnectors(next);
+      setSvgSize({ w: container.scrollWidth, h: container.scrollHeight });
+    }
+    recompute();
+    const ro = new ResizeObserver(recompute);
+    ro.observe(container);
+    window.addEventListener("resize", recompute);
+    return () => {
+      ro.disconnect();
+      window.removeEventListener("resize", recompute);
+    };
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [winnersMatches, losersMatches, gf0, gf1, teamCount]);
+
+  function renderRounds(list, labelForRound) {
+    const total = list.length ? Math.max(...list.map((m) => m.round)) + 1 : 0;
+    return Array.from({ length: total }, (_, r) => {
+      const rm = list.filter((m) => m.round === r).sort((x, y) => x.position - y.position);
+      return (
+        <div key={r} className="flex flex-col min-w-[220px]">
+          <Overline className="mb-1">{labelForRound(r, rm.length)}</Overline>
+          <div className="flex flex-col justify-around gap-4 flex-1">
+            {rm.map((m) => (
+              <MatchCard
+                key={`${m.id}-${m.status}`}
+                m={m}
+                teamName={teamName}
+                openEdit={openEdit}
+                cardRef={setNodeRef(`m-${m.id}`)}
+                isAdmin={isAdmin}
+                enterScoreLabel={labels.enterScoreLabel}
+                byeLabel={labels.byeLabel}
+                editLabel={labels.editLabel}
+              />
+            ))}
+          </div>
+        </div>
+      );
+    });
+  }
+
+  return (
+    <div
+      ref={bracketRef}
+      className="relative overflow-x-auto pb-4 cursor-grab active:cursor-grabbing"
+      data-testid="bracket-double"
+    >
+      <svg
+        ref={svgRef}
+        className="wire-layer absolute top-0 left-0"
+        width={svgSize.w}
+        height={svgSize.h}
+        style={{ overflow: "visible", zIndex: 0 }}
+      >
+        {connectors.map((c) => (
+          <path
+            key={c.key}
+            data-src={c.sourceId}
+            d={c.d}
+            className={"wire" + (c.live ? " live" : "") + (c.loser ? " wire-loser" : "")}
+          />
+        ))}
+      </svg>
+      <svg
+        ref={pulseSvgRef}
+        className="absolute top-0 left-0 pointer-events-none"
+        width={svgSize.w}
+        height={svgSize.h}
+        style={{ overflow: "visible", zIndex: 4 }}
+      />
+
+      <div className="relative z-[1] flex gap-14">
+        <div className="flex flex-col gap-10">
+          <div>
+            <Overline className="mb-2">{t("tour.bracket.winners")}</Overline>
+            <div className="flex gap-10">{renderRounds(winnersMatches, (r, count) => roundLabel(count))}</div>
+          </div>
+          <div>
+            <Overline className="mb-2 text-[#ff0055]">{t("tour.bracket.losers")}</Overline>
+            <div className="flex gap-10">{renderRounds(losersMatches, lbRoundLabelFor)}</div>
+          </div>
+        </div>
+        {gf0 && (
+          <div className="flex flex-col justify-center min-w-[220px]">
+            <Overline className="mb-2 text-volt">{t("tour.bracket.final")}</Overline>
+            <div className="flex flex-col gap-6">
+              <div>
+                <p className="overline mb-1">{roundLabel(1)}</p>
+                <MatchCard
+                  m={gf0}
+                  teamName={teamName}
+                  openEdit={openEdit}
+                  cardRef={setNodeRef(`m-${gf0.id}`)}
+                  isAdmin={isAdmin}
+                  enterScoreLabel={labels.enterScoreLabel}
+                  byeLabel={labels.byeLabel}
+                  editLabel={labels.editLabel}
+                />
+              </div>
+              {gf1 && gf1.teamAId != null && (
+                <div>
+                  <p className="overline mb-1 text-[#ff0055]">{t("tour.bracket.reset")}</p>
+                  <MatchCard
+                    m={gf1}
+                    teamName={teamName}
+                    openEdit={openEdit}
+                    cardRef={setNodeRef(`m-${gf1.id}`)}
+                    isAdmin={isAdmin}
+                    enterScoreLabel={labels.enterScoreLabel}
+                    byeLabel={labels.byeLabel}
+                    editLabel={labels.editLabel}
+                  />
+                </div>
+              )}
+            </div>
+          </div>
+        )}
+      </div>
+    </div>
+  );
+}
+
 function TournamentPicker() {
   const { t } = useI18n();
   const [list, setList] = useState(null);
@@ -537,19 +822,13 @@ export function Tournament() {
   const gf0 = matches.find((m) => m.bracket === "final" && m.round === 0);
   const gf1 = matches.find((m) => m.bracket === "final" && m.round === 1);
 
-  // Winners-bracket wires stay simple round+1/floor(position/2) math — same
-  // as single elimination, since within one bracket the shape is identical.
+  // Used only by the single-elimination BracketRow below — winners-bracket
+  // wires stay simple round+1/floor(position/2) math, same as before double
+  // elimination existed. DoubleEliminationBracket computes its own winner
+  // AND loser wire destinations internally (it needs both, and needs them
+  // sharing one coordinate space — see that component).
   const nextInWinners = (m) =>
     winnersMatches.find((x) => x.round === m.round + 1 && x.position === Math.floor(m.position / 2));
-  // Losers-bracket wires follow the alternating drop/minor pattern (see
-  // docs/03-double-elimination-spec.md) — lbWinnerDestination mirrors the
-  // backend's routing exactly so the wire always points where a result will
-  // actually send the winner.
-  const nextInLosers = (m) => {
-    const dest = lbWinnerDestination(teamCount, m.round, m.position);
-    if (!dest) return null;
-    return losersMatches.find((x) => x.round === dest.round && x.position === dest.position);
-  };
 
   const champion = useMemo(() => {
     if (isDouble) {
@@ -927,78 +1206,22 @@ export function Tournament() {
           )}
 
           {matches.length > 0 && isDouble && (
-            <div className="space-y-8">
-              <div>
-                <Overline className="mb-2">{t("tour.bracket.winners")}</Overline>
-                <BracketRow
-                  matches={winnersMatches}
-                  nextMatchFor={nextInWinners}
-                  showChampionNode={false}
-                  teamName={teamName}
-                  openEdit={openEdit}
-                  isAdmin={isAdmin}
-                  testId="bracket-winners"
-                  labels={{
-                    enterScoreLabel: t("tour.enterScore"),
-                    byeLabel: t("tour.bye"),
-                    editLabel: t("tour.editScore"),
-                  }}
-                />
-              </div>
-              <div>
-                <Overline className="mb-2 text-[#ff0055]">{t("tour.bracket.losers")}</Overline>
-                <BracketRow
-                  matches={losersMatches}
-                  nextMatchFor={nextInLosers}
-                  showChampionNode={false}
-                  teamName={teamName}
-                  openEdit={openEdit}
-                  isAdmin={isAdmin}
-                  testId="bracket-losers"
-                  roundLabelFor={(r) => `${t("tour.res.round")} ${r + 1}`}
-                  labels={{
-                    enterScoreLabel: t("tour.enterScore"),
-                    byeLabel: t("tour.bye"),
-                    editLabel: t("tour.editScore"),
-                  }}
-                />
-              </div>
-              {gf0 && (
-                <div>
-                  <Overline className="mb-2 text-volt">{t("tour.bracket.final")}</Overline>
-                  <div className="flex gap-6" data-testid="bracket-final">
-                    <div>
-                      <p className="overline mb-1">{roundLabel(1)}</p>
-                      <MatchCard
-                        m={gf0}
-                        teamName={teamName}
-                        openEdit={openEdit}
-                        cardRef={() => {}}
-                        isAdmin={isAdmin}
-                        enterScoreLabel={t("tour.enterScore")}
-                        byeLabel={t("tour.bye")}
-                        editLabel={t("tour.editScore")}
-                      />
-                    </div>
-                    {gf1 && gf1.teamAId != null && (
-                      <div>
-                        <p className="overline mb-1 text-[#ff0055]">{t("tour.bracket.reset")}</p>
-                        <MatchCard
-                          m={gf1}
-                          teamName={teamName}
-                          openEdit={openEdit}
-                          cardRef={() => {}}
-                          isAdmin={isAdmin}
-                          enterScoreLabel={t("tour.enterScore")}
-                          byeLabel={t("tour.bye")}
-                          editLabel={t("tour.editScore")}
-                        />
-                      </div>
-                    )}
-                  </div>
-                </div>
-              )}
-            </div>
+            <DoubleEliminationBracket
+              winnersMatches={winnersMatches}
+              losersMatches={losersMatches}
+              gf0={gf0}
+              gf1={gf1}
+              teamCount={teamCount}
+              teamName={teamName}
+              openEdit={openEdit}
+              isAdmin={isAdmin}
+              t={t}
+              labels={{
+                enterScoreLabel: t("tour.enterScore"),
+                byeLabel: t("tour.bye"),
+                editLabel: t("tour.editScore"),
+              }}
+            />
           )}
 
           {edit?.mode === "score" && (

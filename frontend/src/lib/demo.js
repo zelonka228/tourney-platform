@@ -80,6 +80,17 @@ export function lbWinnerDestination(n, lbRound, lbPosition) {
   return { round: lbRound + 1, position: Math.floor(lbPosition / 2) };
 }
 
+// Where does the LOSER of winners-bracket match (wbRound, wbPosition) land
+// in the losers bracket? Drawn as a second, danger-colored wire alongside
+// the winner wire so a loss visibly "drops" into the losers bracket instead
+// of just vanishing.
+export function loserDestination(n, wbRound, wbPosition) {
+  if (wbRound === 0) {
+    return { round: 0, position: Math.floor(wbPosition / 2) };
+  }
+  return { round: 2 * wbRound - 1, position: wbPosition };
+}
+
 // Доповнення до найближчого степеня двійки через «баї».
 export function bracketPlan(n) {
   const full = nextPow2(Math.max(n, 1));

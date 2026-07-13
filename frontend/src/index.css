@@ -113,6 +113,10 @@ body {
   stroke: var(--cyan);
   filter: drop-shadow(0 0 4px var(--cyan));
 }
+.wire.wire-loser.live {
+  stroke: var(--danger);
+  filter: drop-shadow(0 0 4px var(--danger));
+}
 
 .flow-pulse-layer {
   position: absolute;
