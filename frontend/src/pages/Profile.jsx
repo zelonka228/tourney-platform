@@ -1,6 +1,7 @@
-import { useEffect, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import { Link } from "react-router-dom";
 import { motion } from "framer-motion";
+import { toPng } from "html-to-image";
 import { useI18n } from "../lib/i18n";
 import { getTeams, getPlayerStats } from "../lib/api";
 import {
@@ -8,10 +9,14 @@ import {
   effectivePlayerRank,
   liveRankFromStats,
   liveNickFromStats,
+  teamRarity,
   DISCIPLINES,
 } from "../lib/demo";
 import { Btn, Overline, Panel, Stat, Input } from "../components/arena";
 import { PlayerStatsWidget } from "../components/PlayerStatsWidget";
+import { TeamCard } from "../components/TeamCard";
+
+const RARITY_TIERS = ["Common", "Rare", "Epic", "Legendary"];
 
 export function Profile() {
   const { t } = useI18n();
@@ -29,10 +34,38 @@ export function Profile() {
   // detail render broke the Rules of Hooks and crashed the whole page on
   // switching from the team list to a team's detail view.
   const [liveElo, setLiveElo] = useState({});
+  const [cardOpen, setCardOpen] = useState(false);
+  const [cardSaving, setCardSaving] = useState(false);
+  const cardRef = useRef(null);
 
   useEffect(() => {
     getTeams().then(setTeams);
   }, []);
+
+  // Escape closes the card preview panel, same convention as the score/reset
+  // modals in Tournament.jsx.
+  useEffect(() => {
+    if (!cardOpen) return;
+    function onKeyDown(e) {
+      if (e.key === "Escape") setCardOpen(false);
+    }
+    window.addEventListener("keydown", onKeyDown);
+    return () => window.removeEventListener("keydown", onKeyDown);
+  }, [cardOpen]);
+
+  async function downloadCard(teamName) {
+    if (!cardRef.current) return;
+    setCardSaving(true);
+    try {
+      const dataUrl = await toPng(cardRef.current);
+      const a = document.createElement("a");
+      a.href = dataUrl;
+      a.download = `${teamName}-card.png`;
+      a.click();
+    } finally {
+      setCardSaving(false);
+    }
+  }
 
   if (sel === null) {
     return (
@@ -100,17 +133,62 @@ export function Profile() {
   const unit = t(`unit.${DISCIPLINES[team.discipline].unitKey}`);
   const rankFor = (p) => liveElo[p.id] ?? effectivePlayerRank(team.discipline, p);
   const rating = avgRating(team.discipline, mainPlayers.map(rankFor));
+  const rarity = teamRarity(team.tournaments);
 
   return (
     <div className="py-10" data-testid="profile-detail">
       <div className="flex items-center justify-between">
-        <Btn size="sm" variant="ghost" data-testid="profile-back-btn" onClick={() => setSel(null)}>
+        <Btn
+          size="sm"
+          variant="ghost"
+          data-testid="profile-back-btn"
+          onClick={() => {
+            setSel(null);
+            setCardOpen(false);
+          }}
+        >
           {t("profile.back")}
         </Btn>
-        <Link to={`/team/${team.id}`} className="text-cyan text-sm font-mono hover:underline">
-          {t("profile.edit")}
-        </Link>
+        <div className="flex items-center gap-4">
+          <Btn
+            size="sm"
+            variant="ghost"
+            data-testid="profile-card-btn"
+            onClick={() => setCardOpen((v) => !v)}
+          >
+            {t("profile.card.open")}
+          </Btn>
+          <Link to={`/team/${team.id}`} className="text-cyan text-sm font-mono hover:underline">
+            {t("profile.edit")}
+          </Link>
+        </div>
       </div>
+
+      {cardOpen && (
+        <Panel
+          clip
+          className="p-6 mt-6 flex flex-col items-center gap-4"
+          data-testid="team-card-panel"
+          role="dialog"
+          aria-modal="true"
+          aria-labelledby="team-card-title"
+        >
+          <h2 id="team-card-title" className="font-display font-bold text-lg text-white self-start">
+            {t("profile.card.open")}
+          </h2>
+          <div className="max-w-full overflow-x-auto">
+            <TeamCard ref={cardRef} team={team} />
+          </div>
+          <Btn
+            variant="primary"
+            data-testid="team-card-download"
+            disabled={cardSaving}
+            onClick={() => downloadCard(team.name)}
+          >
+            {cardSaving ? "…" : t("profile.card.download")}
+          </Btn>
+        </Panel>
+      )}
 
       <h1 className="font-display font-black text-4xl sm:text-5xl tracking-tighter text-white mt-6">
         {team.name}
@@ -178,11 +256,13 @@ export function Profile() {
           <Panel clip className="p-6">
             <Overline>{t("profile.rarity")}</Overline>
             <div className="flex gap-2 mt-4">
-              {["Common", "Rare", "Epic", "Legendary"].map((tier, i) => (
+              {RARITY_TIERS.map((tier) => (
                 <span
                   key={tier}
                   className={`px-3 py-1 text-xs font-mono border rounded-sm ${
-                    i === 2 ? "border-volt text-volt bg-volt/10" : "border-[#27272a] text-[#52525b]"
+                    tier === rarity
+                      ? "border-volt text-volt bg-volt/10"
+                      : "border-[#27272a] text-[#52525b]"
                   }`}
                 >
                   {tier}

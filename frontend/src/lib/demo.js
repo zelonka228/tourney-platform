@@ -119,6 +119,19 @@ export function seedPositions(size) {
   return seeds;
 }
 
+// Рідкість RPG-картки команди — від кількості виграних турнірів
+// (team.tournaments), а не від рейтингу гравців: рейтинг у трьох
+// дисциплінах виражений у несумісних одиницях (FACEIT ELO, MMR,
+// Valorant-звання), тому чесне порівняння між ними неможливе без вигаданої
+// нормалізації, якої проєкт свідомо уникає. Перемоги в турнірах — єдина
+// метрика, однаково чесна для всіх дисциплін.
+export function teamRarity(tournamentsWon) {
+  if (tournamentsWon >= 3) return "Legendary";
+  if (tournamentsWon === 2) return "Epic";
+  if (tournamentsWon === 1) return "Rare";
+  return "Common";
+}
+
 // Середній рейтинг команди в одиниці її дисципліни.
 export function avgRating(discipline, ranks) {
   const def = DISCIPLINES[discipline];

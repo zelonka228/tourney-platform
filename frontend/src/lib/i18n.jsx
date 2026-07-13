@@ -119,6 +119,8 @@ const DICT = {
     "profile.rarity": "Рідкість картки",
     "profile.ratingDesc":
       "Рейтинг рахується в одиниці дисципліни: CS2 — FACEIT ELO, Dota 2 — MMR, Valorant — звання. Команди порівнюються в межах однієї гри.",
+    "profile.card.open": "Картка команди",
+    "profile.card.download": "Завантажити PNG",
 
     "widget.loading": "Завантаження статистики…",
     "widget.viewProfile.faceit": "Відкрити профіль FACEIT",
@@ -308,6 +310,8 @@ const DICT = {
     "profile.rarity": "Card rarity",
     "profile.ratingDesc":
       "Rating is measured in each game's own unit: CS2 — FACEIT ELO, Dota 2 — MMR, Valorant — rank. Teams are compared within one game.",
+    "profile.card.open": "Team card",
+    "profile.card.download": "Download PNG",
 
     "widget.loading": "Loading stats…",
     "widget.viewProfile.faceit": "Open FACEIT profile",
