@@ -707,7 +707,7 @@ function DoubleEliminationBracket({
                 of how the rest of the bracket is being scanned. */}
             <div className="flex items-center gap-3">
               <div className="min-w-[220px]">
-                <BracketLabel className="mb-1 text-[#9a9aa3]">{t("tour.bracket.match1")}</BracketLabel>
+                <BracketLabel className="mb-1 text-[#9a9aa3]">{roundLabel(1)}</BracketLabel>
                 <MatchCard
                   m={gf0}
                   teamName={teamName}
@@ -725,7 +725,7 @@ function DoubleEliminationBracket({
                     →
                   </span>
                   <div className="min-w-[220px]">
-                    <BracketLabel className="mb-1 text-[#ff0055]">{t("tour.bracket.match2")}</BracketLabel>
+                    <BracketLabel className="mb-1 text-[#ff0055]">{t("tour.bracket.reset")}</BracketLabel>
                     <MatchCard
                       m={gf1}
                       teamName={teamName}
