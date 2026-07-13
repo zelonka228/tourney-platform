@@ -96,7 +96,7 @@
 - **Backend REST API** (Express + Prisma) — CRUD команд і турнірів, генерація сітки (single/double elimination), ввід рахунку, валідація вхідних даних, єдина обробка помилок (`400` / `404` / `409`), 56 автоматизованих тестів.
 - **Автономний фронтенд** — якщо backend недоступний, `api.js` м'яко повертається на демонстраційні дані для перегляду; дії, що змінюють дані, потребують живого бекенду.
 
-Подвійне вибування реалізовано для кількості команд-степенів двійки (4/8/16/32) — див. [docs/03-double-elimination-spec.md](docs/03-double-elimination-spec.md). Далі за планом (Тиждень 4): PNG-експорт RPG-картки, фінальне тестування, звіт — див. [Статус за тижнями](#статус-за-тижнями).
+Подвійне вибування реалізовано для кількості команд-степенів двійки (4/8/16/32) — див. [docs/03-double-elimination-spec.md](docs/03-double-elimination-spec.md). RPG-картка команди з PNG-експортом — див. [docs/04-rpg-card-spec.md](docs/04-rpg-card-spec.md). Далі за планом (Тиждень 4): фінальне тестування, звіт — див. [Статус за тижнями](#статус-за-тижнями).
 
 **[⬆ До змісту](#зміст)**
 
@@ -272,7 +272,7 @@ npm test
 | 9 | Рейтингова система команд | 3 | ![done](https://img.shields.io/badge/-done-brightgreen?style=flat-square) |
 | 10 | Live-оновлення результатів матчів (WebSocket) | 3–4 | ![done](https://img.shields.io/badge/-done-brightgreen?style=flat-square) |
 | 11 | Frontend-візуалізація турнірної сітки | 3–4 | ![done](https://img.shields.io/badge/-done-brightgreen?style=flat-square) |
-| 12 | Генератор RPG-карток команд (PNG-експорт) | 4 | ![planned](https://img.shields.io/badge/-planned-lightgrey?style=flat-square) |
+| 12 | Генератор RPG-карток команд (PNG-експорт) | 4 | ![done](https://img.shields.io/badge/-done-brightgreen?style=flat-square) |
 | 13 | Тестування, виправлення помилок, звіт з практики | 4 | ![planned](https://img.shields.io/badge/-planned-lightgrey?style=flat-square) |
 
 **[⬆ До змісту](#зміст)**
@@ -282,6 +282,8 @@ npm test
 ## Документація
 
 - [docs/02-week2-spec.md](docs/02-week2-spec.md) — контракт схеми БД та REST API.
+- [docs/03-double-elimination-spec.md](docs/03-double-elimination-spec.md) — специфікація подвійного вибування.
+- [docs/04-rpg-card-spec.md](docs/04-rpg-card-spec.md) — специфікація RPG-картки команди.
 
 Академічні деліверабли практики (звіт, календарний графік, щоденники) до репозиторію не входять — ведуться окремо.
 
