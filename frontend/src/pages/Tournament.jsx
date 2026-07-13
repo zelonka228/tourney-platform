@@ -40,7 +40,7 @@ function useRoundLabel() {
 // here (two same-specificity Tailwind color classes on one element don't
 // reliably resolve by source order).
 function BracketLabel({ children, className = "" }) {
-  return <div className={`font-mono uppercase tracking-[0.2em] text-[13px] ${className}`}>{children}</div>;
+  return <div className={`font-mono uppercase tracking-[0.16em] text-[15px] ${className}`}>{children}</div>;
 }
 
 function MatchCard({
@@ -152,17 +152,17 @@ function MatchCard({
           );
         })}
         {todo && (
-          <div className="text-center py-1.5 bg-cyan text-void text-[11px] font-mono uppercase tracking-widest">
+          <div className="text-center py-1.5 bg-cyan text-void text-[12px] font-mono uppercase tracking-widest">
             {enterScoreLabel}
           </div>
         )}
         {isBye && (
-          <div className="text-center py-1.5 bg-[#3f3f46] text-[#d4d4d8] text-[11px] font-mono uppercase tracking-widest">
+          <div className="text-center py-1.5 bg-[#3f3f46] text-[#d4d4d8] text-[12px] font-mono uppercase tracking-widest">
             {byeLabel}
           </div>
         )}
         {editable && (
-          <div className="text-center py-1.5 border-t border-[#27272a] text-[#8b8b95] text-[11px] font-mono uppercase tracking-widest hover:text-[#ff0055] transition-colors">
+          <div className="text-center py-1.5 border-t border-[#27272a] text-[#8b8b95] text-[12px] font-mono uppercase tracking-widest hover:text-[#ff0055] transition-colors">
             {editLabel}
           </div>
         )}
@@ -433,6 +433,17 @@ function DoubleEliminationBracket({
   const decidedIdsRef = useRef(new Set());
   const [connectors, setConnectors] = useState([]);
   const [svgSize, setSvgSize] = useState({ w: 0, h: 0 });
+  // The gap between the winners-row block and the losers-row block below it
+  // — a guaranteed-empty horizontal band, regardless of how many columns
+  // either row has. Every winners→losers "loss" wire routes its horizontal
+  // run through this exact band (down from the source, across, down into
+  // the destination) instead of a naive straight-line elbow between the two
+  // cards, which — whenever a winners match and its losers-bracket
+  // destination land in the same column position (common, since both rows
+  // use the same 220px columns) — cut straight down through whatever else
+  // happened to sit at that x, including unrelated cards and labels.
+  const wbRowRef = useRef(null);
+  const lbRowRef = useRef(null);
 
   const setNodeRef = (key) => (el) => {
     if (el) nodeRefs.current.set(key, el);
@@ -534,6 +545,10 @@ function DoubleEliminationBracket({
     if (!container || allMatches.length === 0) return;
     function recompute() {
       const cRect = container.getBoundingClientRect();
+      const wbRect = wbRowRef.current?.getBoundingClientRect();
+      const lbRect = lbRowRef.current?.getBoundingClientRect();
+      const gutterY =
+        wbRect && lbRect ? (wbRect.bottom + lbRect.top) / 2 - cRect.top + container.scrollTop : null;
       const next = [];
       function pushWire(source, dest, kind) {
         if (!dest) return;
@@ -542,15 +557,42 @@ function DoubleEliminationBracket({
         if (!a || !b) return;
         const ar = a.getBoundingClientRect(),
           br = b.getBoundingClientRect();
-        const x1 = ar.right - cRect.left + container.scrollLeft;
-        const y1 = ar.top + ar.height / 2 - cRect.top + container.scrollTop;
-        const x2 = br.left - cRect.left + container.scrollLeft;
-        const y2 = br.top + br.height / 2 - cRect.top + container.scrollTop;
-        const midX = (x1 + x2) / 2;
+        let d;
+        if (kind === "loser" && gutterY != null) {
+          const x2 = br.left + br.width / 2 - cRect.left + container.scrollLeft;
+          const y2 = br.top - cRect.top + container.scrollTop;
+          // Winners round-0 columns hold 2+ stacked cards; only the BOTTOM
+          // one has clear space to drop straight down (nothing below it in
+          // its own column). Any card ABOVE another one in the same column
+          // exits sideways first — into the empty gap before the next
+          // column — so its wire never runs straight through the card
+          // sitting right below it on the way down to the gutter.
+          const columnSiblings = winnersMatches.filter((x) => x.round === source.round);
+          const isBottomOfColumn =
+            columnSiblings.length === 0 ||
+            source.position === Math.max(...columnSiblings.map((x) => x.position));
+          if (isBottomOfColumn) {
+            const x1 = ar.left + ar.width / 2 - cRect.left + container.scrollLeft;
+            const y1 = ar.bottom - cRect.top + container.scrollTop;
+            d = `M ${x1} ${y1} V ${gutterY} H ${x2} V ${y2}`;
+          } else {
+            const x1 = ar.right - cRect.left + container.scrollLeft;
+            const y1 = ar.top + ar.height / 2 - cRect.top + container.scrollTop;
+            const laneX = x1 + 20;
+            d = `M ${x1} ${y1} H ${laneX} V ${gutterY} H ${x2} V ${y2}`;
+          }
+        } else {
+          const x1 = ar.right - cRect.left + container.scrollLeft;
+          const y1 = ar.top + ar.height / 2 - cRect.top + container.scrollTop;
+          const x2 = br.left - cRect.left + container.scrollLeft;
+          const y2 = br.top + br.height / 2 - cRect.top + container.scrollTop;
+          const midX = (x1 + x2) / 2;
+          d = `M ${x1} ${y1} H ${midX} V ${y2} H ${x2}`;
+        }
         next.push({
           key: `${source.id}-${kind}-${dest.id}`,
           sourceId: `${source.id}-${kind}`,
-          d: `M ${x1} ${y1} H ${midX} V ${y2} H ${x2}`,
+          d,
           live: source.status === "done" || source.status === "bye",
           loser: kind === "loser",
         });
@@ -635,22 +677,25 @@ function DoubleEliminationBracket({
         style={{ overflow: "visible", zIndex: 4 }}
       />
 
-      <div className="relative z-[1] flex gap-14">
+      <div className="relative z-[1] flex gap-16">
         <div className="flex flex-col gap-10">
-          <div>
+          <div ref={wbRowRef}>
             <BracketLabel className="mb-2 text-[#9a9aa3]">{t("tour.bracket.winners")}</BracketLabel>
             <div className="flex gap-10">{renderRounds(winnersMatches, (r, count) => roundLabel(count))}</div>
           </div>
-          <div>
+          <div ref={lbRowRef}>
             <BracketLabel className="mb-2 text-[#ff0055]">{t("tour.bracket.losers")}</BracketLabel>
             <div className="flex gap-10">{renderRounds(losersMatches, lbRoundLabelFor)}</div>
           </div>
         </div>
         {gf0 && (
-          <div className="flex flex-col justify-center min-w-[220px]">
+          <div className="flex flex-col justify-center">
             <BracketLabel className="mb-2 text-volt">{t("tour.bracket.final")}</BracketLabel>
-            <div className="flex flex-col gap-6">
-              <div>
+            {/* Fінал, then реванш to its right if it's needed — same
+                left-to-right flow as every other round in the bracket,
+                instead of stacking реванш underneath as an afterthought. */}
+            <div className="flex gap-10">
+              <div className="min-w-[220px]">
                 <BracketLabel className="mb-1 text-[#9a9aa3]">{roundLabel(1)}</BracketLabel>
                 <MatchCard
                   m={gf0}
@@ -664,7 +709,7 @@ function DoubleEliminationBracket({
                 />
               </div>
               {gf1 && gf1.teamAId != null && (
-                <div>
+                <div className="min-w-[220px]">
                   <BracketLabel className="mb-1 text-[#ff0055]">{t("tour.bracket.reset")}</BracketLabel>
                   <MatchCard
                     m={gf1}
