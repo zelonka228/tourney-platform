@@ -20,14 +20,17 @@ function checkNameLength(name) {
   }
 }
 
-// Double elimination (v1) only supports power-of-two team counts — see
-// docs/03-double-elimination-spec.md for why (byes in the losers bracket are
-// a substantially harder problem, deliberately out of scope for now).
+// Double elimination (v1) only supports power-of-two team counts of at
+// least 4 — see docs/03-double-elimination-spec.md for why (byes in the
+// losers bracket are a substantially harder problem, deliberately out of
+// scope for now). 2 teams is excluded too: with no one else to fill a
+// losers bracket, the "losers bracket" degenerates to nothing and gains
+// nothing over just playing single elimination.
 function checkDoubleElimSupported(bracketType, teamCount) {
-  if (bracketType === "double" && !isPowerOfTwo(teamCount)) {
+  if (bracketType === "double" && (teamCount < 4 || !isPowerOfTwo(teamCount))) {
     throw new HttpError(
       400,
-      "Подвійне вибування наразі підтримує лише кількість команд, що є степенем двійки (4, 8, 16, 32)."
+      "Подвійне вибування наразі підтримує лише кількість команд, що є степенем двійки, від 4 (4, 8, 16, 32)."
     );
   }
 }
