@@ -78,9 +78,12 @@ export function Create() {
   );
   const isDouble = bracket === "double";
   const doubleBlocked =
-    isDouble && selectedIds.length > 0 && (selectedIds.length < 4 || !isPowerOfTwo(selectedIds.length));
+    isDouble &&
+    selectedIds.length > 0 &&
+    (selectedIds.length < 4 || !isPowerOfTwo(selectedIds.length));
   const plan = bracketPlan(Math.max(selectedIds.length, 1));
-  const canSubmit = (!isDouble || !doubleBlocked) && selectedIds.length >= 2 && name.trim() !== "" && !submitting;
+  const canSubmit =
+    (!isDouble || !doubleBlocked) && selectedIds.length >= 2 && name.trim() !== "" && !submitting;
 
   async function handleSubmit() {
     setSubmitting(true);

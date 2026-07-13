@@ -15,7 +15,13 @@ import {
   updateTournament,
   unregisterTeam,
 } from "../lib/api";
-import { validScorelines, BEST_OF, winTarget, lbWinnerDestination, loserDestination } from "../lib/demo";
+import {
+  validScorelines,
+  BEST_OF,
+  winTarget,
+  lbWinnerDestination,
+  loserDestination,
+} from "../lib/demo";
 import { Btn, Field, Input, Overline, Panel, Select } from "../components/arena";
 
 const SOCKET_URL = import.meta.env.VITE_API_URL ?? "http://localhost:4000";
@@ -40,7 +46,11 @@ function useRoundLabel() {
 // here (two same-specificity Tailwind color classes on one element don't
 // reliably resolve by source order).
 function BracketLabel({ children, className = "" }) {
-  return <div className={`font-mono uppercase tracking-[0.16em] text-[15px] ${className}`}>{children}</div>;
+  return (
+    <div className={`font-mono uppercase tracking-[0.16em] text-[15px] ${className}`}>
+      {children}
+    </div>
+  );
 }
 
 function MatchCard({
@@ -343,7 +353,12 @@ function BracketRow({
         style={{ overflow: "visible", zIndex: 0 }}
       >
         {connectors.map((c) => (
-          <path key={c.key} data-src={c.sourceId} d={c.d} className={"wire" + (c.live ? " live" : "")} />
+          <path
+            key={c.key}
+            data-src={c.sourceId}
+            d={c.d}
+            className={"wire" + (c.live ? " live" : "")}
+          />
         ))}
       </svg>
       <svg
@@ -535,7 +550,9 @@ function DoubleEliminationBracket({
     if (m.bracket === "losers") {
       const dest = lbWinnerDestination(teamCount, m.round, m.position);
       if (!dest) return gf0 ?? null;
-      return losersMatches.find((x) => x.round === dest.round && x.position === dest.position) ?? null;
+      return (
+        losersMatches.find((x) => x.round === dest.round && x.position === dest.position) ?? null
+      );
     }
     // bracket === "final": one match, no destination — whoever wins it is
     // the tournament champion outright.
@@ -544,7 +561,9 @@ function DoubleEliminationBracket({
   function loserDestOf(m) {
     if (m.bracket !== "winners") return null;
     const dest = loserDestination(teamCount, m.round, m.position);
-    return losersMatches.find((x) => x.round === dest.round && x.position === dest.position) ?? null;
+    return (
+      losersMatches.find((x) => x.round === dest.round && x.position === dest.position) ?? null
+    );
   }
 
   useLayoutEffect(() => {
@@ -555,7 +574,9 @@ function DoubleEliminationBracket({
       const wbRect = wbRowRef.current?.getBoundingClientRect();
       const lbRect = lbRowRef.current?.getBoundingClientRect();
       const gutterY =
-        wbRect && lbRect ? (wbRect.bottom + lbRect.top) / 2 - cRect.top + container.scrollTop : null;
+        wbRect && lbRect
+          ? (wbRect.bottom + lbRect.top) / 2 - cRect.top + container.scrollTop
+          : null;
       const next = [];
       function pushWire(source, dest, kind) {
         if (!dest) return;
@@ -689,7 +710,9 @@ function DoubleEliminationBracket({
         <div className="flex flex-col gap-10">
           <div ref={wbRowRef}>
             <BracketLabel className="mb-2 text-[#9a9aa3]">{t("tour.bracket.winners")}</BracketLabel>
-            <div className="flex gap-10">{renderRounds(winnersMatches, (r, count) => roundLabel(count))}</div>
+            <div className="flex gap-10">
+              {renderRounds(winnersMatches, (r, count) => roundLabel(count))}
+            </div>
           </div>
           <div ref={lbRowRef}>
             <BracketLabel className="mb-2 text-[#ff0055]">{t("tour.bracket.losers")}</BracketLabel>
@@ -872,13 +895,16 @@ export function Tournament() {
   // AND loser wire destinations internally (it needs both, and needs them
   // sharing one coordinate space — see that component).
   const nextInWinners = (m) =>
-    winnersMatches.find((x) => x.round === m.round + 1 && x.position === Math.floor(m.position / 2));
+    winnersMatches.find(
+      (x) => x.round === m.round + 1 && x.position === Math.floor(m.position / 2)
+    );
 
   const champion = useMemo(() => {
     if (isDouble) {
       // One grand-final match (WB champion vs LB champion) decides it
       // outright — no bracket reset.
-      if (gf0?.status === "done") return teamName(gf0.scoreA > gf0.scoreB ? gf0.teamAId : gf0.teamBId);
+      if (gf0?.status === "done")
+        return teamName(gf0.scoreA > gf0.scoreB ? gf0.teamAId : gf0.teamBId);
       return null;
     }
     const totalRounds = winnersMatches.length
@@ -888,7 +914,9 @@ export function Tournament() {
     if (!finalMatch) return null;
     if (finalMatch.status === "bye") return teamName(finalMatch.teamAId ?? finalMatch.teamBId);
     if (finalMatch.status === "done")
-      return teamName(finalMatch.scoreA > finalMatch.scoreB ? finalMatch.teamAId : finalMatch.teamBId);
+      return teamName(
+        finalMatch.scoreA > finalMatch.scoreB ? finalMatch.teamAId : finalMatch.teamBId
+      );
     return null;
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [isDouble, gf0, winnersMatches, tournament]);
@@ -1374,7 +1402,11 @@ export function Tournament() {
                         title={t(`tour.bracket.${m.bracket}`)}
                         style={{
                           background:
-                            m.bracket === "losers" ? "#ff0055" : m.bracket === "final" ? "#dfff00" : "#00f0ff",
+                            m.bracket === "losers"
+                              ? "#ff0055"
+                              : m.bracket === "final"
+                                ? "#dfff00"
+                                : "#00f0ff",
                         }}
                       />
                     </td>
