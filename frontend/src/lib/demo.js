@@ -50,6 +50,36 @@ const nextPow2 = (n) => {
   return p;
 };
 
+// Double elimination (v1) only supports team counts that are already a
+// power of two — see docs/03-double-elimination-spec.md. Mirrors
+// backend/src/bracket.js isPowerOfTwo().
+export function isPowerOfTwo(n) {
+  return Number.isInteger(n) && n >= 2 && (n & (n - 1)) === 0;
+}
+
+// Losers-bracket round/winner-destination math for rendering the double-elim
+// bracket client-side. Mirrors backend/src/bracket.js exactly (see
+// docs/03-double-elimination-spec.md for the derivation) — kept in lockstep
+// with the server so the wires drawn here always match how the server will
+// actually advance a result.
+export function winnersRoundCount(n) {
+  return Math.log2(n);
+}
+
+export function losersRoundCount(n) {
+  return 2 * (winnersRoundCount(n) - 1);
+}
+
+// Where does the WINNER of losers-bracket match (lbRound, lbPosition) go
+// next? Returns null when `lbRound` is the last losers-bracket round (that
+// winner heads to the grand final instead, not drawn as a wire here).
+export function lbWinnerDestination(n, lbRound, lbPosition) {
+  const last = losersRoundCount(n) - 1;
+  if (lbRound === last) return null;
+  if (lbRound % 2 === 0) return { round: lbRound + 1, position: lbPosition };
+  return { round: lbRound + 1, position: Math.floor(lbPosition / 2) };
+}
+
 // Доповнення до найближчого степеня двійки через «баї».
 export function bracketPlan(n) {
   const full = nextPow2(Math.max(n, 1));
