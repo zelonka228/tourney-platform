@@ -126,11 +126,20 @@ function MatchCard({
           { id: m.teamBId, name: b, score: m.scoreB },
         ].map((side, i) => {
           const win = decided && winnerId === side.id;
+          // The loser of a real (non-bye) decided match gets its own clear
+          // marking — red accent border/tint + a strikethrough on the name
+          // — so who's out is obvious straight from the card, without
+          // having to trace which way a wire goes.
+          const lost = decided && !win && !isBye;
           return (
             <div
               key={i}
               className={`flex items-center justify-between px-3 py-2.5 text-sm ${i === 1 ? "border-t border-[#27272a]" : ""} ${
-                win ? "text-white border-l-2 border-l-cyan bg-cyan/5" : "text-[#a1a1aa]"
+                win
+                  ? "text-white border-l-2 border-l-cyan bg-cyan/5"
+                  : lost
+                    ? "text-[#a1a1aa] border-l-2 border-l-[#ff0055]/50 bg-[#ff0055]/5"
+                    : "text-[#a1a1aa]"
               }`}
             >
               <AnimatePresence mode="popLayout" initial={false}>
@@ -140,7 +149,7 @@ function MatchCard({
                   animate={{ opacity: 1, x: 0 }}
                   exit={{ opacity: 0 }}
                   transition={{ type: "spring", stiffness: 380, damping: 26 }}
-                  className={`truncate ${win ? "font-semibold" : ""} ${!side.name && isBye ? "italic text-[#52525b]" : ""}`}
+                  className={`truncate ${win ? "font-semibold" : ""} ${lost ? "line-through decoration-[#ff0055]/70 decoration-2" : ""} ${!side.name && isBye ? "italic text-[#52525b]" : ""}`}
                 >
                   {side.name ?? "—"}
                 </motion.span>
@@ -691,12 +700,14 @@ function DoubleEliminationBracket({
         {gf0 && (
           <div className="flex flex-col justify-center">
             <BracketLabel className="mb-2 text-volt">{t("tour.bracket.final")}</BracketLabel>
-            {/* Fінал, then реванш to its right if it's needed — same
-                left-to-right flow as every other round in the bracket,
-                instead of stacking реванш underneath as an afterthought. */}
-            <div className="flex gap-10">
+            {/* Explicitly numbered ("1. Матч" / "2. Реванш") rather than
+                relying on left-to-right position alone to say which comes
+                first — plus a literal arrow between them once the second
+                match exists, so the order reads unambiguously regardless
+                of how the rest of the bracket is being scanned. */}
+            <div className="flex items-center gap-3">
               <div className="min-w-[220px]">
-                <BracketLabel className="mb-1 text-[#9a9aa3]">{roundLabel(1)}</BracketLabel>
+                <BracketLabel className="mb-1 text-[#9a9aa3]">{t("tour.bracket.match1")}</BracketLabel>
                 <MatchCard
                   m={gf0}
                   teamName={teamName}
@@ -709,19 +720,24 @@ function DoubleEliminationBracket({
                 />
               </div>
               {gf1 && gf1.teamAId != null && (
-                <div className="min-w-[220px]">
-                  <BracketLabel className="mb-1 text-[#ff0055]">{t("tour.bracket.reset")}</BracketLabel>
-                  <MatchCard
-                    m={gf1}
-                    teamName={teamName}
-                    openEdit={openEdit}
-                    cardRef={setNodeRef(`m-${gf1.id}`)}
-                    isAdmin={isAdmin}
-                    enterScoreLabel={labels.enterScoreLabel}
-                    byeLabel={labels.byeLabel}
-                    editLabel={labels.editLabel}
-                  />
-                </div>
+                <>
+                  <span className="text-[#ff0055] text-2xl font-mono self-center mt-5" aria-hidden="true">
+                    →
+                  </span>
+                  <div className="min-w-[220px]">
+                    <BracketLabel className="mb-1 text-[#ff0055]">{t("tour.bracket.match2")}</BracketLabel>
+                    <MatchCard
+                      m={gf1}
+                      teamName={teamName}
+                      openEdit={openEdit}
+                      cardRef={setNodeRef(`m-${gf1.id}`)}
+                      isAdmin={isAdmin}
+                      enterScoreLabel={labels.enterScoreLabel}
+                      byeLabel={labels.byeLabel}
+                      editLabel={labels.editLabel}
+                    />
+                  </div>
+                </>
               )}
             </div>
           </div>
