@@ -226,8 +226,7 @@ async function main() {
   ok(doubleAttempt.status === 400, "POST /api/tournaments double-elim with 1 team (not pow2) → 400");
   await call("DELETE", `/api/teams/${doubleTeam.data.id}`);
 
-  // --- Double elimination: 4 teams, full run without a bracket reset ---
-  // (the WB champion wins the grand final outright).
+  // --- Double elimination: 4 teams, full run, WB champion wins the final ---
   function matchAt(matches, bracket, round, position) {
     return matches.find((m) => m.bracket === bracket && m.round === round && m.position === position);
   }
@@ -246,18 +245,14 @@ async function main() {
       teamIds,
     });
     ok(
-      de.status === 201 && de.data?.matches?.length === 7,
-      "POST /api/tournaments double-elim, 4 teams → 201, 7 matches (3 WB + 2 LB + 2 final)"
+      de.status === 201 && de.data?.matches?.length === 6,
+      "POST /api/tournaments double-elim, 4 teams → 201, 6 matches (3 WB + 2 LB + 1 final)"
     );
     const deId = de.data.id;
     const m = de.data.matches;
 
     const wb0a = matchAt(m, "winners", 0, 0);
     const wb0b = matchAt(m, "winners", 0, 1);
-    ok(
-      matchAt(m, "final", 1, 0)?.status === "pending-unused",
-      "grand-final reset match starts as 'pending-unused'"
-    );
 
     const r1 = await call("PUT", `/api/matches/${wb0a.id}/score`, { scoreA: 1, scoreB: 0 });
     ok(
@@ -311,33 +306,29 @@ async function main() {
       "grand final round0 has the WB champion (teamA) and the LB champion (teamB)"
     );
 
-    // WB champion (teamA) wins the grand final outright → tournament done,
-    // the reset match (round 1) is never activated.
+    // WB champion (teamA) wins the grand final → tournament done, one match.
     const rGf = await call("PUT", `/api/matches/${gf0.id}/score`, { scoreA: 1, scoreB: 0 });
     ok(
       rGf.status === 200 && rGf.data.champion === wbChampion && rGf.data.advanced == null,
-      "grand final won by the WB champion → tournament decided, no reset match needed"
+      "grand final won by the WB champion → tournament decided outright"
     );
     const doneCheck = await call("GET", `/api/tournaments/${deId}`);
     ok(doneCheck.data.status === "completed", "tournament status → completed after grand final");
-    ok(
-      matchAt(doneCheck.data.matches, "final", 1, 0)?.status === "pending-unused",
-      "reset match stayed 'pending-unused' — never needed"
-    );
 
     await call("DELETE", `/api/tournaments/${deId}`);
     for (const id of teamIds) await call("DELETE", `/api/teams/${id}`);
   }
 
-  // --- Double elimination: 4 teams, the LB finalist forces a bracket reset ---
+  // --- Double elimination: 4 teams, the LB champion wins the final outright ---
+  // (no bracket reset — one grand-final match decides it either way).
   {
     const teamIds = [];
     for (let i = 0; i < 4; i++) {
-      const t = await call("POST", "/api/teams", { name: `DE Reset Team ${i}`, discipline: "CS2" });
+      const t = await call("POST", "/api/teams", { name: `DE LB Champ Team ${i}`, discipline: "CS2" });
       teamIds.push(t.data.id);
     }
     const de = await call("POST", "/api/tournaments", {
-      name: "DE4Reset",
+      name: "DE4LbWins",
       discipline: "CS2",
       bracketType: "double",
       matchFormat: 1,
@@ -366,31 +357,15 @@ async function main() {
     const gf0 = matchAt(cur.data.matches, "final", 0, 0);
     ok(gf0.teamAId === wbChampion && gf0.teamBId === lbChampion, "grand final seated as expected");
 
-    // LB champion (teamB) wins round 0 → reset match activates instead of
-    // the tournament completing.
+    // LB champion (teamB) wins the one and only grand-final match →
+    // tournament is decided immediately, no reset/second match.
     const rGf0 = await call("PUT", `/api/matches/${gf0.id}/score`, { scoreA: 0, scoreB: 1 });
     ok(
-      rGf0.status === 200 &&
-        rGf0.data.champion == null &&
-        rGf0.data.advanced?.bracket === "final" &&
-        rGf0.data.advanced?.round === 1,
-      "LB champion wins grand-final round0 → bracket-reset match activates, tournament not yet decided"
+      rGf0.status === 200 && rGf0.data.champion === lbChampion && rGf0.data.advanced == null,
+      "LB champion wins the grand final → tournament decided outright, no reset match"
     );
-    ok(
-      rGf0.data.advanced.teamAId === wbChampion && rGf0.data.advanced.teamBId === lbChampion,
-      "reset match seated with the same two teams"
-    );
-    const notDoneYet = await call("GET", `/api/tournaments/${deId}`);
-    ok(notDoneYet.data.status !== "completed", "tournament not completed yet — reset match still pending");
-
-    const gf1 = matchAt(notDoneYet.data.matches, "final", 1, 0);
-    const rGf1 = await call("PUT", `/api/matches/${gf1.id}/score`, { scoreA: 1, scoreB: 0 });
-    ok(
-      rGf1.status === 200 && rGf1.data.champion === wbChampion && rGf1.data.advanced == null,
-      "reset match decides the tournament (WB champion wins the second match)"
-    );
-    const finallyDone = await call("GET", `/api/tournaments/${deId}`);
-    ok(finallyDone.data.status === "completed", "tournament status → completed after the reset match");
+    const doneCheck = await call("GET", `/api/tournaments/${deId}`);
+    ok(doneCheck.data.status === "completed", "tournament status → completed after the LB champion wins");
 
     await call("DELETE", `/api/tournaments/${deId}`);
     for (const id of teamIds) await call("DELETE", `/api/teams/${id}`);

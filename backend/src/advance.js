@@ -10,27 +10,17 @@
 // goes without writing anything — advanceWinner/advanceLoser use them to
 // perform the forward write, and the /reset endpoint reuses the exact same
 // destination logic to find what to clear, so the two directions can never
-// drift apart from each other.
+// drift apart from each other. A grand final (bracket "final") is always a
+// single, terminal match — locateWinnerTarget returns null for it either
+// way, same as it would for a single-elimination final.
 import { isPowerOfTwo, loserDestination, lbWinnerDestination } from "./bracket.js";
 
 // Locates the target match + slot the WINNER of `match` advances into.
-// `winnerId` is needed only to resolve the grand final's round 0 (whether
-// the WB champion won outright, in which case there's nowhere further to
-// go, vs the LB champion winning, which activates the bracket-reset match).
-// Returns null for a terminal match: a single-elimination final, the
-// bracket-reset match itself, or a grand-final round 0 won by the WB
-// champion. `slot: null` is a special case meaning "the whole match" (the
-// bracket-reset match starts empty and gets both teams copied in at once,
-// not filled slot-by-slot like every other match).
-export async function locateWinnerTarget(prisma, match, winnerId) {
-  if (match.bracket === "final") {
-    if (match.round === 1) return null;
-    if (winnerId === match.teamAId) return null; // WB champion won outright
-    const reset = await prisma.match.findFirst({
-      where: { tournamentId: match.tournamentId, bracket: "final", round: 1 },
-    });
-    return reset ? { match: reset, slot: null } : null;
-  }
+// Returns null for a terminal match: a single-elimination final, or the
+// grand final (double elim) — one match, whoever wins is champion outright,
+// no bracket reset.
+export async function locateWinnerTarget(prisma, match) {
+  if (match.bracket === "final") return null;
   if (match.bracket === "losers") {
     const teamCount = await prisma.tournamentTeam.count({ where: { tournamentId: match.tournamentId } });
     const dest = lbWinnerDestination(teamCount, match.round, match.position);
@@ -77,15 +67,8 @@ export async function locateLoserTarget(prisma, match) {
 // Pushes `winnerId` into its next destination. Returns the updated match, or
 // null if `match` was terminal.
 export async function advanceWinner(prisma, match, winnerId) {
-  const target = await locateWinnerTarget(prisma, match, winnerId);
+  const target = await locateWinnerTarget(prisma, match);
   if (!target) return null;
-  if (target.slot === null) {
-    // Grand final round 0 → round 1 (bracket reset): copy both teams over.
-    return prisma.match.update({
-      where: { id: target.match.id },
-      data: { teamAId: match.teamAId, teamBId: match.teamBId, status: "pending" },
-    });
-  }
   return prisma.match.update({ where: { id: target.match.id }, data: { [target.slot]: winnerId } });
 }
 

@@ -137,18 +137,14 @@ router.post(
 
     const winnerId = match.scoreA > match.scoreB ? match.teamAId : match.teamBId;
 
-    const winnerTarget = await locateWinnerTarget(prisma, match, winnerId);
+    const winnerTarget = await locateWinnerTarget(prisma, match);
     const loserTarget = await locateLoserTarget(prisma, match);
 
-    if (winnerTarget) {
-      const alreadyPlayed =
-        winnerTarget.slot === null ? winnerTarget.match.status === "done" : winnerTarget.match.status !== "pending";
-      if (alreadyPlayed) {
-        throw new HttpError(
-          409,
-          "Переможець уже пройшов далі, і той матч теж зіграно — спершу скасуйте результат наступного матчу."
-        );
-      }
+    if (winnerTarget && winnerTarget.match.status !== "pending") {
+      throw new HttpError(
+        409,
+        "Переможець уже пройшов далі, і той матч теж зіграно — спершу скасуйте результат наступного матчу."
+      );
     }
     if (loserTarget && loserTarget.match.status !== "pending") {
       throw new HttpError(
@@ -159,20 +155,13 @@ router.post(
 
     let updatedNext = null;
     if (winnerTarget) {
-      updatedNext =
-        winnerTarget.slot === null
-          ? await prisma.match.update({
-              where: { id: winnerTarget.match.id },
-              data: { teamAId: null, teamBId: null, status: "pending-unused" },
-            })
-          : await prisma.match.update({
-              where: { id: winnerTarget.match.id },
-              data: { [winnerTarget.slot]: null },
-            });
+      updatedNext = await prisma.match.update({
+        where: { id: winnerTarget.match.id },
+        data: { [winnerTarget.slot]: null },
+      });
     } else {
-      // Terminal match (single-elim final, grand final round 0 won outright
-      // by the WB champion, or the bracket-reset match) — roll back the
-      // champion bookkeeping it wrote.
+      // Terminal match (single-elimination final, or the grand final) —
+      // roll back the champion bookkeeping it wrote.
       const champTeam = await prisma.team.findUnique({ where: { id: winnerId } });
       const streakMatch = /^1 місце ×(\d+)$/.exec(champTeam.best ?? "");
       const n = streakMatch ? Number(streakMatch[1]) : 1;

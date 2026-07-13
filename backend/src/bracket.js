@@ -133,15 +133,12 @@ export function loserDestination(n, wbRound, wbPosition) {
   return { round: 2 * wbRound - 1, position: wbPosition, slot: "teamB" };
 }
 
-// Grand-final rows: round 0 is the real first match (WB champion vs LB
-// champion). Round 1 is the bracket-reset match, only ever played if the LB
-// champion wins round 0 — it starts as "pending-unused" so it doesn't show
-// up as a playable/pending match until advance.js activates it.
+// Grand-final row: one match, WB champion vs LB champion. Whoever wins it
+// is the tournament champion outright — no bracket reset (a second,
+// decisive match if the LB champion wins) — that's deliberately out of
+// scope, see docs/03-double-elimination-spec.md.
 export function buildFinalRows() {
-  return [
-    { round: 0, position: 0, teamAId: null, teamBId: null, bracket: "final" },
-    { round: 1, position: 0, teamAId: null, teamBId: null, bracket: "final", status: "pending-unused" },
-  ];
+  return [{ round: 0, position: 0, teamAId: null, teamBId: null, bracket: "final" }];
 }
 
 // Where does the WINNER of losers-bracket match (lbRound, lbPosition) go

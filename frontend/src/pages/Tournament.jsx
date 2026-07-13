@@ -423,7 +423,6 @@ function DoubleEliminationBracket({
   winnersMatches,
   losersMatches,
   gf0,
-  gf1,
   teamCount,
   teamName,
   openEdit,
@@ -511,8 +510,8 @@ function DoubleEliminationBracket({
   );
 
   const allMatches = useMemo(
-    () => [...winnersMatches, ...losersMatches, ...(gf0 ? [gf0] : []), ...(gf1 ? [gf1] : [])],
-    [winnersMatches, losersMatches, gf0, gf1]
+    () => [...winnersMatches, ...losersMatches, ...(gf0 ? [gf0] : [])],
+    [winnersMatches, losersMatches, gf0]
   );
 
   useEffect(() => {
@@ -538,9 +537,8 @@ function DoubleEliminationBracket({
       if (!dest) return gf0 ?? null;
       return losersMatches.find((x) => x.round === dest.round && x.position === dest.position) ?? null;
     }
-    if (m.bracket === "final" && m.round === 0) {
-      return gf1 && gf1.teamAId != null ? gf1 : null;
-    }
+    // bracket === "final": one match, no destination — whoever wins it is
+    // the tournament champion outright.
     return null;
   }
   function loserDestOf(m) {
@@ -613,7 +611,8 @@ function DoubleEliminationBracket({
       for (const m of losersMatches) {
         pushWire(m, winnerDestOf(m), "winner");
       }
-      if (gf0) pushWire(gf0, winnerDestOf(gf0), "winner");
+      // Grand final (gf0) has no outgoing wire — it's a single, terminal
+      // match, nothing to draw a destination for.
       next.sort((a, b) => (a.loser === b.loser ? 0 : a.loser ? -1 : 1)); // winner wires drawn on top
       setConnectors(next);
       setSvgSize({ w: container.scrollWidth, h: container.scrollHeight });
@@ -627,7 +626,7 @@ function DoubleEliminationBracket({
       window.removeEventListener("resize", recompute);
     };
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [winnersMatches, losersMatches, gf0, gf1, teamCount]);
+  }, [winnersMatches, losersMatches, gf0, teamCount]);
 
   function renderRounds(list, labelForRound) {
     const total = list.length ? Math.max(...list.map((m) => m.round)) + 1 : 0;
@@ -698,48 +697,21 @@ function DoubleEliminationBracket({
           </div>
         </div>
         {gf0 && (
-          <div className="flex flex-col justify-center">
+          <div className="flex flex-col justify-center min-w-[220px]">
             <BracketLabel className="mb-2 text-volt">{t("tour.bracket.final")}</BracketLabel>
-            {/* Explicitly numbered ("1. Матч" / "2. Реванш") rather than
-                relying on left-to-right position alone to say which comes
-                first — plus a literal arrow between them once the second
-                match exists, so the order reads unambiguously regardless
-                of how the rest of the bracket is being scanned. */}
-            <div className="flex items-center gap-3">
-              <div className="min-w-[220px]">
-                <BracketLabel className="mb-1 text-[#9a9aa3]">{roundLabel(1)}</BracketLabel>
-                <MatchCard
-                  m={gf0}
-                  teamName={teamName}
-                  openEdit={openEdit}
-                  cardRef={setNodeRef(`m-${gf0.id}`)}
-                  isAdmin={isAdmin}
-                  enterScoreLabel={labels.enterScoreLabel}
-                  byeLabel={labels.byeLabel}
-                  editLabel={labels.editLabel}
-                />
-              </div>
-              {gf1 && gf1.teamAId != null && (
-                <>
-                  <span className="text-[#ff0055] text-2xl font-mono self-center mt-5" aria-hidden="true">
-                    →
-                  </span>
-                  <div className="min-w-[220px]">
-                    <BracketLabel className="mb-1 text-[#ff0055]">{t("tour.bracket.reset")}</BracketLabel>
-                    <MatchCard
-                      m={gf1}
-                      teamName={teamName}
-                      openEdit={openEdit}
-                      cardRef={setNodeRef(`m-${gf1.id}`)}
-                      isAdmin={isAdmin}
-                      enterScoreLabel={labels.enterScoreLabel}
-                      byeLabel={labels.byeLabel}
-                      editLabel={labels.editLabel}
-                    />
-                  </div>
-                </>
-              )}
-            </div>
+            {/* WB champion vs LB champion, one match — whoever wins is the
+                tournament champion outright, no reset/second match. */}
+            <BracketLabel className="mb-1 text-[#9a9aa3]">{roundLabel(1)}</BracketLabel>
+            <MatchCard
+              m={gf0}
+              teamName={teamName}
+              openEdit={openEdit}
+              cardRef={setNodeRef(`m-${gf0.id}`)}
+              isAdmin={isAdmin}
+              enterScoreLabel={labels.enterScoreLabel}
+              byeLabel={labels.byeLabel}
+              editLabel={labels.editLabel}
+            />
           </div>
         )}
       </div>
@@ -893,7 +865,6 @@ export function Tournament() {
   const winnersMatches = useMemo(() => matches.filter((m) => m.bracket === "winners"), [matches]);
   const losersMatches = useMemo(() => matches.filter((m) => m.bracket === "losers"), [matches]);
   const gf0 = matches.find((m) => m.bracket === "final" && m.round === 0);
-  const gf1 = matches.find((m) => m.bracket === "final" && m.round === 1);
 
   // Used only by the single-elimination BracketRow below — winners-bracket
   // wires stay simple round+1/floor(position/2) math, same as before double
@@ -905,13 +876,8 @@ export function Tournament() {
 
   const champion = useMemo(() => {
     if (isDouble) {
-      // Bracket-reset (round 1) only exists once the LB finalist forces it
-      // (see advance.js) — while it's still "pending-unused" it hasn't been
-      // activated, so round 0 alone can decide the tournament.
-      if (gf1 && gf1.status !== "pending-unused") {
-        if (gf1.status !== "done") return null;
-        return teamName(gf1.scoreA > gf1.scoreB ? gf1.teamAId : gf1.teamBId);
-      }
+      // One grand-final match (WB champion vs LB champion) decides it
+      // outright — no bracket reset.
       if (gf0?.status === "done") return teamName(gf0.scoreA > gf0.scoreB ? gf0.teamAId : gf0.teamBId);
       return null;
     }
@@ -925,7 +891,7 @@ export function Tournament() {
       return teamName(finalMatch.scoreA > finalMatch.scoreB ? finalMatch.teamAId : finalMatch.teamBId);
     return null;
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [isDouble, gf0, gf1, winnersMatches, tournament]);
+  }, [isDouble, gf0, winnersMatches, tournament]);
 
   // Round counts (used to label e.g. "1/2 фіналу") are scoped per bracket —
   // "winners" round 0 and "losers" round 0 are different matches with
@@ -1283,7 +1249,6 @@ export function Tournament() {
               winnersMatches={winnersMatches}
               losersMatches={losersMatches}
               gf0={gf0}
-              gf1={gf1}
               teamCount={teamCount}
               teamName={teamName}
               openEdit={openEdit}
