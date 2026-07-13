@@ -2,7 +2,7 @@
 import { Router } from "express";
 import prisma from "../db.js";
 import { DISCIPLINES } from "../rating.js";
-import { buildBracketRows } from "../bracket.js";
+import { buildBracketRows, buildLosersBracketRows, buildFinalRows, isPowerOfTwo } from "../bracket.js";
 import { resolveByes } from "../advance.js";
 import { asyncHandler, requireFields, requireEnum, HttpError, parseId } from "../http.js";
 import { requireAdmin } from "../auth.js";
@@ -18,6 +18,26 @@ function checkNameLength(name) {
   if (typeof name === "string" && name.length > NAME_MAX_LEN) {
     throw new HttpError(400, `Назва не може перевищувати ${NAME_MAX_LEN} символів.`);
   }
+}
+
+// Double elimination (v1) only supports power-of-two team counts — see
+// docs/03-double-elimination-spec.md for why (byes in the losers bracket are
+// a substantially harder problem, deliberately out of scope for now).
+function checkDoubleElimSupported(bracketType, teamCount) {
+  if (bracketType === "double" && !isPowerOfTwo(teamCount)) {
+    throw new HttpError(
+      400,
+      "Подвійне вибування наразі підтримує лише кількість команд, що є степенем двійки (4, 8, 16, 32)."
+    );
+  }
+}
+
+function buildAllRows(bracketType, teamIds) {
+  const rows = buildBracketRows(teamIds);
+  if (bracketType === "double") {
+    rows.push(...buildLosersBracketRows(teamIds.length), ...buildFinalRows());
+  }
+  return rows;
 }
 
 // Every response nests the actual Team (name, logo, ...) under each
@@ -67,9 +87,7 @@ router.post(
     checkNameLength(name);
 
     const hasTeams = Array.isArray(teamIds) && teamIds.length > 0;
-    if (hasTeams && bracketType === "double") {
-      throw new HttpError(400, "Подвійне вибування ще не підтримується.");
-    }
+    if (hasTeams) checkDoubleElimSupported(bracketType, teamIds.length);
     const shouldGenerate = hasTeams && generateBracket !== false;
 
     const data = { name, discipline, bracketType, matchFormat: Number(matchFormat) };
@@ -81,7 +99,7 @@ router.post(
     }
     if (shouldGenerate) {
       data.matches = {
-        create: buildBracketRows(teamIds.map(Number)),
+        create: buildAllRows(bracketType, teamIds.map(Number)),
       };
     }
 
@@ -115,17 +133,18 @@ router.post(
       include: { teams: { orderBy: { seed: "asc" }, include: { team: true } }, matches: true },
     });
     if (!tournament) throw new HttpError(404, "Турнір не знайдено.");
-    if (tournament.bracketType === "double") {
-      throw new HttpError(400, "Подвійне вибування ще не підтримується.");
-    }
     if (tournament.matches.length > 0) {
       throw new HttpError(409, "Сітку для цього турніру вже згенеровано.");
     }
     if (tournament.teams.length < 2) {
       throw new HttpError(400, "Потрібно щонайменше 2 зареєстровані команди.");
     }
+    checkDoubleElimSupported(tournament.bracketType, tournament.teams.length);
 
-    const rows = buildBracketRows(tournament.teams.map((t) => t.teamId));
+    const rows = buildAllRows(
+      tournament.bracketType,
+      tournament.teams.map((t) => t.teamId)
+    );
     await prisma.match.createMany({
       data: rows.map((r) => ({ ...r, tournamentId: id })),
     });

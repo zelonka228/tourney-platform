@@ -94,6 +94,9 @@ model Match {
   scoreA       Int?
   scoreB       Int?
   status       String @default("pending")
+  // "winners" | "losers" | "final" — always "winners" for bracketType "single".
+  // Round numbers are local to each bracket (see docs/03-double-elimination-spec.md).
+  bracket      String @default("winners")
 
   tournament Tournament @relation(fields: [tournamentId], references: [id], onDelete: Cascade)
 }

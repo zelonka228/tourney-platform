@@ -65,3 +65,102 @@ export function buildBracketRows(teamIds) {
 
   return rows;
 }
+
+// ---- Double elimination (losers bracket) ----
+// See docs/03-double-elimination-spec.md for the derivation. Only supports
+// power-of-two team counts for now — arbitrary counts would need byes seeded
+// into the losers bracket too (avoiding early rematches around the bye),
+// which is deliberately out of scope for the first version.
+
+export function isPowerOfTwo(n) {
+  return Number.isInteger(n) && n >= 2 && (n & (n - 1)) === 0;
+}
+
+// Number of winners-bracket rounds (0-indexed 0..k-1, k-1 is the WB final).
+export function winnersRoundCount(n) {
+  return Math.log2(n);
+}
+
+// Total losers-bracket rounds: 2*(k-1) for k winners-bracket rounds. Round 0
+// pairs WB round-0's losers against each other. After that, rounds
+// alternate "drop" (pairs the previous LB round's survivors against the
+// next fresh batch of WB losers) and "minor" (pairs the previous LB round's
+// survivors against each other, no fresh blood), ending on a drop round fed
+// by the WB final's loser — that round's winner is the losers-bracket
+// champion.
+export function losersRoundCount(n) {
+  return 2 * (winnersRoundCount(n) - 1);
+}
+
+function losersRoundMatchCount(n, lbRound) {
+  if (lbRound === 0) return n / 4;
+  if (lbRound % 2 === 1) {
+    // Drop round fed by WB round `wbRound`'s losers — always the same match
+    // count as that WB round, since the LB survivor pool arriving here is
+    // by construction equal in size to it.
+    const wbRound = (lbRound + 1) / 2;
+    return n / 2 ** (wbRound + 1);
+  }
+  return losersRoundMatchCount(n, lbRound - 1) / 2; // minor round: half the preceding drop round
+}
+
+// Builds the empty losers-bracket Match rows (teams filled in later, as WB
+// and LB matches complete) for a power-of-two team count.
+export function buildLosersBracketRows(n) {
+  const rows = [];
+  for (let r = 0; r < losersRoundCount(n); r++) {
+    const count = losersRoundMatchCount(n, r);
+    for (let m = 0; m < count; m++) {
+      rows.push({ round: r, position: m, teamAId: null, teamBId: null, bracket: "losers" });
+    }
+  }
+  return rows;
+}
+
+// Where does the LOSER of winners-bracket match (wbRound, wbPosition) land
+// in the losers bracket? WB round 0's losers pair against each other
+// directly; every later WB round's losers drop into slot "teamB" of a
+// specific LB "drop" round (see losersRoundMatchCount above) — slot "teamA"
+// there is reserved for whichever LB survivor already made it that far.
+export function loserDestination(n, wbRound, wbPosition) {
+  if (wbRound === 0) {
+    return {
+      round: 0,
+      position: Math.floor(wbPosition / 2),
+      slot: wbPosition % 2 === 0 ? "teamA" : "teamB",
+    };
+  }
+  return { round: 2 * wbRound - 1, position: wbPosition, slot: "teamB" };
+}
+
+// Grand-final rows: round 0 is the real first match (WB champion vs LB
+// champion). Round 1 is the bracket-reset match, only ever played if the LB
+// champion wins round 0 — it starts as "pending-unused" so it doesn't show
+// up as a playable/pending match until advance.js activates it.
+export function buildFinalRows() {
+  return [
+    { round: 0, position: 0, teamAId: null, teamBId: null, bracket: "final" },
+    { round: 1, position: 0, teamAId: null, teamBId: null, bracket: "final", status: "pending-unused" },
+  ];
+}
+
+// Where does the WINNER of losers-bracket match (lbRound, lbPosition) go
+// next? Returns null when `lbRound` is the last losers-bracket round — that
+// winner is the losers-bracket champion, headed to the grand final instead
+// (handled by the caller, see advance.js).
+export function lbWinnerDestination(n, lbRound, lbPosition) {
+  const last = losersRoundCount(n) - 1;
+  if (lbRound === last) return null;
+  if (lbRound % 2 === 0) {
+    // Round 0, or a minor round → next is a drop round, same position,
+    // teamA (teamB is reserved for that round's fresh WB loser).
+    return { round: lbRound + 1, position: lbPosition, slot: "teamA" };
+  }
+  // Drop round (not the last one) → followed by a minor round that pairs
+  // its two winners together.
+  return {
+    round: lbRound + 1,
+    position: Math.floor(lbPosition / 2),
+    slot: lbPosition % 2 === 0 ? "teamA" : "teamB",
+  };
+}
