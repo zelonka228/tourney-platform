@@ -43,7 +43,7 @@ export const TeamCard = forwardRef(function TeamCard({ team }, ref) {
     team.discipline,
     mainPlayers.map((p) => effectivePlayerRank(team.discipline, p))
   );
-  const rarity = teamRarity(team.tournaments);
+  const rarity = teamRarity(team);
   const style = RARITY_STYLE[rarity];
 
   return (

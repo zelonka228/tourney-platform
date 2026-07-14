@@ -133,7 +133,7 @@ export function Profile() {
   const unit = t(`unit.${DISCIPLINES[team.discipline].unitKey}`);
   const rankFor = (p) => liveElo[p.id] ?? effectivePlayerRank(team.discipline, p);
   const rating = avgRating(team.discipline, mainPlayers.map(rankFor));
-  const rarity = teamRarity(team.tournaments);
+  const rarity = teamRarity(team);
 
   return (
     <div className="py-10" data-testid="profile-detail">
