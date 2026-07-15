@@ -380,6 +380,8 @@ const CS2Back = forwardRef(function CS2Back({ team }, ref) {
         <text x="160" y="490" textAnchor="middle" fontFamily="Unbounded, sans-serif" fontWeight="900" fontSize="22" fill="#f4f4f5">
           {team.name.toUpperCase()}
         </text>
+
+        <FrameChrome />
       </svg>
       <div style={rifleStyle("rotate(-45deg)")} />
       <div style={rifleStyle("rotate(45deg) scaleX(-1)")} />
