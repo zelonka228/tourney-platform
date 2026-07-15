@@ -23,6 +23,11 @@ import blastpackUrl from "../assets/blastpack.png";
 import curveballUrl from "../assets/curveball.png";
 import cybercageUrl from "../assets/cybercage.png";
 import healingorbUrl from "../assets/healingorb.png";
+import dotaAegisUrl from "../assets/dota-aegis.png";
+import dotaStrengthUrl from "../assets/dota-strength.png";
+import dotaAgilityUrl from "../assets/dota-agility.png";
+import dotaIntelligenceUrl from "../assets/dota-intelligence.png";
+import dotaUniversalUrl from "../assets/dota-universal.png";
 
 const TIER_VARS = {
   Common: {
@@ -389,100 +394,263 @@ const CS2Back = forwardRef(function CS2Back({ team }, ref) {
   );
 });
 
+const DOTA_HEX = "160,0 320,40 320,560 160,600 0,560 0,40";
+const DOTA_HEX_INNER = "160,9 315,48 315,552 160,591 5,552 5,48";
+
+// Шестикутна "рунний камінь" рамка Dota-карток (перед+зад) — інша геометрія,
+// ніж FrameChrome (CS2, прямокутник) і ValorantFrame (восьмикутник). Самоцвіт
+// зверху й знизу, ромбові шипи на всіх 6 вершинах.
+function DotaFrame() {
+  return (
+    <>
+      <polygon points={DOTA_HEX} fill="none" stroke="var(--tier-color)" strokeWidth="var(--tier-width)" />
+      <polygon points={DOTA_HEX_INNER} fill="none" stroke="var(--tier-color)" strokeWidth="1" strokeOpacity="0.4" />
+      <g fill="var(--tier-color)">
+        <rect x="155.5" y="-4.5" width="9" height="9" transform="rotate(45 160 0)" />
+        <rect x="315.5" y="35.5" width="9" height="9" transform="rotate(45 320 40)" />
+        <rect x="315.5" y="555.5" width="9" height="9" transform="rotate(45 320 560)" />
+        <rect x="155.5" y="595.5" width="9" height="9" transform="rotate(45 160 600)" />
+        <rect x="-4.5" y="555.5" width="9" height="9" transform="rotate(45 0 560)" />
+        <rect x="-4.5" y="35.5" width="9" height="9" transform="rotate(45 0 40)" />
+      </g>
+      <circle cx="160" cy="16" r="7" fill="#1a0a08" stroke="var(--tier-color)" strokeWidth="1.4" />
+      <path d="M160,11 L163,16 L160,21 L157,16 Z" fill="var(--tier-color)" />
+    </>
+  );
+}
+
+const dotaHexGrid = (id, opacity) => (
+  <pattern id={id} width="34" height="30" patternUnits="userSpaceOnUse">
+    <polygon points="8.5,0 25.5,0 34,15 25.5,30 8.5,30 0,15" fill="none" stroke="var(--tier-color)" strokeWidth="0.6" strokeOpacity={opacity} />
+  </pattern>
+);
+
 // ---------------------------------------------------------------------------
-// Dota 2: гранований самоцвіт-медальйон з філігранню та лавровим мотивом —
-// техніка з push-quality-v6.html (feTurbulence-зерно, шаруваті градієнти,
-// bezier-філігрань), перенесена на 320×600 і прив'язана до --tier-color, щоб
-// колір каменя й рамки міняв редкість, а не був завжди золотим.
+// Dota-перед: шестикутна рамка, Cinzel (антична декоративна засічка — інший
+// характер, ніж Unbounded у CS2 чи Bebas Neue у Valorant), той самий
+// контент-флоу (top:194), що й CardFront/ValorantFront.
+const DotaFront = forwardRef(function DotaFront({ team, rarity, rating, unit, mainPlayers }, ref) {
+  const id = uid(team);
+  return (
+    <div ref={ref} style={faceStyle({ background: "#1a0a08" })}>
+      <svg viewBox="0 0 320 600" width="100%" height="100%">
+        <defs>
+          <clipPath id={`dfClip-${id}`}>
+            <polygon points={DOTA_HEX} />
+          </clipPath>
+          <clipPath id={`dfPortrait-${id}`}>
+            <circle cx="160" cy="130" r="46" />
+          </clipPath>
+          {dotaHexGrid(`dfHex-${id}`, 0.08)}
+        </defs>
+        <g clipPath={`url(#dfClip-${id})`}>
+          <rect width="320" height="600" fill="#1a0a08" />
+          <rect width="320" height="600" fill={`url(#dfHex-${id})`} />
+        </g>
+        <DotaFrame />
+        <line x1="46" y1="44" x2="274" y2="44" stroke="var(--tier-color)" strokeWidth="1.5" strokeOpacity="0.6" />
+        <circle cx="160" cy="130" r="46" fill="#09090B" stroke="var(--tier-color)" strokeWidth="3.5" />
+        <g clipPath={`url(#dfPortrait-${id})`}>
+          {team.logo ? (
+            <image href={team.logo} x="114" y="84" width="92" height="92" preserveAspectRatio="xMidYMid slice" />
+          ) : (
+            <rect x="114" y="84" width="92" height="92" fill="#09090B" />
+          )}
+        </g>
+        {!team.logo && (
+          <rect x="146" y="116" width="28" height="28" fill="none" stroke="var(--tier-color)" strokeOpacity="0.5" strokeWidth="2" transform="rotate(45 160 130)" />
+        )}
+      </svg>
+
+      <div style={{ position: "absolute", top: 32, left: 0, right: 0, textAlign: "center" }}>
+        <span
+          style={{
+            background: "#1a0a08",
+            padding: "0 14px",
+            fontFamily: "'Cinzel', serif",
+            fontWeight: 800,
+            fontSize: 19,
+            color: "#f4e9d8",
+            letterSpacing: "0.04em",
+          }}
+        >
+          {team.name.toUpperCase()}
+        </span>
+      </div>
+
+      <div style={{ position: "absolute", left: 0, right: 0, top: 194, display: "flex", flexDirection: "column", alignItems: "center" }}>
+        <div
+          style={{
+            fontFamily: "'JetBrains Mono', monospace",
+            fontWeight: 700,
+            fontSize: 34,
+            color: "#00f0ff",
+            textShadow: "0 0 10px rgba(0,240,255,0.5)",
+            lineHeight: 1,
+          }}
+        >
+          {rating.label}
+        </div>
+        <div style={{ fontFamily: "'JetBrains Mono', monospace", fontSize: 10, letterSpacing: "0.12em", color: "#8a8a90", marginTop: 5 }}>
+          {unit.toUpperCase()}
+        </div>
+
+        <div
+          style={{
+            width: "78%",
+            display: "flex",
+            justifyContent: "space-between",
+            fontFamily: "'IBM Plex Sans', sans-serif",
+            fontSize: 10,
+            color: "#8a8a90",
+            marginTop: 18,
+          }}
+        >
+          <span>
+            WINRATE <b style={{ color: "#f4f4f5", fontFamily: "'JetBrains Mono', monospace" }}>{team.winrate ?? "—"}</b>
+          </span>
+          <span>
+            СТРІК <b style={{ color: "#f4f4f5", fontFamily: "'JetBrains Mono', monospace" }}>{team.streak ?? "—"}</b>
+          </span>
+          <span>
+            ТУРНІРІВ <b style={{ color: "#f4f4f5", fontFamily: "'JetBrains Mono', monospace" }}>{team.tournaments}</b>
+          </span>
+        </div>
+
+        <div style={{ width: "78%", height: 1, background: "var(--tier-color)", opacity: 0.3, marginTop: 16 }} />
+
+        <div style={{ fontFamily: "'JetBrains Mono', monospace", fontSize: 9, letterSpacing: "0.15em", color: "#71717a", marginTop: 12 }}>
+          СКЛАД · {unit.toUpperCase()}
+        </div>
+
+        <div style={{ width: "80%", marginTop: 7 }}>
+          {mainPlayers.map((p, i) => (
+            <div
+              key={p.id ?? `${p.nick}-${i}`}
+              style={{
+                display: "flex",
+                justifyContent: "space-between",
+                alignItems: "center",
+                width: "100%",
+                padding: "4px 0",
+                borderBottom: i === mainPlayers.length - 1 ? "none" : "1px solid rgba(255,255,255,0.08)",
+              }}
+            >
+              <div>
+                <div style={{ fontFamily: "'IBM Plex Sans'", fontSize: 12, fontWeight: 600, color: "#f4f4f5", lineHeight: 1.3 }}>
+                  {effectivePlayerNick(team.discipline, p)}
+                </div>
+                <div style={{ fontFamily: "'IBM Plex Sans'", fontSize: 9, color: "#71717a", lineHeight: 1.3 }}>{p.role}</div>
+              </div>
+              <span style={{ fontFamily: "'JetBrains Mono'", fontSize: 13, color: "#00f0ff" }}>
+                {effectivePlayerRank(team.discipline, p)}
+              </span>
+            </div>
+          ))}
+        </div>
+
+        <div
+          style={{
+            textAlign: "center",
+            fontFamily: "'Cinzel', serif",
+            fontWeight: 700,
+            letterSpacing: "0.15em",
+            fontSize: 14,
+            color: "var(--tier-color)",
+            marginTop: 18,
+          }}
+        >
+          {rarity.toUpperCase()}
+        </div>
+      </div>
+    </div>
+  );
+});
+
+// ---------------------------------------------------------------------------
+// Dota-зад: медальйон з реальною іконкою Aegis of the Immortal (головний
+// трофей гри, вручається переможцю The International) — м'яка radial-gradient
+// маска замість твердого прямокутника (Aegis-рендер має білий фон, який
+// інакше проступав би крізь темний медальйон), і ряд реальних іконок
+// атрибутів (Strength/Agility/Intelligence/Universal) під ним, приглушений
+// (opacity 0.55), щоб не конкурувати з Aegis як головним акцентом.
 const DotaBack = forwardRef(function DotaBack({ team }, ref) {
   const id = uid(team);
   return (
-    <div ref={ref} style={faceStyle({ transform: "rotateY(180deg)", background: "#0a0a0c" })}>
+    <div ref={ref} style={faceStyle({ transform: "rotateY(180deg)", background: "#1a0a08" })}>
       <svg viewBox="0 0 320 600" width="100%" height="100%">
         <defs>
-          <radialGradient id={`dVig-${id}`} cx="50%" cy="30%" r="75%">
+          <clipPath id={`dbClip-${id}`}>
+            <polygon points={DOTA_HEX} />
+          </clipPath>
+          {dotaHexGrid(`dbHex-${id}`, 0.16)}
+          <radialGradient id={`dbVig-${id}`} cx="50%" cy="32%" r="75%">
             <stop offset="55%" stopColor="#000" stopOpacity="0" />
-            <stop offset="100%" stopColor="#000" stopOpacity="0.5" />
+            <stop offset="100%" stopColor="#000" stopOpacity="0.55" />
           </radialGradient>
-          <radialGradient id={`dSocket-${id}`} cx="50%" cy="42%" r="65%">
-            <stop offset="0%" stopColor="#201a10" />
-            <stop offset="70%" stopColor="#12100a" />
-            <stop offset="100%" stopColor="#0a0a0c" />
-          </radialGradient>
-          <radialGradient id={`dGem-${id}`} cx="38%" cy="30%" r="75%">
-            <stop offset="0%" stopColor="#fff8e8" />
-            <stop offset="22%" stopColor="var(--tier-color)" />
-            <stop offset="60%" stopColor="var(--tier-color)" stopOpacity="0.55" />
-            <stop offset="100%" stopColor="#0a0a0c" />
+          <radialGradient id={`dbSocket-${id}`} cx="50%" cy="42%" r="65%">
+            <stop offset="0%" stopColor="#2a1006" />
+            <stop offset="70%" stopColor="#160a04" />
+            <stop offset="100%" stopColor="#1a0a08" />
           </radialGradient>
         </defs>
-        <rect width="320" height="600" fill="#0a0a0c" />
-        <rect width="320" height="600" fill="var(--tier-color)" opacity="var(--tier-grain)" />
-        <rect width="320" height="600" fill={`url(#dVig-${id})`} />
-
-        {/* дрібні "жарини" для атмосфери, не заважають рамці й медальйону */}
-        <g fill="var(--tier-color)">
-          <circle cx="48" cy="150" r="1.4" opacity="0.6" />
-          <circle cx="272" cy="180" r="1.1" opacity="0.5" />
-          <circle cx="44" cy="380" r="1.3" opacity="0.5" />
-          <circle cx="276" cy="400" r="1.5" opacity="0.6" />
-          <circle cx="58" cy="520" r="1.2" opacity="0.5" />
-          <circle cx="262" cy="530" r="1.3" opacity="0.5" />
+        <g clipPath={`url(#dbClip-${id})`}>
+          <rect width="320" height="600" fill="#1a0a08" />
+          <rect width="320" height="600" fill="var(--tier-color)" opacity="var(--tier-grain)" />
+          <rect width="320" height="600" fill={`url(#dbHex-${id})`} />
+          <rect width="320" height="600" fill={`url(#dbVig-${id})`} />
         </g>
 
-        {/* верхній рунічний шестикутник */}
-        <polygon points="160,38 186,53 186,83 160,98 134,83 134,53" fill="#0e0d09" stroke="var(--tier-color)" strokeWidth="2" />
-        <polygon points="160,46 179,57 179,79 160,90 141,79 141,57" fill="none" stroke="var(--tier-color)" strokeWidth="1.2" opacity="0.5" />
-        <text x="160" y="69" textAnchor="middle" dominantBaseline="central" fontFamily="JetBrains Mono, monospace" fontWeight="700" fontSize="9.5" letterSpacing="0.3" fill="var(--tier-color)">
+        <DotaFrame />
+
+        <text x="160" y="36" textAnchor="middle" fontFamily="Cinzel, serif" fontWeight="700" fontSize="18" letterSpacing="0.15em" fill="var(--tier-color)">
           DOTA 2
         </text>
 
-        {/* філігранні завитки в проміжку між руною і медальйоном */}
-        <g fill="none" stroke="var(--tier-color)" strokeWidth="1.8" strokeLinecap="round" opacity="0.85">
-          <path d="M130,155 C110,146 104,128 114,110 C119,101 133,98 139,105" />
-          <path d="M190,155 C210,146 216,128 206,110 C201,101 187,98 181,105" />
-        </g>
-        <g fill={`url(#dGem-${id})`}>
-          <circle cx="114" cy="110" r="3" />
-          <circle cx="206" cy="110" r="3" />
-          <circle cx="139" cy="105" r="2.2" />
-          <circle cx="181" cy="105" r="2.2" />
-        </g>
-
-        {/* медальйон-самоцвіт */}
-        <circle cx="160" cy="300" r="135" fill={`url(#dSocket-${id})`} stroke="var(--tier-color)" strokeWidth="2.8" />
-        <circle cx="160" cy="300" r="123" fill="none" stroke="var(--tier-color)" strokeWidth="1.3" strokeOpacity="0.5" />
-        <circle cx="160" cy="300" r="95" fill={`url(#dGem-${id})`} />
-        <ellipse cx="128" cy="262" rx="27" ry="16" fill="#fff8e8" opacity="0.5" />
-        <g stroke="#000" strokeWidth="1.5" opacity="0.35">
-          <line x1="160" y1="205" x2="160" y2="395" />
-          <line x1="65" y1="300" x2="255" y2="300" />
-          <line x1="93" y1="233" x2="227" y2="367" />
-          <line x1="227" y1="233" x2="93" y2="367" />
-        </g>
-        <g fill={`url(#dGem-${id})`} stroke="var(--tier-color)" strokeWidth="1">
-          <circle cx="255.5" cy="204.5" r="6" />
-          <circle cx="64.5" cy="204.5" r="6" />
-          <circle cx="255.5" cy="395.5" r="6" />
-          <circle cx="64.5" cy="395.5" r="6" />
-        </g>
-
-        {/* лавровий мотив над іменем */}
-        <g fill="var(--tier-color)" opacity="0.9">
-          <ellipse cx="120" cy="462" rx="7" ry="3.2" transform="rotate(-25 120 462)" />
-          <ellipse cx="108" cy="455" rx="7" ry="3.2" transform="rotate(-12 108 455)" />
-          <ellipse cx="98" cy="450" rx="7" ry="3.2" />
-          <ellipse cx="200" cy="462" rx="7" ry="3.2" transform="rotate(25 200 462)" />
-          <ellipse cx="212" cy="455" rx="7" ry="3.2" transform="rotate(12 212 455)" />
-          <ellipse cx="222" cy="450" rx="7" ry="3.2" />
-        </g>
-
-        <text x="160" y="490" textAnchor="middle" fontFamily="Unbounded, sans-serif" fontWeight="900" fontSize="22" fill="#f4f4f5">
-          {team.name.toUpperCase()}
-        </text>
-
-        <FrameChrome />
+        <circle cx="160" cy="290" r="135" fill={`url(#dbSocket-${id})`} stroke="var(--tier-color)" strokeWidth="2.8" />
+        <circle cx="160" cy="290" r="123" fill="none" stroke="var(--tier-color)" strokeWidth="1.3" strokeOpacity="0.5" />
       </svg>
+
+      <img
+        src={dotaAegisUrl}
+        alt=""
+        style={{
+          position: "absolute",
+          left: "50%",
+          top: 290,
+          transform: "translate(-50%,-50%)",
+          width: 220,
+          height: 194,
+          objectFit: "contain",
+          WebkitMaskImage: "radial-gradient(ellipse 58% 58% at center, black 45%, transparent 82%)",
+          maskImage: "radial-gradient(ellipse 58% 58% at center, black 45%, transparent 82%)",
+          filter: "drop-shadow(0 0 10px var(--tier-glow))",
+        }}
+      />
+
+      <div style={{ position: "absolute", top: 452, left: 0, right: 0, display: "flex", justifyContent: "center", gap: 16, opacity: 0.55 }}>
+        <img src={dotaStrengthUrl} alt="" style={{ width: 34, height: 34 }} />
+        <img src={dotaAgilityUrl} alt="" style={{ width: 34, height: 34 }} />
+        <img src={dotaIntelligenceUrl} alt="" style={{ width: 34, height: 34 }} />
+        <img src={dotaUniversalUrl} alt="" style={{ width: 34, height: 34 }} />
+      </div>
+
+      <div
+        style={{
+          position: "absolute",
+          top: 500,
+          left: 0,
+          right: 0,
+          textAlign: "center",
+          fontFamily: "'Cinzel', serif",
+          fontWeight: 800,
+          fontSize: 21,
+          color: "#f4e9d8",
+          textShadow: "0 1px 3px rgba(0,0,0,0.8)",
+        }}
+      >
+        {team.name.toUpperCase()}
+      </div>
     </div>
   );
 });
@@ -759,7 +927,7 @@ const ValorantBack = forwardRef(function ValorantBack({ team }, ref) {
 // Визначено тут (не на початку файлу) — компоненти-переди/зади ще не
 // проініціалізовані на момент виконання модуля, якщо оголосити мапи раніше
 // за них (TDZ, той самий клас багу, що вже стався один раз із цим файлом).
-const DISCIPLINE_FRONT = { Valorant: ValorantFront };
+const DISCIPLINE_FRONT = { "Dota 2": DotaFront, Valorant: ValorantFront };
 const DISCIPLINE_BACK = { CS2: CS2Back, "Dota 2": DotaBack, Valorant: ValorantBack };
 
 // ---------------------------------------------------------------------------
