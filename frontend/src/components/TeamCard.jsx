@@ -14,6 +14,15 @@ import {
   DISCIPLINES,
 } from "../lib/demo";
 import ak47Url from "../assets/ak47.png";
+import spikeRushUrl from "../assets/spikerush.png";
+import duelistUrl from "../assets/duelist.png";
+import controllerUrl from "../assets/controller.png";
+import initiatorUrl from "../assets/initiator.png";
+import sentinelUrl from "../assets/sentinel.png";
+import blastpackUrl from "../assets/blastpack.png";
+import curveballUrl from "../assets/curveball.png";
+import cybercageUrl from "../assets/cybercage.png";
+import healingorbUrl from "../assets/healingorb.png";
 
 const TIER_VARS = {
   Common: {
@@ -77,6 +86,7 @@ export const TeamCard = forwardRef(function TeamCard({ team }, ref) {
   );
   const rarity = teamRarity(team);
   const tierVars = TIER_VARS[rarity];
+  const Front = DISCIPLINE_FRONT[team.discipline] ?? CardFront;
   const Back = DISCIPLINE_BACK[team.discipline] ?? GenericBack;
 
   function handleFlip() {
@@ -115,7 +125,7 @@ export const TeamCard = forwardRef(function TeamCard({ team }, ref) {
             cursor: generated ? "pointer" : "default",
           }}
         >
-          <CardFront
+          <Front
             ref={frontRef}
             team={team}
             rarity={rarity}
@@ -475,15 +485,285 @@ const DotaBack = forwardRef(function DotaBack({ team }, ref) {
   );
 });
 
-// Ключі — той самий текст, що backend/prisma/seed.js пише в team.discipline.
-// Визначено тут (не на початку файлу) — CS2Back/DotaBack ще не проініціалізовані
-// на момент виконання модуля, якщо оголосити мапу раніше за них (TDZ).
-const DISCIPLINE_BACK = { CS2: CS2Back, "Dota 2": DotaBack };
+const VALORANT_OCTAGON = "26,0 294,0 320,26 320,574 294,600 26,600 0,574 0,26";
+
+// Восьмикутна рамка Valorant-карток (перед+зад) — інша геометрія, ніж
+// FrameChrome (прямокутник з кутовими скобами) для CS2/Dota, тому окрема
+// функція, а не параметризація тієї самої.
+function ValorantFrame() {
+  return (
+    <>
+      <g stroke="var(--tier-color)" strokeWidth="1.8">
+        <line x1="18" y1="36" x2="18" y2="48" />
+        <line x1="302" y1="36" x2="302" y2="48" />
+        <line x1="18" y1="552" x2="18" y2="564" />
+        <line x1="302" y1="552" x2="302" y2="564" />
+      </g>
+      <polygon points={VALORANT_OCTAGON} fill="none" stroke="var(--tier-color)" strokeWidth="var(--tier-width)" />
+    </>
+  );
+}
 
 // ---------------------------------------------------------------------------
-// Заглушка для дисциплін, під які ще не намальовано власний зад (наразі —
-// Valorant, "Пока-что только с кс и дотой" — див. чат). Та сама рамка й
-// тільки лого + назва команди, без гри-специфічної символіки.
+// Valorant-перед: восьмикутний виріз рамки, Bebas Neue (реальний UI-шрифт
+// гри — Tungsten платний, Bebas Neue найближчий безкоштовний аналог) і лінія
+// замість трапеції під назвою команди. Той самий контент-флоу (top:196), що
+// й CardFront, — той самий клас багу з накладанням ростера вже виключено.
+const ValorantFront = forwardRef(function ValorantFront(
+  { team, rarity, rating, unit, mainPlayers },
+  ref
+) {
+  const id = uid(team);
+  return (
+    <div ref={ref} style={faceStyle({ background: "#170a17" })}>
+      <svg viewBox="0 0 320 600" width="100%" height="100%">
+        <defs>
+          <clipPath id={`vfClip-${id}`}>
+            <polygon points={VALORANT_OCTAGON} />
+          </clipPath>
+          <clipPath id={`vfPortrait-${id}`}>
+            <circle cx="160" cy="130" r="46" />
+          </clipPath>
+        </defs>
+        <g clipPath={`url(#vfClip-${id})`}>
+          <rect width="320" height="600" fill="#170a17" />
+        </g>
+        <ValorantFrame />
+        <line x1="46" y1="44" x2="274" y2="44" stroke="var(--tier-color)" strokeWidth="1.5" strokeOpacity="0.6" />
+        <circle cx="160" cy="130" r="46" fill="#09090B" stroke="var(--tier-color)" strokeWidth="3.5" />
+        <g clipPath={`url(#vfPortrait-${id})`}>
+          {team.logo ? (
+            <image href={team.logo} x="114" y="84" width="92" height="92" preserveAspectRatio="xMidYMid slice" />
+          ) : (
+            <rect x="114" y="84" width="92" height="92" fill="#09090B" />
+          )}
+        </g>
+        {!team.logo && (
+          <rect x="146" y="116" width="28" height="28" fill="none" stroke="var(--tier-color)" strokeOpacity="0.5" strokeWidth="2" transform="rotate(45 160 130)" />
+        )}
+      </svg>
+
+      <div style={{ position: "absolute", top: 32, left: 0, right: 0, textAlign: "center" }}>
+        <span
+          style={{
+            background: "#170a17",
+            padding: "0 14px",
+            fontFamily: "'Bebas Neue', sans-serif",
+            fontSize: 24,
+            color: "#f4f4f5",
+            letterSpacing: "0.02em",
+          }}
+        >
+          {team.name.toUpperCase()}
+        </span>
+      </div>
+
+      <div style={{ position: "absolute", left: 0, right: 0, top: 196, display: "flex", flexDirection: "column", alignItems: "center" }}>
+        <div
+          style={{
+            fontFamily: "'Bebas Neue', sans-serif",
+            fontSize: 34,
+            color: "var(--tier-color)",
+            textShadow: "0 0 10px var(--tier-glow)",
+            lineHeight: 1,
+          }}
+        >
+          {rating.label}
+        </div>
+        <div style={{ fontFamily: "'JetBrains Mono', monospace", fontSize: 10, letterSpacing: "0.12em", color: "#8a8a90", marginTop: 6 }}>
+          {unit.toUpperCase()}
+        </div>
+
+        <div
+          style={{
+            width: "80%",
+            display: "flex",
+            justifyContent: "space-between",
+            fontFamily: "'IBM Plex Sans', sans-serif",
+            fontSize: 10,
+            color: "#8a8a90",
+            marginTop: 22,
+          }}
+        >
+          <span>
+            WINRATE <b style={{ color: "#f4f4f5", fontFamily: "'JetBrains Mono', monospace" }}>{team.winrate ?? "—"}</b>
+          </span>
+          <span>
+            СТРІК <b style={{ color: "#f4f4f5", fontFamily: "'JetBrains Mono', monospace" }}>{team.streak ?? "—"}</b>
+          </span>
+          <span>
+            ТУРНІРІВ <b style={{ color: "#f4f4f5", fontFamily: "'JetBrains Mono', monospace" }}>{team.tournaments}</b>
+          </span>
+        </div>
+
+        <div style={{ width: "80%", height: 1, background: "var(--tier-color)", opacity: 0.3, marginTop: 16 }} />
+
+        <div style={{ fontFamily: "'JetBrains Mono', monospace", fontSize: 9, letterSpacing: "0.15em", color: "#71717a", marginTop: 12 }}>
+          СКЛАД · {unit.toUpperCase()}
+        </div>
+
+        <div style={{ width: "84%", marginTop: 6 }}>
+          {mainPlayers.map((p, i) => (
+            <div
+              key={p.id ?? `${p.nick}-${i}`}
+              style={{
+                display: "flex",
+                justifyContent: "space-between",
+                alignItems: "center",
+                width: "100%",
+                padding: "4px 0",
+                borderBottom: i === mainPlayers.length - 1 ? "none" : "1px solid rgba(255,255,255,0.08)",
+              }}
+            >
+              <div>
+                <div style={{ fontFamily: "'IBM Plex Sans'", fontSize: 13, fontWeight: 600, color: "#f4f4f5", lineHeight: 1.3 }}>
+                  {effectivePlayerNick(team.discipline, p)}
+                </div>
+                <div style={{ fontFamily: "'IBM Plex Sans'", fontSize: 10, color: "#71717a", lineHeight: 1.3 }}>{p.role}</div>
+              </div>
+              <span style={{ fontFamily: "'JetBrains Mono'", fontSize: 13, color: "var(--tier-color)" }}>
+                {effectivePlayerRank(team.discipline, p)}
+              </span>
+            </div>
+          ))}
+        </div>
+
+        <div
+          style={{
+            marginTop: 20,
+            textAlign: "center",
+            fontFamily: "'Bebas Neue', sans-serif",
+            letterSpacing: "0.12em",
+            fontSize: 15,
+            color: "var(--tier-color)",
+            border: "1.5px solid var(--tier-color)",
+            borderRadius: 2,
+            padding: "6px 22px",
+          }}
+        >
+          {rarity.toUpperCase()}
+        </div>
+      </div>
+    </div>
+  );
+});
+
+// ---------------------------------------------------------------------------
+// Valorant-зад: іконка режиму Spike Rush по центру (офіційна плоска іконка),
+// 4 офіційні іконки ролей знизу, дрібні ability-іконки розкидані по фону
+// напівпрозоро — усі реальні PNG з Riot's Asset Kit / Valorant Fandom wiki
+// (дозволено користувачем для цього некомерційного навчального проєкту),
+// перефарбовані в колір рідкості через CSS mask-image.
+const ValorantBack = forwardRef(function ValorantBack({ team }, ref) {
+  const id = uid(team);
+  const maskStyle = (url, extra) => ({
+    position: "absolute",
+    WebkitMaskImage: `url(${url})`,
+    maskImage: `url(${url})`,
+    WebkitMaskSize: "contain",
+    maskSize: "contain",
+    WebkitMaskRepeat: "no-repeat",
+    maskRepeat: "no-repeat",
+    WebkitMaskPosition: "center",
+    maskPosition: "center",
+    background: "var(--tier-color)",
+    ...extra,
+  });
+
+  return (
+    <div ref={ref} style={faceStyle({ transform: "rotateY(180deg)", background: "#170a17" })}>
+      <svg viewBox="0 0 320 600" width="100%" height="100%">
+        <defs>
+          <clipPath id={`vbClip-${id}`}>
+            <polygon points={VALORANT_OCTAGON} />
+          </clipPath>
+          <pattern id={`vbHex-${id}`} width="34" height="30" patternUnits="userSpaceOnUse">
+            <polygon points="8.5,0 25.5,0 34,15 25.5,30 8.5,30 0,15" fill="none" stroke="var(--tier-color)" strokeWidth="0.6" strokeOpacity="0.2" />
+          </pattern>
+          <radialGradient id={`vbVig-${id}`} cx="50%" cy="38%" r="70%">
+            <stop offset="55%" stopColor="#000" stopOpacity="0" />
+            <stop offset="100%" stopColor="#000" stopOpacity="0.5" />
+          </radialGradient>
+        </defs>
+        <g clipPath={`url(#vbClip-${id})`}>
+          <rect width="320" height="600" fill="#170a17" />
+          <rect width="320" height="600" fill="var(--tier-color)" opacity="var(--tier-grain)" />
+          <rect width="320" height="600" fill={`url(#vbHex-${id})`} />
+          <rect width="320" height="600" fill={`url(#vbVig-${id})`} />
+        </g>
+        <ValorantFrame />
+      </svg>
+
+      <div style={maskStyle(blastpackUrl, { left: 52, top: 120, width: 34, height: 34, opacity: 0.16, transform: "rotate(-12deg)" })} />
+      <div style={maskStyle(curveballUrl, { left: 240, top: 150, width: 32, height: 32, opacity: 0.15, transform: "rotate(10deg)" })} />
+      <div style={maskStyle(cybercageUrl, { left: 40, top: 320, width: 32, height: 32, opacity: 0.15, transform: "rotate(8deg)" })} />
+      <div style={maskStyle(healingorbUrl, { left: 248, top: 340, width: 34, height: 34, opacity: 0.16, transform: "rotate(-8deg)" })} />
+
+      <div
+        style={maskStyle(spikeRushUrl, {
+          left: 160,
+          top: 250,
+          width: 150,
+          height: 150,
+          transform: "translate(-50%,-50%)",
+          filter: "drop-shadow(0 0 16px var(--tier-glow))",
+        })}
+      />
+
+      <div
+        style={{
+          position: "absolute",
+          top: 22,
+          left: 0,
+          right: 0,
+          textAlign: "center",
+          fontFamily: "'JetBrains Mono', monospace",
+          fontWeight: 700,
+          fontSize: 16,
+          letterSpacing: "0.22em",
+          color: "var(--tier-color)",
+        }}
+      >
+        VALORANT
+      </div>
+
+      <div style={{ position: "absolute", top: 390, left: 0, right: 0, display: "flex", justifyContent: "center", gap: 22 }}>
+        <div style={maskStyle(duelistUrl, { position: "relative", width: 36, height: 36 })} />
+        <div style={maskStyle(controllerUrl, { position: "relative", width: 36, height: 36 })} />
+        <div style={maskStyle(initiatorUrl, { position: "relative", width: 36, height: 36 })} />
+        <div style={maskStyle(sentinelUrl, { position: "relative", width: 36, height: 36 })} />
+      </div>
+
+      <div
+        style={{
+          position: "absolute",
+          top: 470,
+          left: 0,
+          right: 0,
+          textAlign: "center",
+          fontFamily: "'Unbounded', sans-serif",
+          fontWeight: 900,
+          fontSize: 20,
+          color: "#f4f4f5",
+        }}
+      >
+        {team.name.toUpperCase()}
+      </div>
+    </div>
+  );
+});
+
+// Ключі — той самий текст, що backend/prisma/seed.js пише в team.discipline.
+// Визначено тут (не на початку файлу) — компоненти-переди/зади ще не
+// проініціалізовані на момент виконання модуля, якщо оголосити мапи раніше
+// за них (TDZ, той самий клас багу, що вже стався один раз із цим файлом).
+const DISCIPLINE_FRONT = { Valorant: ValorantFront };
+const DISCIPLINE_BACK = { CS2: CS2Back, "Dota 2": DotaBack, Valorant: ValorantBack };
+
+// ---------------------------------------------------------------------------
+// Заглушка на випадок нової дисципліни без власного дизайну заду (наразі всі
+// три наявні дисципліни мають власний зад). Та сама рамка й тільки лого +
+// назва команди, без гри-специфічної символіки.
 const GenericBack = forwardRef(function GenericBack({ team }, ref) {
   const id = uid(team);
   return (
