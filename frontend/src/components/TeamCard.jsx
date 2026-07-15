@@ -199,8 +199,15 @@ const CardFront = forwardRef(function CardFront({ team, rarity, rating, unit, ma
           <clipPath id={`fjClip-${id}`}>
             <circle cx="160" cy="130" r="46" />
           </clipPath>
+          <pattern id={`fjCircuit-${id}`} width="46" height="46" patternUnits="userSpaceOnUse">
+            <path d="M0,23 L17,23 L17,6 L34,6" fill="none" stroke="var(--tier-color)" strokeWidth="0.7" strokeOpacity="0.09" />
+            <path d="M46,23 L29,23 L29,40 L12,40" fill="none" stroke="var(--tier-color)" strokeWidth="0.7" strokeOpacity="0.09" />
+            <circle cx="17" cy="6" r="1.3" fill="var(--tier-color)" opacity="0.12" />
+            <circle cx="29" cy="40" r="1.3" fill="var(--tier-color)" opacity="0.12" />
+          </pattern>
         </defs>
         <rect width="320" height="600" fill="#0c0c0e" />
+        <rect width="320" height="600" fill={`url(#fjCircuit-${id})`} />
         <FrameChrome />
         <line x1="46" y1="44" x2="274" y2="44" stroke="var(--tier-color)" strokeWidth="1.5" strokeOpacity="0.6" />
         <circle cx="160" cy="130" r="46" fill="#09090B" stroke="var(--tier-color)" strokeWidth="3.5" />
@@ -694,9 +701,14 @@ const ValorantFront = forwardRef(function ValorantFront(
           <clipPath id={`vfPortrait-${id}`}>
             <circle cx="160" cy="130" r="46" />
           </clipPath>
+          <pattern id={`vfShard-${id}`} width="52" height="52" patternUnits="userSpaceOnUse" patternTransform="rotate(-25)">
+            <rect x="0" width="6" height="52" fill="var(--tier-color)" opacity="0.06" />
+            <rect x="26" width="3" height="52" fill="var(--tier-color)" opacity="0.04" />
+          </pattern>
         </defs>
         <g clipPath={`url(#vfClip-${id})`}>
           <rect width="320" height="600" fill="#170a17" />
+          <rect width="320" height="600" fill={`url(#vfShard-${id})`} />
         </g>
         <ValorantFrame />
         <line x1="46" y1="44" x2="274" y2="44" stroke="var(--tier-color)" strokeWidth="1.5" strokeOpacity="0.6" />
