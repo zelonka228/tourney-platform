@@ -603,7 +603,7 @@ const DotaBack = forwardRef(function DotaBack({ team }, ref) {
 
         <DotaFrame />
 
-        <text x="160" y="36" textAnchor="middle" fontFamily="Cinzel, serif" fontWeight="700" fontSize="18" letterSpacing="0.15em" fill="var(--tier-color)">
+        <text x="160" y="48" textAnchor="middle" fontFamily="Cinzel, serif" fontWeight="700" fontSize="18" letterSpacing="0.15em" fill="var(--tier-color)">
           DOTA 2
         </text>
 
