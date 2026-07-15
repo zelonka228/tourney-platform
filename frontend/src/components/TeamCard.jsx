@@ -29,31 +29,22 @@ import dotaAgilityUrl from "../assets/dota-agility.png";
 import dotaIntelligenceUrl from "../assets/dota-intelligence.png";
 import dotaUniversalUrl from "../assets/dota-universal.png";
 
-const TIER_VARS = {
-  Common: {
-    "--tier-color": "#a1a1aa",
-    "--tier-glow": "rgba(161,161,170,0.18)",
-    "--tier-width": "2px",
-    "--tier-grain": "0.015",
-  },
-  Rare: {
-    "--tier-color": "#4b6bff",
-    "--tier-glow": "rgba(75,107,255,0.4)",
-    "--tier-width": "2.2px",
-    "--tier-grain": "0.02",
-  },
-  Epic: {
-    "--tier-color": "#e94bd6",
-    "--tier-glow": "rgba(233,75,214,0.45)",
-    "--tier-width": "2.5px",
-    "--tier-grain": "0.025",
-  },
-  Legendary: {
-    "--tier-color": "#ffd23f",
-    "--tier-glow": "rgba(255,178,50,0.5)",
-    "--tier-width": "3px",
-    "--tier-grain": "0.035",
-  },
+// Значення за редкістю. Раніше застосовувались виключно як CSS custom
+// properties (--tier-color тощо) через inline style на батьківському
+// flip-контейнері, а компоненти нижче читали їх через var(--tier-color).
+// html-to-image (PNG-експорт) клонує лише сам вузол активної сторони
+// (frontRef/backRef), БЕЗ цього батька — і, як з'ясувалось емпірично,
+// узагалі не резолвить CSS custom properties для будь-чого всередині
+// вкладеного <svg> (ні як атрибут, ні як style-властивість), хоча для
+// звичайних HTML-елементів (текст) резолвить нормально. Тому тепер кожен
+// компонент нижче отримує вже ГОТОВІ рядкові значення кольору через проп
+// `tier`, а не читає CSS-змінну — це працює однаково і на екрані, і в
+// експорті, бо не залежить від того, як саме бібліотека клонує стилі.
+const TIER_VALUES = {
+  Common: { color: "#a1a1aa", glow: "rgba(161,161,170,0.18)", width: "2px", grain: "0.015" },
+  Rare: { color: "#4b6bff", glow: "rgba(75,107,255,0.4)", width: "2.2px", grain: "0.02" },
+  Epic: { color: "#e94bd6", glow: "rgba(233,75,214,0.45)", width: "2.5px", grain: "0.025" },
+  Legendary: { color: "#ffd23f", glow: "rgba(255,178,50,0.5)", width: "3px", grain: "0.035" },
 };
 
 const GEN_TRANSITION = "transform 1.1s cubic-bezier(.16,1.2,.3,1), opacity 0.4s ease";
@@ -90,7 +81,7 @@ export const TeamCard = forwardRef(function TeamCard({ team }, ref) {
     mainPlayers.map((p) => effectivePlayerRank(team.discipline, p))
   );
   const rarity = teamRarity(team);
-  const tierVars = TIER_VARS[rarity];
+  const tier = TIER_VALUES[rarity];
   const Front = DISCIPLINE_FRONT[team.discipline] ?? CardFront;
   const Back = DISCIPLINE_BACK[team.discipline] ?? GenericBack;
 
@@ -117,7 +108,6 @@ export const TeamCard = forwardRef(function TeamCard({ team }, ref) {
           onClick={handleFlip}
           data-testid="team-card-flip"
           style={{
-            ...tierVars,
             position: "relative",
             width: "100%",
             height: "100%",
@@ -137,8 +127,9 @@ export const TeamCard = forwardRef(function TeamCard({ team }, ref) {
             rating={rating}
             unit={unit}
             mainPlayers={mainPlayers}
+            tier={tier}
           />
-          <Back ref={backRef} team={team} rarity={rarity} />
+          <Back ref={backRef} team={team} rarity={rarity} tier={tier} />
         </div>
       </div>
       {generated && (
@@ -152,26 +143,26 @@ export const TeamCard = forwardRef(function TeamCard({ team }, ref) {
 
 // ---------------------------------------------------------------------------
 // Спільна рамка з тонкими кутовими скобами та ромбовими шипами по кутах —
-// однакова для переду й усіх задів, лише колір іде з --tier-color. Винесена
+// однакова для переду й усіх задів, лише колір іде з проп tier. Винесена
 // окремо, щоб не дублювати одну й ту саму геометрію в 3 місцях.
-function FrameChrome() {
+function FrameChrome({ tier }) {
   return (
     <>
-      <rect x="9" y="9" width="302" height="582" fill="none" stroke="var(--tier-color)" strokeWidth="var(--tier-width)" />
-      <rect x="18" y="18" width="284" height="564" fill="none" stroke="var(--tier-color)" strokeWidth="1" strokeOpacity="0.4" />
-      <g stroke="var(--tier-color)" strokeWidth="2.4" fill="none">
+      <rect x="9" y="9" width="302" height="582" fill="none" stroke={tier.color} strokeWidth={tier.width} />
+      <rect x="18" y="18" width="284" height="564" fill="none" stroke={tier.color} strokeWidth="1" strokeOpacity="0.4" />
+      <g stroke={tier.color} strokeWidth="2.4" fill="none">
         <path d="M9,46 L9,9 L46,9" />
         <path d="M311,46 L311,9 L274,9" />
         <path d="M9,554 L9,591 L46,591" />
         <path d="M311,554 L311,591 L274,591" />
       </g>
-      <g fill="var(--tier-color)">
+      <g fill={tier.color}>
         <rect x="4.5" y="4.5" width="9" height="9" transform="rotate(45 9 9)" />
         <rect x="306.5" y="4.5" width="9" height="9" transform="rotate(45 311 9)" />
         <rect x="4.5" y="586.5" width="9" height="9" transform="rotate(45 9 591)" />
         <rect x="306.5" y="586.5" width="9" height="9" transform="rotate(45 311 591)" />
       </g>
-      <g fill="var(--tier-color)">
+      <g fill={tier.color}>
         <circle cx="160" cy="12" r="2.6" />
         <circle cx="160" cy="588" r="2.6" />
       </g>
@@ -190,7 +181,7 @@ const faceStyle = (extra) => ({
 });
 
 // ---------------------------------------------------------------------------
-const CardFront = forwardRef(function CardFront({ team, rarity, rating, unit, mainPlayers }, ref) {
+const CardFront = forwardRef(function CardFront({ team, rarity, rating, unit, mainPlayers, tier }, ref) {
   const id = uid(team);
   return (
     <div ref={ref} style={faceStyle({ background: "transparent" })}>
@@ -200,17 +191,17 @@ const CardFront = forwardRef(function CardFront({ team, rarity, rating, unit, ma
             <circle cx="160" cy="130" r="46" />
           </clipPath>
           <pattern id={`fjCircuit-${id}`} width="46" height="46" patternUnits="userSpaceOnUse">
-            <path d="M0,23 L17,23 L17,6 L34,6" fill="none" stroke="var(--tier-color)" strokeWidth="0.7" strokeOpacity="0.09" />
-            <path d="M46,23 L29,23 L29,40 L12,40" fill="none" stroke="var(--tier-color)" strokeWidth="0.7" strokeOpacity="0.09" />
-            <circle cx="17" cy="6" r="1.3" fill="var(--tier-color)" opacity="0.12" />
-            <circle cx="29" cy="40" r="1.3" fill="var(--tier-color)" opacity="0.12" />
+            <path d="M0,23 L17,23 L17,6 L34,6" fill="none" stroke={tier.color} strokeWidth="0.7" strokeOpacity="0.09" />
+            <path d="M46,23 L29,23 L29,40 L12,40" fill="none" stroke={tier.color} strokeWidth="0.7" strokeOpacity="0.09" />
+            <circle cx="17" cy="6" r="1.3" fill={tier.color} opacity="0.12" />
+            <circle cx="29" cy="40" r="1.3" fill={tier.color} opacity="0.12" />
           </pattern>
         </defs>
         <rect width="320" height="600" fill="#0c0c0e" />
         <rect width="320" height="600" fill={`url(#fjCircuit-${id})`} />
-        <FrameChrome />
-        <line x1="46" y1="44" x2="274" y2="44" stroke="var(--tier-color)" strokeWidth="1.5" strokeOpacity="0.6" />
-        <circle cx="160" cy="130" r="46" fill="#09090B" stroke="var(--tier-color)" strokeWidth="3.5" />
+        <FrameChrome tier={tier} />
+        <line x1="46" y1="44" x2="274" y2="44" stroke={tier.color} strokeWidth="1.5" strokeOpacity="0.6" />
+        <circle cx="160" cy="130" r="46" fill="#09090B" stroke={tier.color} strokeWidth="3.5" />
         <g clipPath={`url(#fjClip-${id})`}>
           {team.logo ? (
             <image href={team.logo} x="114" y="84" width="92" height="92" preserveAspectRatio="xMidYMid slice" />
@@ -219,7 +210,7 @@ const CardFront = forwardRef(function CardFront({ team, rarity, rating, unit, ma
           )}
         </g>
         {!team.logo && (
-          <rect x="146" y="116" width="28" height="28" fill="none" stroke="var(--tier-color)" strokeOpacity="0.5" strokeWidth="2" transform="rotate(45 160 130)" />
+          <rect x="146" y="116" width="28" height="28" fill="none" stroke={tier.color} strokeOpacity="0.5" strokeWidth="2" transform="rotate(45 160 130)" />
         )}
       </svg>
 
@@ -282,7 +273,7 @@ const CardFront = forwardRef(function CardFront({ team, rarity, rating, unit, ma
           </span>
         </div>
 
-        <div style={{ width: "78%", height: 1, background: "var(--tier-color)", opacity: 0.3, marginTop: 18 }} />
+        <div style={{ width: "78%", height: 1, background: tier.color, opacity: 0.3, marginTop: 18 }} />
 
         <div style={{ fontFamily: "'JetBrains Mono', monospace", fontSize: 9, letterSpacing: "0.15em", color: "#71717a", marginTop: 14 }}>
           СКЛАД · {unit.toUpperCase()}
@@ -322,7 +313,7 @@ const CardFront = forwardRef(function CardFront({ team, rarity, rating, unit, ma
             fontWeight: 700,
             letterSpacing: "0.2em",
             fontSize: 13,
-            color: "var(--tier-color)",
+            color: tier.color,
           }}
         >
           {rarity.toUpperCase()}
@@ -335,7 +326,7 @@ const CardFront = forwardRef(function CardFront({ team, rarity, rating, unit, ma
 // ---------------------------------------------------------------------------
 // CS2: схрещені калаші (реальний силует, CSS mask-image) на медальйоні +
 // приціл-емблема "CS2" зверху.
-const CS2Back = forwardRef(function CS2Back({ team }, ref) {
+const CS2Back = forwardRef(function CS2Back({ team, tier }, ref) {
   const id = uid(team);
   const rifleStyle = (rotateExpr) => ({
     position: "absolute",
@@ -352,8 +343,8 @@ const CS2Back = forwardRef(function CS2Back({ team }, ref) {
     maskRepeat: "no-repeat",
     WebkitMaskPosition: "center",
     maskPosition: "center",
-    background: "var(--tier-color)",
-    filter: "drop-shadow(0 0 8px var(--tier-glow))",
+    background: tier.color,
+    filter: `drop-shadow(0 0 8px ${tier.glow})`,
   });
 
   return (
@@ -371,29 +362,29 @@ const CS2Back = forwardRef(function CS2Back({ team }, ref) {
           </radialGradient>
         </defs>
         <rect width="320" height="600" fill="#0a0a0c" />
-        <rect width="320" height="600" fill="var(--tier-color)" opacity="var(--tier-grain)" />
+        <rect width="320" height="600" fill={tier.color} opacity={tier.grain} />
         <rect width="320" height="600" fill={`url(#bjVig-${id})`} />
 
-        <circle cx="160" cy="68" r="34" stroke="var(--tier-color)" strokeWidth="2" fill="none" />
-        <circle cx="160" cy="68" r="24" stroke="var(--tier-color)" strokeWidth="1.2" fill="none" opacity="0.5" />
-        <g stroke="var(--tier-color)" strokeWidth="2">
+        <circle cx="160" cy="68" r="34" stroke={tier.color} strokeWidth="2" fill="none" />
+        <circle cx="160" cy="68" r="24" stroke={tier.color} strokeWidth="1.2" fill="none" opacity="0.5" />
+        <g stroke={tier.color} strokeWidth="2">
           <line x1="160" y1="22" x2="160" y2="32" />
           <line x1="160" y1="104" x2="160" y2="114" />
           <line x1="114" y1="68" x2="124" y2="68" />
           <line x1="196" y1="68" x2="206" y2="68" />
         </g>
-        <text x="160" y="68" textAnchor="middle" dominantBaseline="central" fontFamily="JetBrains Mono, monospace" fontWeight="700" fontSize="14" letterSpacing="0.5" fill="var(--tier-color)">
+        <text x="160" y="68" textAnchor="middle" dominantBaseline="central" fontFamily="JetBrains Mono, monospace" fontWeight="700" fontSize="14" letterSpacing="0.5" fill={tier.color}>
           CS2
         </text>
 
-        <circle cx="160" cy="300" r="135" fill={`url(#bjMedallion-${id})`} stroke="var(--tier-color)" strokeWidth="2.8" />
-        <circle cx="160" cy="300" r="123" fill="none" stroke="var(--tier-color)" strokeWidth="1.3" strokeOpacity="0.5" />
+        <circle cx="160" cy="300" r="135" fill={`url(#bjMedallion-${id})`} stroke={tier.color} strokeWidth="2.8" />
+        <circle cx="160" cy="300" r="123" fill="none" stroke={tier.color} strokeWidth="1.3" strokeOpacity="0.5" />
 
         <text x="160" y="490" textAnchor="middle" fontFamily="Unbounded, sans-serif" fontWeight="900" fontSize="22" fill="#f4f4f5">
           {team.name.toUpperCase()}
         </text>
 
-        <FrameChrome />
+        <FrameChrome tier={tier} />
       </svg>
       <div style={rifleStyle("rotate(-45deg)")} />
       <div style={rifleStyle("rotate(45deg) scaleX(-1)")} />
@@ -407,12 +398,12 @@ const DOTA_HEX_INNER = "160,9 315,48 315,552 160,591 5,552 5,48";
 // Шестикутна "рунний камінь" рамка Dota-карток (перед+зад) — інша геометрія,
 // ніж FrameChrome (CS2, прямокутник) і ValorantFrame (восьмикутник). Самоцвіт
 // зверху й знизу, ромбові шипи на всіх 6 вершинах.
-function DotaFrame() {
+function DotaFrame({ tier }) {
   return (
     <>
-      <polygon points={DOTA_HEX} fill="none" stroke="var(--tier-color)" strokeWidth="var(--tier-width)" />
-      <polygon points={DOTA_HEX_INNER} fill="none" stroke="var(--tier-color)" strokeWidth="1" strokeOpacity="0.4" />
-      <g fill="var(--tier-color)">
+      <polygon points={DOTA_HEX} fill="none" stroke={tier.color} strokeWidth={tier.width} />
+      <polygon points={DOTA_HEX_INNER} fill="none" stroke={tier.color} strokeWidth="1" strokeOpacity="0.4" />
+      <g fill={tier.color}>
         <rect x="155.5" y="-4.5" width="9" height="9" transform="rotate(45 160 0)" />
         <rect x="315.5" y="35.5" width="9" height="9" transform="rotate(45 320 40)" />
         <rect x="315.5" y="555.5" width="9" height="9" transform="rotate(45 320 560)" />
@@ -420,15 +411,15 @@ function DotaFrame() {
         <rect x="-4.5" y="555.5" width="9" height="9" transform="rotate(45 0 560)" />
         <rect x="-4.5" y="35.5" width="9" height="9" transform="rotate(45 0 40)" />
       </g>
-      <circle cx="160" cy="16" r="7" fill="#1a0a08" stroke="var(--tier-color)" strokeWidth="1.4" />
-      <path d="M160,11 L163,16 L160,21 L157,16 Z" fill="var(--tier-color)" />
+      <circle cx="160" cy="16" r="7" fill="#1a0a08" stroke={tier.color} strokeWidth="1.4" />
+      <path d="M160,11 L163,16 L160,21 L157,16 Z" fill={tier.color} />
     </>
   );
 }
 
-const dotaHexGrid = (id, opacity) => (
+const dotaHexGrid = (id, opacity, color) => (
   <pattern id={id} width="34" height="30" patternUnits="userSpaceOnUse">
-    <polygon points="8.5,0 25.5,0 34,15 25.5,30 8.5,30 0,15" fill="none" stroke="var(--tier-color)" strokeWidth="0.6" strokeOpacity={opacity} />
+    <polygon points="8.5,0 25.5,0 34,15 25.5,30 8.5,30 0,15" fill="none" stroke={color} strokeWidth="0.6" strokeOpacity={opacity} />
   </pattern>
 );
 
@@ -436,7 +427,7 @@ const dotaHexGrid = (id, opacity) => (
 // Dota-перед: шестикутна рамка, Cinzel (антична декоративна засічка — інший
 // характер, ніж Unbounded у CS2 чи Bebas Neue у Valorant), той самий
 // контент-флоу (top:194), що й CardFront/ValorantFront.
-const DotaFront = forwardRef(function DotaFront({ team, rarity, rating, unit, mainPlayers }, ref) {
+const DotaFront = forwardRef(function DotaFront({ team, rarity, rating, unit, mainPlayers, tier }, ref) {
   const id = uid(team);
   return (
     <div ref={ref} style={faceStyle({ background: "transparent" })}>
@@ -448,15 +439,15 @@ const DotaFront = forwardRef(function DotaFront({ team, rarity, rating, unit, ma
           <clipPath id={`dfPortrait-${id}`}>
             <circle cx="160" cy="130" r="46" />
           </clipPath>
-          {dotaHexGrid(`dfHex-${id}`, 0.08)}
+          {dotaHexGrid(`dfHex-${id}`, 0.08, tier.color)}
         </defs>
         <g clipPath={`url(#dfClip-${id})`}>
           <rect width="320" height="600" fill="#1a0a08" />
           <rect width="320" height="600" fill={`url(#dfHex-${id})`} />
         </g>
-        <DotaFrame />
-        <line x1="46" y1="44" x2="274" y2="44" stroke="var(--tier-color)" strokeWidth="1.5" strokeOpacity="0.6" />
-        <circle cx="160" cy="130" r="46" fill="#09090B" stroke="var(--tier-color)" strokeWidth="3.5" />
+        <DotaFrame tier={tier} />
+        <line x1="46" y1="44" x2="274" y2="44" stroke={tier.color} strokeWidth="1.5" strokeOpacity="0.6" />
+        <circle cx="160" cy="130" r="46" fill="#09090B" stroke={tier.color} strokeWidth="3.5" />
         <g clipPath={`url(#dfPortrait-${id})`}>
           {team.logo ? (
             <image href={team.logo} x="114" y="84" width="92" height="92" preserveAspectRatio="xMidYMid slice" />
@@ -465,7 +456,7 @@ const DotaFront = forwardRef(function DotaFront({ team, rarity, rating, unit, ma
           )}
         </g>
         {!team.logo && (
-          <rect x="146" y="116" width="28" height="28" fill="none" stroke="var(--tier-color)" strokeOpacity="0.5" strokeWidth="2" transform="rotate(45 160 130)" />
+          <rect x="146" y="116" width="28" height="28" fill="none" stroke={tier.color} strokeOpacity="0.5" strokeWidth="2" transform="rotate(45 160 130)" />
         )}
       </svg>
 
@@ -524,7 +515,7 @@ const DotaFront = forwardRef(function DotaFront({ team, rarity, rating, unit, ma
           </span>
         </div>
 
-        <div style={{ width: "78%", height: 1, background: "var(--tier-color)", opacity: 0.3, marginTop: 16 }} />
+        <div style={{ width: "78%", height: 1, background: tier.color, opacity: 0.3, marginTop: 16 }} />
 
         <div style={{ fontFamily: "'JetBrains Mono', monospace", fontSize: 9, letterSpacing: "0.15em", color: "#71717a", marginTop: 12 }}>
           СКЛАД · {unit.toUpperCase()}
@@ -563,7 +554,7 @@ const DotaFront = forwardRef(function DotaFront({ team, rarity, rating, unit, ma
             fontWeight: 700,
             letterSpacing: "0.15em",
             fontSize: 14,
-            color: "var(--tier-color)",
+            color: tier.color,
             marginTop: 18,
           }}
         >
@@ -581,7 +572,7 @@ const DotaFront = forwardRef(function DotaFront({ team, rarity, rating, unit, ma
 // інакше проступав би крізь темний медальйон), і ряд реальних іконок
 // атрибутів (Strength/Agility/Intelligence/Universal) під ним, приглушений
 // (opacity 0.55), щоб не конкурувати з Aegis як головним акцентом.
-const DotaBack = forwardRef(function DotaBack({ team }, ref) {
+const DotaBack = forwardRef(function DotaBack({ team, tier }, ref) {
   const id = uid(team);
   return (
     <div ref={ref} style={faceStyle({ transform: "rotateY(180deg)", background: "transparent" })}>
@@ -590,7 +581,7 @@ const DotaBack = forwardRef(function DotaBack({ team }, ref) {
           <clipPath id={`dbClip-${id}`}>
             <polygon points={DOTA_HEX} />
           </clipPath>
-          {dotaHexGrid(`dbHex-${id}`, 0.16)}
+          {dotaHexGrid(`dbHex-${id}`, 0.16, tier.color)}
           <radialGradient id={`dbVig-${id}`} cx="50%" cy="32%" r="75%">
             <stop offset="55%" stopColor="#000" stopOpacity="0" />
             <stop offset="100%" stopColor="#000" stopOpacity="0.55" />
@@ -603,19 +594,19 @@ const DotaBack = forwardRef(function DotaBack({ team }, ref) {
         </defs>
         <g clipPath={`url(#dbClip-${id})`}>
           <rect width="320" height="600" fill="#1a0a08" />
-          <rect width="320" height="600" fill="var(--tier-color)" opacity="var(--tier-grain)" />
+          <rect width="320" height="600" fill={tier.color} opacity={tier.grain} />
           <rect width="320" height="600" fill={`url(#dbHex-${id})`} />
           <rect width="320" height="600" fill={`url(#dbVig-${id})`} />
         </g>
 
-        <DotaFrame />
+        <DotaFrame tier={tier} />
 
-        <text x="160" y="48" textAnchor="middle" fontFamily="Cinzel, serif" fontWeight="700" fontSize="18" letterSpacing="0.15em" fill="var(--tier-color)">
+        <text x="160" y="48" textAnchor="middle" fontFamily="Cinzel, serif" fontWeight="700" fontSize="18" letterSpacing="0.15em" fill={tier.color}>
           DOTA 2
         </text>
 
-        <circle cx="160" cy="290" r="135" fill={`url(#dbSocket-${id})`} stroke="var(--tier-color)" strokeWidth="2.8" />
-        <circle cx="160" cy="290" r="123" fill="none" stroke="var(--tier-color)" strokeWidth="1.3" strokeOpacity="0.5" />
+        <circle cx="160" cy="290" r="135" fill={`url(#dbSocket-${id})`} stroke={tier.color} strokeWidth="2.8" />
+        <circle cx="160" cy="290" r="123" fill="none" stroke={tier.color} strokeWidth="1.3" strokeOpacity="0.5" />
       </svg>
 
       <img
@@ -631,7 +622,7 @@ const DotaBack = forwardRef(function DotaBack({ team }, ref) {
           objectFit: "contain",
           WebkitMaskImage: "radial-gradient(ellipse 58% 58% at center, black 45%, transparent 82%)",
           maskImage: "radial-gradient(ellipse 58% 58% at center, black 45%, transparent 82%)",
-          filter: "drop-shadow(0 0 10px var(--tier-glow))",
+          filter: `drop-shadow(0 0 10px ${tier.glow})`,
         }}
       />
 
@@ -667,16 +658,16 @@ const VALORANT_OCTAGON = "26,0 294,0 320,26 320,574 294,600 26,600 0,574 0,26";
 // Восьмикутна рамка Valorant-карток (перед+зад) — інша геометрія, ніж
 // FrameChrome (прямокутник з кутовими скобами) для CS2/Dota, тому окрема
 // функція, а не параметризація тієї самої.
-function ValorantFrame() {
+function ValorantFrame({ tier }) {
   return (
     <>
-      <g stroke="var(--tier-color)" strokeWidth="1.8">
+      <g stroke={tier.color} strokeWidth="1.8">
         <line x1="18" y1="36" x2="18" y2="48" />
         <line x1="302" y1="36" x2="302" y2="48" />
         <line x1="18" y1="552" x2="18" y2="564" />
         <line x1="302" y1="552" x2="302" y2="564" />
       </g>
-      <polygon points={VALORANT_OCTAGON} fill="none" stroke="var(--tier-color)" strokeWidth="var(--tier-width)" />
+      <polygon points={VALORANT_OCTAGON} fill="none" stroke={tier.color} strokeWidth={tier.width} />
     </>
   );
 }
@@ -687,7 +678,7 @@ function ValorantFrame() {
 // замість трапеції під назвою команди. Той самий контент-флоу (top:196), що
 // й CardFront, — той самий клас багу з накладанням ростера вже виключено.
 const ValorantFront = forwardRef(function ValorantFront(
-  { team, rarity, rating, unit, mainPlayers },
+  { team, rarity, rating, unit, mainPlayers, tier },
   ref
 ) {
   const id = uid(team);
@@ -702,17 +693,17 @@ const ValorantFront = forwardRef(function ValorantFront(
             <circle cx="160" cy="130" r="46" />
           </clipPath>
           <pattern id={`vfShard-${id}`} width="52" height="52" patternUnits="userSpaceOnUse" patternTransform="rotate(-25)">
-            <rect x="0" width="6" height="52" fill="var(--tier-color)" opacity="0.06" />
-            <rect x="26" width="3" height="52" fill="var(--tier-color)" opacity="0.04" />
+            <rect x="0" width="6" height="52" fill={tier.color} opacity="0.06" />
+            <rect x="26" width="3" height="52" fill={tier.color} opacity="0.04" />
           </pattern>
         </defs>
         <g clipPath={`url(#vfClip-${id})`}>
           <rect width="320" height="600" fill="#170a17" />
           <rect width="320" height="600" fill={`url(#vfShard-${id})`} />
         </g>
-        <ValorantFrame />
-        <line x1="46" y1="44" x2="274" y2="44" stroke="var(--tier-color)" strokeWidth="1.5" strokeOpacity="0.6" />
-        <circle cx="160" cy="130" r="46" fill="#09090B" stroke="var(--tier-color)" strokeWidth="3.5" />
+        <ValorantFrame tier={tier} />
+        <line x1="46" y1="44" x2="274" y2="44" stroke={tier.color} strokeWidth="1.5" strokeOpacity="0.6" />
+        <circle cx="160" cy="130" r="46" fill="#09090B" stroke={tier.color} strokeWidth="3.5" />
         <g clipPath={`url(#vfPortrait-${id})`}>
           {team.logo ? (
             <image href={team.logo} x="114" y="84" width="92" height="92" preserveAspectRatio="xMidYMid slice" />
@@ -721,7 +712,7 @@ const ValorantFront = forwardRef(function ValorantFront(
           )}
         </g>
         {!team.logo && (
-          <rect x="146" y="116" width="28" height="28" fill="none" stroke="var(--tier-color)" strokeOpacity="0.5" strokeWidth="2" transform="rotate(45 160 130)" />
+          <rect x="146" y="116" width="28" height="28" fill="none" stroke={tier.color} strokeOpacity="0.5" strokeWidth="2" transform="rotate(45 160 130)" />
         )}
       </svg>
 
@@ -745,8 +736,8 @@ const ValorantFront = forwardRef(function ValorantFront(
           style={{
             fontFamily: "'Bebas Neue', sans-serif",
             fontSize: 34,
-            color: "var(--tier-color)",
-            textShadow: "0 0 10px var(--tier-glow)",
+            color: tier.color,
+            textShadow: `0 0 10px ${tier.glow}`,
             lineHeight: 1,
           }}
         >
@@ -778,7 +769,7 @@ const ValorantFront = forwardRef(function ValorantFront(
           </span>
         </div>
 
-        <div style={{ width: "80%", height: 1, background: "var(--tier-color)", opacity: 0.3, marginTop: 16 }} />
+        <div style={{ width: "80%", height: 1, background: tier.color, opacity: 0.3, marginTop: 16 }} />
 
         <div style={{ fontFamily: "'JetBrains Mono', monospace", fontSize: 9, letterSpacing: "0.15em", color: "#71717a", marginTop: 12 }}>
           СКЛАД · {unit.toUpperCase()}
@@ -803,7 +794,7 @@ const ValorantFront = forwardRef(function ValorantFront(
                 </div>
                 <div style={{ fontFamily: "'IBM Plex Sans'", fontSize: 10, color: "#71717a", lineHeight: 1.3 }}>{p.role}</div>
               </div>
-              <span style={{ fontFamily: "'JetBrains Mono'", fontSize: 13, color: "var(--tier-color)" }}>
+              <span style={{ fontFamily: "'JetBrains Mono'", fontSize: 13, color: tier.color }}>
                 {effectivePlayerRank(team.discipline, p)}
               </span>
             </div>
@@ -817,8 +808,8 @@ const ValorantFront = forwardRef(function ValorantFront(
             fontFamily: "'Bebas Neue', sans-serif",
             letterSpacing: "0.12em",
             fontSize: 15,
-            color: "var(--tier-color)",
-            border: "1.5px solid var(--tier-color)",
+            color: tier.color,
+            border: `1.5px solid ${tier.color}`,
             borderRadius: 2,
             padding: "6px 22px",
           }}
@@ -836,7 +827,7 @@ const ValorantFront = forwardRef(function ValorantFront(
 // напівпрозоро — усі реальні PNG з Riot's Asset Kit / Valorant Fandom wiki
 // (дозволено користувачем для цього некомерційного навчального проєкту),
 // перефарбовані в колір рідкості через CSS mask-image.
-const ValorantBack = forwardRef(function ValorantBack({ team }, ref) {
+const ValorantBack = forwardRef(function ValorantBack({ team, tier }, ref) {
   const id = uid(team);
   const maskStyle = (url, extra) => ({
     position: "absolute",
@@ -848,7 +839,7 @@ const ValorantBack = forwardRef(function ValorantBack({ team }, ref) {
     maskRepeat: "no-repeat",
     WebkitMaskPosition: "center",
     maskPosition: "center",
-    background: "var(--tier-color)",
+    background: tier.color,
     ...extra,
   });
 
@@ -860,7 +851,7 @@ const ValorantBack = forwardRef(function ValorantBack({ team }, ref) {
             <polygon points={VALORANT_OCTAGON} />
           </clipPath>
           <pattern id={`vbHex-${id}`} width="34" height="30" patternUnits="userSpaceOnUse">
-            <polygon points="8.5,0 25.5,0 34,15 25.5,30 8.5,30 0,15" fill="none" stroke="var(--tier-color)" strokeWidth="0.6" strokeOpacity="0.2" />
+            <polygon points="8.5,0 25.5,0 34,15 25.5,30 8.5,30 0,15" fill="none" stroke={tier.color} strokeWidth="0.6" strokeOpacity="0.2" />
           </pattern>
           <radialGradient id={`vbVig-${id}`} cx="50%" cy="38%" r="70%">
             <stop offset="55%" stopColor="#000" stopOpacity="0" />
@@ -869,11 +860,11 @@ const ValorantBack = forwardRef(function ValorantBack({ team }, ref) {
         </defs>
         <g clipPath={`url(#vbClip-${id})`}>
           <rect width="320" height="600" fill="#170a17" />
-          <rect width="320" height="600" fill="var(--tier-color)" opacity="var(--tier-grain)" />
+          <rect width="320" height="600" fill={tier.color} opacity={tier.grain} />
           <rect width="320" height="600" fill={`url(#vbHex-${id})`} />
           <rect width="320" height="600" fill={`url(#vbVig-${id})`} />
         </g>
-        <ValorantFrame />
+        <ValorantFrame tier={tier} />
       </svg>
 
       <div style={maskStyle(blastpackUrl, { left: 52, top: 120, width: 34, height: 34, opacity: 0.16, transform: "rotate(-12deg)" })} />
@@ -888,7 +879,7 @@ const ValorantBack = forwardRef(function ValorantBack({ team }, ref) {
           width: 150,
           height: 150,
           transform: "translate(-50%,-50%)",
-          filter: "drop-shadow(0 0 16px var(--tier-glow))",
+          filter: `drop-shadow(0 0 16px ${tier.glow})`,
         })}
       />
 
@@ -903,7 +894,7 @@ const ValorantBack = forwardRef(function ValorantBack({ team }, ref) {
           fontWeight: 700,
           fontSize: 16,
           letterSpacing: "0.22em",
-          color: "var(--tier-color)",
+          color: tier.color,
         }}
       >
         VALORANT
@@ -946,7 +937,7 @@ const DISCIPLINE_BACK = { CS2: CS2Back, "Dota 2": DotaBack, Valorant: ValorantBa
 // Заглушка на випадок нової дисципліни без власного дизайну заду (наразі всі
 // три наявні дисципліни мають власний зад). Та сама рамка й тільки лого +
 // назва команди, без гри-специфічної символіки.
-const GenericBack = forwardRef(function GenericBack({ team }, ref) {
+const GenericBack = forwardRef(function GenericBack({ team, tier }, ref) {
   const id = uid(team);
   return (
     <div ref={ref} style={faceStyle({ transform: "rotateY(180deg)", background: "transparent" })}>
@@ -957,8 +948,8 @@ const GenericBack = forwardRef(function GenericBack({ team }, ref) {
           </clipPath>
         </defs>
         <rect width="320" height="600" fill="#0a0a0c" />
-        <rect width="320" height="600" fill="var(--tier-color)" opacity="var(--tier-grain)" />
-        <circle cx="160" cy="300" r="90" fill="#09090B" stroke="var(--tier-color)" strokeWidth="3" />
+        <rect width="320" height="600" fill={tier.color} opacity={tier.grain} />
+        <circle cx="160" cy="300" r="90" fill="#09090B" stroke={tier.color} strokeWidth="3" />
         <g clipPath={`url(#gjClip-${id})`}>
           {team.logo ? (
             <image href={team.logo} x="70" y="210" width="180" height="180" preserveAspectRatio="xMidYMid slice" />
@@ -969,10 +960,10 @@ const GenericBack = forwardRef(function GenericBack({ team }, ref) {
         <text x="160" y="450" textAnchor="middle" fontFamily="Unbounded, sans-serif" fontWeight="900" fontSize="20" fill="#f4f4f5">
           {team.name.toUpperCase()}
         </text>
-        <text x="160" y="475" textAnchor="middle" fontFamily="JetBrains Mono, monospace" fontSize="11" letterSpacing="0.2em" fill="var(--tier-color)">
+        <text x="160" y="475" textAnchor="middle" fontFamily="JetBrains Mono, monospace" fontSize="11" letterSpacing="0.2em" fill={tier.color}>
           {team.discipline.toUpperCase()}
         </text>
-        <FrameChrome />
+        <FrameChrome tier={tier} />
       </svg>
     </div>
   );
