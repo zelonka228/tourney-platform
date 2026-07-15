@@ -193,7 +193,7 @@ const faceStyle = (extra) => ({
 const CardFront = forwardRef(function CardFront({ team, rarity, rating, unit, mainPlayers }, ref) {
   const id = uid(team);
   return (
-    <div ref={ref} style={faceStyle({ background: "#0c0c0e" })}>
+    <div ref={ref} style={faceStyle({ background: "transparent" })}>
       <svg viewBox="0 0 320 600" width="100%" height="100%">
         <defs>
           <clipPath id={`fjClip-${id}`}>
@@ -350,7 +350,7 @@ const CS2Back = forwardRef(function CS2Back({ team }, ref) {
   });
 
   return (
-    <div ref={ref} style={faceStyle({ transform: "rotateY(180deg)", background: "#0a0a0c" })}>
+    <div ref={ref} style={faceStyle({ transform: "rotateY(180deg)", background: "transparent" })}>
       <svg viewBox="0 0 320 600" width="100%" height="100%">
         <defs>
           <radialGradient id={`bjVig-${id}`} cx="50%" cy="30%" r="75%">
@@ -432,7 +432,7 @@ const dotaHexGrid = (id, opacity) => (
 const DotaFront = forwardRef(function DotaFront({ team, rarity, rating, unit, mainPlayers }, ref) {
   const id = uid(team);
   return (
-    <div ref={ref} style={faceStyle({ background: "#1a0a08" })}>
+    <div ref={ref} style={faceStyle({ background: "transparent" })}>
       <svg viewBox="0 0 320 600" width="100%" height="100%">
         <defs>
           <clipPath id={`dfClip-${id}`}>
@@ -577,7 +577,7 @@ const DotaFront = forwardRef(function DotaFront({ team, rarity, rating, unit, ma
 const DotaBack = forwardRef(function DotaBack({ team }, ref) {
   const id = uid(team);
   return (
-    <div ref={ref} style={faceStyle({ transform: "rotateY(180deg)", background: "#1a0a08" })}>
+    <div ref={ref} style={faceStyle({ transform: "rotateY(180deg)", background: "transparent" })}>
       <svg viewBox="0 0 320 600" width="100%" height="100%">
         <defs>
           <clipPath id={`dbClip-${id}`}>
@@ -685,7 +685,7 @@ const ValorantFront = forwardRef(function ValorantFront(
 ) {
   const id = uid(team);
   return (
-    <div ref={ref} style={faceStyle({ background: "#170a17" })}>
+    <div ref={ref} style={faceStyle({ background: "transparent" })}>
       <svg viewBox="0 0 320 600" width="100%" height="100%">
         <defs>
           <clipPath id={`vfClip-${id}`}>
@@ -841,7 +841,7 @@ const ValorantBack = forwardRef(function ValorantBack({ team }, ref) {
   });
 
   return (
-    <div ref={ref} style={faceStyle({ transform: "rotateY(180deg)", background: "#170a17" })}>
+    <div ref={ref} style={faceStyle({ transform: "rotateY(180deg)", background: "transparent" })}>
       <svg viewBox="0 0 320 600" width="100%" height="100%">
         <defs>
           <clipPath id={`vbClip-${id}`}>
@@ -937,7 +937,7 @@ const DISCIPLINE_BACK = { CS2: CS2Back, "Dota 2": DotaBack, Valorant: ValorantBa
 const GenericBack = forwardRef(function GenericBack({ team }, ref) {
   const id = uid(team);
   return (
-    <div ref={ref} style={faceStyle({ transform: "rotateY(180deg)", background: "#0a0a0c" })}>
+    <div ref={ref} style={faceStyle({ transform: "rotateY(180deg)", background: "transparent" })}>
       <svg viewBox="0 0 320 600" width="100%" height="100%">
         <defs>
           <clipPath id={`gjClip-${id}`}>
