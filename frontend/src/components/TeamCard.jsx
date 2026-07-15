@@ -197,7 +197,7 @@ const CardFront = forwardRef(function CardFront({ team, rarity, rating, unit, ma
         </defs>
         <rect width="320" height="600" fill="#0c0c0e" />
         <FrameChrome />
-        <polygon points="40,30 280,30 262,58 58,58" fill="#100e08" stroke="var(--tier-color)" strokeWidth="2" />
+        <line x1="46" y1="44" x2="274" y2="44" stroke="var(--tier-color)" strokeWidth="1.5" strokeOpacity="0.6" />
         <circle cx="160" cy="130" r="46" fill="#09090B" stroke="var(--tier-color)" strokeWidth="3.5" />
         <g clipPath={`url(#fjClip-${id})`}>
           {team.logo ? (
@@ -211,24 +211,24 @@ const CardFront = forwardRef(function CardFront({ team, rarity, rating, unit, ma
         )}
       </svg>
 
-      <div
-        style={{
-          position: "absolute",
-          top: 36,
-          left: 0,
-          right: 0,
-          textAlign: "center",
-          fontFamily: "'Unbounded', sans-serif",
-          fontWeight: 800,
-          fontSize: 16,
-          color: "#f4f4f5",
-          padding: "0 62px",
-          overflow: "hidden",
-          textOverflow: "ellipsis",
-          whiteSpace: "nowrap",
-        }}
-      >
-        {team.name.toUpperCase()}
+      <div style={{ position: "absolute", top: 34, left: 0, right: 0, textAlign: "center" }}>
+        <span
+          style={{
+            display: "inline-block",
+            maxWidth: 220,
+            overflow: "hidden",
+            textOverflow: "ellipsis",
+            whiteSpace: "nowrap",
+            background: "#0c0c0e",
+            padding: "0 14px",
+            fontFamily: "'Unbounded', sans-serif",
+            fontWeight: 800,
+            fontSize: 16,
+            color: "#f4f4f5",
+          }}
+        >
+          {team.name.toUpperCase()}
+        </span>
       </div>
 
       <div style={{ position: "absolute", left: 0, right: 0, top: 196, display: "flex", flexDirection: "column", alignItems: "center" }}>
