@@ -16,6 +16,11 @@ import { attachUser } from "./auth.js";
 import { notFound, errorHandler } from "./http.js";
 
 const app = express();
+// Render (and most PaaS hosts) sit behind a reverse proxy — without this,
+// express-rate-limit can't tell real client IPs apart (X-Forwarded-For is
+// present but untrusted) and either mis-attributes every request to the
+// proxy's IP or refuses to start. Harmless locally (no proxy in front).
+app.set("trust proxy", 1);
 app.use(cors());
 // Default express.json() limit is 100kb — too small for team payloads that
 // include a base64 logo (frontend allows data URLs up to ~300kb after JPEG
