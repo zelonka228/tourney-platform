@@ -43,7 +43,6 @@ services:
     runtime: static
     name: tourneyforge-frontend
     rootDir: frontend
-    plan: free
     buildCommand: npm install && npm run build
     staticPublishPath: dist
     envVars:
