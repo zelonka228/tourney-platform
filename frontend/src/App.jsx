@@ -29,7 +29,7 @@ function LangSwitch() {
       className="flex items-center border border-[#27272a] rounded-sm overflow-hidden"
       data-testid="lang-switch"
     >
-      {["ua", "en"].map((l) => (
+      {["ua", "ru", "en"].map((l) => (
         <button
           key={l}
           data-testid={`lang-switch-${l}`}
