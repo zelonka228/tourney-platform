@@ -9,6 +9,7 @@
     "db:push": "prisma db push",
     "db:seed": "node prisma/seed.js",
     "db:generate": "prisma generate",
+    "build": "prisma generate --schema=prisma/schema.production.prisma && prisma db push --schema=prisma/schema.production.prisma --accept-data-loss",
     "test": "node test-api.js"
   },
   "dependencies": {

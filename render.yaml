@@ -1,0 +1,60 @@
+# Render Blueprint — deploys backend (Node web service), frontend (static
+# site) and a free PostgreSQL database from this one repo. See
+# docs/06-deploy-render.md for the step-by-step guide (account creation,
+# connecting the repo, and the one manual env-var edit this needs).
+#
+# Local dev is unaffected: it keeps using SQLite (backend/prisma/schema.prisma,
+# DATABASE_URL="file:./dev.db" in backend/.env) exactly as before. This
+# Blueprint targets backend/prisma/schema.production.prisma (PostgreSQL)
+# instead — see that file's header comment for why there are two schemas.
+
+databases:
+  - name: tourneyforge-db
+    plan: free
+    databaseName: tourneyforge
+    user: tourneyforge
+
+services:
+  - type: web
+    name: tourneyforge-backend
+    runtime: node
+    rootDir: backend
+    plan: free
+    buildCommand: npm install && npm run build
+    startCommand: npm start
+    healthCheckPath: /api/health
+    envVars:
+      - key: DATABASE_URL
+        fromDatabase:
+          name: tourneyforge-db
+          property: connectionString
+      - key: JWT_SECRET
+        generateValue: true
+      # Optional — CS2/Valorant live player-stats widget. Leave blank to
+      # skip; the feature degrades to a clean 503 without them (see
+      # docs/02-week2-spec.md and backend/.env.example for where to get
+      # free keys). Fill in later from the Render dashboard if wanted.
+      - key: FACEIT_API_KEY
+        sync: false
+      - key: VALORANT_API_KEY
+        sync: false
+
+  - type: web
+    runtime: static
+    name: tourneyforge-frontend
+    rootDir: frontend
+    plan: free
+    buildCommand: npm install && npm run build
+    staticPublishPath: dist
+    envVars:
+      # Vite bakes this in at BUILD time, not runtime — it can't be filled
+      # automatically from the backend service the way DATABASE_URL is
+      # above (no protocol-aware "url" property in Render's fromService).
+      # Set it to the backend's real URL after the first deploy, then
+      # trigger a manual redeploy of THIS service — see the deploy doc.
+      - key: VITE_API_URL
+        sync: false
+    routes:
+      - type: rewrite
+        source: /*
+        destination: /index.html

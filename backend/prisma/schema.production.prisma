@@ -1,0 +1,111 @@
+// Production mirror of schema.prisma — identical models, PostgreSQL provider.
+// Prisma's `datasource.provider` can't be switched via env var (only `url`
+// can), so a hosted deploy (Render, Railway, ...) needs its own schema file.
+// IMPORTANT: any model change in schema.prisma must be copied here too —
+// there is no single source of truth across the two providers.
+
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+model User {
+  id            Int      @id @default(autoincrement())
+  username      String   @unique
+  usernameLower String   @unique
+  passwordHash  String
+  role          String
+  bio           String?
+  avatar        String?
+  createdAt     DateTime @default(now())
+}
+
+model Team {
+  id             Int      @id @default(autoincrement())
+  name           String   @unique
+  discipline     String
+  logo           String?
+  winrate        String?
+  streak         String?
+  tournaments    Int      @default(0)
+  best           String?
+  rarityOverride String?
+  createdAt      DateTime @default(now())
+  updatedAt      DateTime @default(now()) @updatedAt
+
+  players         Player[]
+  tournamentTeams TournamentTeam[]
+  ratingHistory   RatingHistory[]
+}
+
+model Player {
+  id           Int     @id @default(autoincrement())
+  teamId       Int
+  nick         String
+  role         String
+  rank         String
+  isSubstitute Boolean @default(false)
+
+  externalRef     String?
+  externalStats   String?
+  externalStatsAt DateTime?
+
+  team Team @relation(fields: [teamId], references: [id], onDelete: Cascade)
+}
+
+model Tournament {
+  id          Int      @id @default(autoincrement())
+  name        String
+  discipline  String
+  bracketType String
+  matchFormat Int
+  status      String   @default("draft")
+  date        String?
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @default(now()) @updatedAt
+
+  teams   TournamentTeam[]
+  matches Match[]
+}
+
+model TournamentTeam {
+  id           Int @id @default(autoincrement())
+  tournamentId Int
+  teamId       Int
+  seed         Int
+
+  tournament Tournament @relation(fields: [tournamentId], references: [id], onDelete: Cascade)
+  team       Team       @relation(fields: [teamId], references: [id], onDelete: Cascade)
+
+  @@unique([tournamentId, teamId])
+}
+
+model Match {
+  id           Int    @id @default(autoincrement())
+  tournamentId Int
+  round        Int
+  position     Int
+  teamAId      Int?
+  teamBId      Int?
+  scoreA       Int?
+  scoreB       Int?
+  status       String @default("pending")
+  bracket      String @default("winners")
+
+  tournament Tournament @relation(fields: [tournamentId], references: [id], onDelete: Cascade)
+}
+
+model RatingHistory {
+  id           Int      @id @default(autoincrement())
+  teamId       Int
+  matchId      Int?
+  ratingBefore Int
+  ratingAfter  Int
+  createdAt    DateTime @default(now())
+
+  team Team @relation(fields: [teamId], references: [id], onDelete: Cascade)
+}

@@ -284,6 +284,8 @@ npm test
 - [docs/02-week2-spec.md](docs/02-week2-spec.md) — контракт схеми БД та REST API.
 - [docs/03-double-elimination-spec.md](docs/03-double-elimination-spec.md) — специфікація подвійного вибування.
 - [docs/04-rpg-card-spec.md](docs/04-rpg-card-spec.md) — специфікація RPG-картки команди.
+- [docs/05-auth-registration-spec.md](docs/05-auth-registration-spec.md) — реєстрація, ролі, особистий кабінет, адмінка.
+- [docs/06-deploy-render.md](docs/06-deploy-render.md) — деплой на Render.com (безкоштовний хостинг).
 
 Академічні деліверабли практики (звіт, календарний графік, щоденники) до репозиторію не входять — ведуться окремо.
 
