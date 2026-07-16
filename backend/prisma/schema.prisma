@@ -10,14 +10,19 @@ datasource db {
   url      = env("DATABASE_URL")
 }
 
-// Two fixed demo accounts (seeded, no self-registration) — "admin" can create/
-// edit/delete teams, tournaments and match scores; "user" is read-only.
+// Self-registration allowed (role always "user" on signup); "admin" promotes
+// accounts to "organizer" (same create/edit/delete rights over teams,
+// tournaments and match scores as "admin", minus account management and
+// rarityOverride) or "admin" itself via /api/admin/users.
 model User {
-  id           Int      @id @default(autoincrement())
-  username     String   @unique
-  passwordHash String
-  role         String // "admin" | "user"
-  createdAt    DateTime @default(now())
+  id            Int      @id @default(autoincrement())
+  username      String   @unique
+  usernameLower String   @unique // username.toLowerCase(), enforces case-insensitive uniqueness (SQLite has no Prisma `mode: "insensitive"`)
+  passwordHash  String
+  role          String // "admin" | "organizer" | "user"
+  bio           String?
+  avatar        String? // base64 dataURL, same convention as Team.logo
+  createdAt     DateTime @default(now())
 }
 
 model Team {
@@ -29,6 +34,7 @@ model Team {
   streak      String?
   tournaments Int      @default(0)
   best        String?
+  rarityOverride String? // "Common" | "Rare" | "Epic" | "Legendary" | null (null = auto from best/tournaments)
   createdAt   DateTime @default(now())
   updatedAt   DateTime @default(now()) @updatedAt
 

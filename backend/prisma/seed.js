@@ -5,11 +5,16 @@ import bcrypt from "bcryptjs";
 
 const prisma = new PrismaClient();
 
-// Two fixed demo accounts — deliberately simple passwords for a learning
-// project with no self-registration, not meant to gate anything sensitive.
+// Three fixed demo accounts — deliberately simple passwords for a learning
+// project (self-registration is now allowed too, but these still cover the
+// three roles for manual testing without registering a fresh account).
+// Admin/User passwords predate the complexity rules in src/password.js and
+// stay as-is (this script writes directly via Prisma, bypassing that
+// validation entirely); Organizer's password satisfies them for reference.
 const USERS = [
   { username: "Admin", password: "admin", role: "admin" },
   { username: "User", password: "user", role: "user" },
+  { username: "Organizer", password: "Organizer1", role: "organizer" },
 ];
 
 // Лого команд — inline SVG data URI, геометрична емблема під назву команди
@@ -210,7 +215,12 @@ async function main() {
 
   for (const u of USERS) {
     await prisma.user.create({
-      data: { username: u.username, role: u.role, passwordHash: await bcrypt.hash(u.password, 10) },
+      data: {
+        username: u.username,
+        usernameLower: u.username.toLowerCase(),
+        role: u.role,
+        passwordHash: await bcrypt.hash(u.password, 10),
+      },
     });
   }
 

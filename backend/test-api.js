@@ -64,6 +64,7 @@ async function main() {
   const blocked = await call("POST", "/api/teams", { name: "ShouldBeBlocked", discipline: "CS2" });
   ok(blocked.status === 401, "POST /api/teams without a token → 401");
   authToken = unauthed;
+  const adminToken = authToken;
 
   // --- Teams: happy path ---
   const created = await call("POST", "/api/teams", {
@@ -422,6 +423,99 @@ async function main() {
     await call("DELETE", `/api/tournaments/${deId}`);
     for (const id of teamIds) await call("DELETE", `/api/teams/${id}`);
   }
+
+  // --- Registration, roles (organizer), account management ---
+  authToken = null;
+  const rand = Math.floor(Math.random() * 1e9);
+  const regUsername = `qaUser${rand}`;
+
+  const weakPw = await call("POST", "/api/auth/register", {
+    username: regUsername,
+    password: "alllowercase1",
+  });
+  ok(weakPw.status === 400, "POST /api/auth/register without an uppercase letter → 400");
+
+  const regResp = await call("POST", "/api/auth/register", {
+    username: regUsername,
+    password: "Str0ngPass",
+  });
+  ok(
+    regResp.status === 201 && regResp.data?.token && regResp.data?.user?.role === "user",
+    "POST /api/auth/register → 201, role user"
+  );
+  const userToken = regResp.data?.token;
+  const userId = regResp.data?.user?.id;
+
+  const dupReg = await call("POST", "/api/auth/register", {
+    username: regUsername.toUpperCase(),
+    password: "Str0ngPass",
+  });
+  ok(dupReg.status === 409, "POST /api/auth/register with a case-different duplicate username → 409");
+
+  // Freshly registered user is read-only, same as the seeded "User" account.
+  authToken = userToken;
+  const userBlocked = await call("POST", "/api/teams", { name: "ShouldBeBlocked2", discipline: "CS2" });
+  ok(userBlocked.status === 403, "POST /api/teams as a plain user → 403");
+
+  // Admin promotes them to organizer via /api/admin/users.
+  authToken = adminToken;
+  const promoted = await call("PUT", `/api/admin/users/${userId}`, { role: "organizer" });
+  ok(promoted.status === 200 && promoted.data?.role === "organizer", "PUT /api/admin/users/:id role→organizer → 200");
+
+  // organizer gets full team/tournament/match rights...
+  authToken = userToken;
+  const orgLogin = await call("POST", "/api/auth/login", { username: regUsername, password: "Str0ngPass" });
+  authToken = orgLogin.data?.token; // fresh token carries the new role
+  const orgTeam = await call("POST", "/api/teams", {
+    name: `Org Squad ${rand}`,
+    discipline: "CS2",
+    players: [{ nick: "o1", role: "IGL", rank: "1500" }],
+  });
+  ok(orgTeam.status === 201, "organizer: POST /api/teams → 201");
+  const orgTeamId = orgTeam.data?.id;
+
+  const orgTour = await call("POST", "/api/tournaments", {
+    name: `Org Cup ${rand}`,
+    discipline: "CS2",
+    bracketType: "single",
+    matchFormat: 1,
+  });
+  ok(orgTour.status === 201, "organizer: POST /api/tournaments → 201");
+  const orgTourId = orgTour.data?.id;
+
+  // ...but not account management or manual rarity override.
+  const orgUsersList = await call("GET", "/api/admin/users");
+  ok(orgUsersList.status === 403, "organizer: GET /api/admin/users → 403");
+
+  const orgRarity = await call("PUT", `/api/teams/${orgTeamId}`, { rarityOverride: "Legendary" });
+  ok(orgRarity.status === 403, "organizer: PUT /api/teams/:id with rarityOverride → 403");
+
+  authToken = adminToken;
+  const adminRarity = await call("PUT", `/api/teams/${orgTeamId}`, { rarityOverride: "Legendary" });
+  ok(
+    adminRarity.status === 200 && adminRarity.data?.rarityOverride === "Legendary",
+    "admin: PUT /api/teams/:id with rarityOverride → 200, applied"
+  );
+
+  await call("DELETE", `/api/tournaments/${orgTourId}`);
+  await call("DELETE", `/api/teams/${orgTeamId}`);
+
+  // Account deletion guardrails: can't delete yourself, can't delete the
+  // last remaining admin.
+  const selfDelete = await call("DELETE", `/api/admin/users/${(await call("GET", "/api/auth/me")).data.user.id}`);
+  ok(selfDelete.status === 409, "admin: DELETE /api/admin/users/:id on self → 409");
+
+  const onlyAdmin = await call("GET", "/api/admin/users");
+  const adminIds = onlyAdmin.data.filter((u) => u.role === "admin").map((u) => u.id);
+  if (adminIds.length === 1) {
+    const lastAdminDelete = await call("DELETE", `/api/admin/users/${adminIds[0]}`);
+    ok(lastAdminDelete.status === 409, "admin: DELETE last remaining admin → 409");
+  }
+
+  const userDelete = await call("DELETE", `/api/admin/users/${userId}`);
+  ok(userDelete.status === 204, "admin: DELETE /api/admin/users/:id (regular user) → 204");
+
+  authToken = adminToken;
 
   // --- Cleanup ---
   const delTour = await call("DELETE", `/api/tournaments/${tourId}`);

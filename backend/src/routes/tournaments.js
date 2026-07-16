@@ -5,7 +5,7 @@ import { DISCIPLINES } from "../rating.js";
 import { buildBracketRows, buildLosersBracketRows, buildFinalRows, isPowerOfTwo } from "../bracket.js";
 import { resolveByes } from "../advance.js";
 import { asyncHandler, requireFields, requireEnum, HttpError, parseId } from "../http.js";
-import { requireAdmin } from "../auth.js";
+import { requireContentManager } from "../auth.js";
 
 const router = Router();
 
@@ -79,7 +79,7 @@ router.get(
 // generates the bracket later via POST .../generate-bracket once satisfied.
 router.post(
   "/",
-  requireAdmin,
+  requireContentManager,
   asyncHandler(async (req, res) => {
     const { name, discipline, bracketType, matchFormat, teamIds, generateBracket } = req.body ?? {};
 
@@ -128,7 +128,7 @@ router.post(
 // already registered via /register (for when teamIds weren't supplied at creation).
 router.post(
   "/:id/generate-bracket",
-  requireAdmin,
+  requireContentManager,
   asyncHandler(async (req, res) => {
     const id = parseId(req.params.id);
     const tournament = await prisma.tournament.findUnique({
@@ -168,7 +168,7 @@ router.post(
 // anything at that point, and silently accepting it would be misleading.
 router.put(
   "/:id/teams/reorder",
-  requireAdmin,
+  requireContentManager,
   asyncHandler(async (req, res) => {
     const id = parseId(req.params.id);
     const { teamIds } = req.body ?? {};
@@ -214,7 +214,7 @@ router.put(
 // PUT /api/tournaments/:id → update scalar fields (name, status, date, matchFormat, ...)
 router.put(
   "/:id",
-  requireAdmin,
+  requireContentManager,
   asyncHandler(async (req, res) => {
     const id = parseId(req.params.id);
     const { name, discipline, bracketType, matchFormat, status, date } = req.body ?? {};
@@ -251,7 +251,7 @@ router.put(
 // DELETE /api/tournaments/:id → 204 (cascade removes teams/matches)
 router.delete(
   "/:id",
-  requireAdmin,
+  requireContentManager,
   asyncHandler(async (req, res) => {
     const id = parseId(req.params.id);
     const existing = await prisma.tournament.findUnique({ where: { id } });
@@ -264,7 +264,7 @@ router.delete(
 // POST /api/tournaments/:id/register → register a team (seed = count + 1)
 router.post(
   "/:id/register",
-  requireAdmin,
+  requireContentManager,
   asyncHandler(async (req, res) => {
     const id = parseId(req.params.id);
     const { teamId } = req.body ?? {};
@@ -314,7 +314,7 @@ router.post(
 // remaining teams' seeds to stay contiguous (1..n), same as reorder.
 router.delete(
   "/:id/teams/:teamId",
-  requireAdmin,
+  requireContentManager,
   asyncHandler(async (req, res) => {
     const id = parseId(req.params.id);
     const teamId = parseId(req.params.teamId);

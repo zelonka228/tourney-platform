@@ -35,3 +35,15 @@ export function requireAdmin(req, _res, next) {
   if (req.user.role !== "admin") throw new HttpError(403, "Потрібні права адміністратора.");
   next();
 }
+
+// "admin" and "organizer" share the same rights over teams/tournaments/
+// matches — only account management (requireAdmin routes) and a team's
+// rarityOverride field are admin-only beyond this.
+export function requireContentManager(req, _res, next) {
+  if (!SECRET) throw new HttpError(503, "JWT_SECRET не налаштовано на сервері.");
+  if (!req.user) throw new HttpError(401, "Потрібна авторизація.");
+  if (req.user.role !== "admin" && req.user.role !== "organizer") {
+    throw new HttpError(403, "Потрібні права організатора або адміністратора.");
+  }
+  next();
+}

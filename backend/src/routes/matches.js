@@ -5,7 +5,7 @@ import { isValidScore } from "../bracket.js";
 import { advanceWinner, advanceLoser, locateWinnerTarget, locateLoserTarget } from "../advance.js";
 import { avgRating } from "../rating.js";
 import { asyncHandler, requireFields, HttpError, parseId } from "../http.js";
-import { requireAdmin } from "../auth.js";
+import { requireContentManager } from "../auth.js";
 
 const router = Router();
 
@@ -17,7 +17,7 @@ const router = Router();
 // champion's stats.
 router.put(
   "/:id/score",
-  requireAdmin,
+  requireContentManager,
   asyncHandler(async (req, res) => {
     const id = parseId(req.params.id);
     const { scoreA, scoreB } = req.body ?? {};
@@ -127,7 +127,7 @@ router.put(
 // here — they're auto-resolved, not a real submitted result.
 router.post(
   "/:id/reset",
-  requireAdmin,
+  requireContentManager,
   asyncHandler(async (req, res) => {
     const id = parseId(req.params.id);
     const match = await prisma.match.findUnique({ where: { id } });

@@ -11,6 +11,7 @@ import tournamentsRouter from "./routes/tournaments.js";
 import matchesRouter from "./routes/matches.js";
 import playersRouter from "./routes/players.js";
 import authRouter from "./routes/auth.js";
+import adminUsersRouter from "./routes/adminUsers.js";
 import { attachUser } from "./auth.js";
 import { notFound, errorHandler } from "./http.js";
 
@@ -25,6 +26,7 @@ app.use(attachUser);
 // --- REST API ---
 app.get("/api/health", (_req, res) => res.json({ ok: true }));
 app.use("/api/auth", authRouter);
+app.use("/api/admin/users", adminUsersRouter);
 app.use("/api/teams", teamsRouter);
 app.use("/api/tournaments", tournamentsRouter);
 app.use("/api/matches", matchesRouter);

@@ -3,13 +3,27 @@ import { Router } from "express";
 import prisma from "../db.js";
 import { avgRating, DISCIPLINES } from "../rating.js";
 import { asyncHandler, requireFields, requireEnum, HttpError, parseId } from "../http.js";
-import { requireAdmin } from "../auth.js";
+import { requireContentManager } from "../auth.js";
 
 const router = Router();
 
 const DISCIPLINE_VALUES = Object.keys(DISCIPLINES); // ["CS2", "Dota 2", "Valorant"]
 const NAME_MAX_LEN = 60;
 const NICK_MAX_LEN = 40;
+const RARITY_VALUES = ["Common", "Rare", "Epic", "Legendary"];
+
+// rarityOverride is admin-only even though organizer can edit everything
+// else about a team — checked separately from the requireContentManager
+// gate on the route itself, only when the field is actually present.
+function checkRarityOverridePermission(req, rarityOverride) {
+  if (rarityOverride === undefined) return;
+  if (req.user?.role !== "admin") {
+    throw new HttpError(403, "Ручна зміна рідкості картки доступна лише адміністратору.");
+  }
+  if (rarityOverride !== null && rarityOverride !== "") {
+    requireEnum("rarityOverride", rarityOverride, RARITY_VALUES);
+  }
+}
 
 function checkNameLength(name) {
   if (typeof name === "string" && name.length > NAME_MAX_LEN) {
@@ -102,15 +116,16 @@ router.get(
 // POST /api/teams → create team + nested players
 router.post(
   "/",
-  requireAdmin,
+  requireContentManager,
   asyncHandler(async (req, res) => {
-    const { name, discipline, logo, winrate, streak, tournaments, best, players = [] } =
+    const { name, discipline, logo, winrate, streak, tournaments, best, rarityOverride, players = [] } =
       req.body ?? {};
 
     requireFields(req.body, ["name", "discipline"]);
     requireEnum("discipline", discipline, DISCIPLINE_VALUES);
     checkNameLength(name);
     validatePlayers(players);
+    checkRarityOverridePermission(req, rarityOverride);
 
     const team = await prisma.team.create({
       data: {
@@ -121,6 +136,7 @@ router.post(
         streak,
         ...(tournaments != null ? { tournaments } : {}),
         best,
+        ...(rarityOverride !== undefined ? { rarityOverride: rarityOverride || null } : {}),
         players: {
           create: players.map((p) => ({
             nick: p.nick,
@@ -140,14 +156,15 @@ router.post(
 // PUT /api/teams/:id → update scalar fields; replace roster if players provided
 router.put(
   "/:id",
-  requireAdmin,
+  requireContentManager,
   asyncHandler(async (req, res) => {
     const id = parseId(req.params.id);
-    const { name, discipline, logo, winrate, streak, tournaments, best, players } =
+    const { name, discipline, logo, winrate, streak, tournaments, best, rarityOverride, players } =
       req.body ?? {};
 
     if (discipline !== undefined) requireEnum("discipline", discipline, DISCIPLINE_VALUES);
     if (name !== undefined) checkNameLength(name);
+    checkRarityOverridePermission(req, rarityOverride);
 
     const existing = await prisma.team.findUnique({ where: { id } });
     if (!existing) throw new HttpError(404, "Команду не знайдено.");
@@ -160,6 +177,7 @@ router.put(
       ...(streak !== undefined ? { streak } : {}),
       ...(tournaments !== undefined ? { tournaments } : {}),
       ...(best !== undefined ? { best } : {}),
+      ...(rarityOverride !== undefined ? { rarityOverride: rarityOverride || null } : {}),
     };
 
     if (Array.isArray(players)) {
@@ -188,7 +206,7 @@ router.put(
 // DELETE /api/teams/:id → 204 (cascade handles TournamentTeam/Player/RatingHistory)
 router.delete(
   "/:id",
-  requireAdmin,
+  requireContentManager,
   asyncHandler(async (req, res) => {
     const id = parseId(req.params.id);
     const existing = await prisma.team.findUnique({ where: { id } });
