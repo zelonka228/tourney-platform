@@ -149,6 +149,7 @@ router.post(
       },
       include: { players: true },
     });
+    req.app.get("io").emit("teams:changed");
     res.status(201).json(team);
   })
 );
@@ -199,6 +200,7 @@ router.put(
       data,
       include: { players: true },
     });
+    req.app.get("io").emit("teams:changed");
     res.json(team);
   })
 );
@@ -227,6 +229,7 @@ router.delete(
     }
 
     await prisma.team.delete({ where: { id } });
+    req.app.get("io").emit("teams:changed");
     res.status(204).end();
   })
 );

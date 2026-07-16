@@ -5,6 +5,7 @@ import { useI18n } from "../lib/i18n";
 import { useAuth } from "../lib/auth";
 import { getTeams, getTournaments, getTournament } from "../lib/api";
 import { Btn, Overline, Panel } from "../components/arena";
+import { socket } from "../lib/socket";
 
 const container = { hidden: {}, show: { transition: { staggerChildren: 0.08 } } };
 const item = {
@@ -20,7 +21,7 @@ function useLiveStats() {
   const [stats, setStats] = useState(null);
   useEffect(() => {
     let cancelled = false;
-    (async () => {
+    async function load() {
       const [teams, tournaments] = await Promise.all([getTeams(), getTournaments()]);
       const details = await Promise.all(tournaments.map((t) => getTournament(t.id)));
       const matchesPlayed = details.reduce(
@@ -30,9 +31,14 @@ function useLiveStats() {
       if (!cancelled) {
         setStats({ teams: teams.length, tournaments: tournaments.length, matches: matchesPlayed });
       }
-    })();
+    }
+    load();
+    socket.on("teams:changed", load);
+    socket.on("tournaments:changed", load);
     return () => {
       cancelled = true;
+      socket.off("teams:changed", load);
+      socket.off("tournaments:changed", load);
     };
   }, []);
   return stats;

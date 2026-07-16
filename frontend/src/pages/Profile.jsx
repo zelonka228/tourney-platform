@@ -4,6 +4,7 @@ import { motion } from "framer-motion";
 import { toPng } from "html-to-image";
 import { useI18n } from "../lib/i18n";
 import { getTeams, getPlayerStats } from "../lib/api";
+import { socket } from "../lib/socket";
 import {
   avgRating,
   effectivePlayerRank,
@@ -29,6 +30,9 @@ const rankFormat = (v) => VALORANT_RANKS[Math.max(0, Math.min(Math.round(v), VAL
 
 export function Profile() {
   const { t } = useI18n();
+  // A team id (not an array index) — an index would silently point at the
+  // wrong team (or crash) once live updates start reshuffling `teams` out
+  // from under whoever has a detail view open.
   const [sel, setSel] = useState(null);
   const [teams, setTeams] = useState([]);
   const [query, setQuery] = useState("");
@@ -49,7 +53,19 @@ export function Profile() {
 
   useEffect(() => {
     getTeams().then(setTeams);
+    const onChanged = () => getTeams().then(setTeams);
+    socket.on("teams:changed", onChanged);
+    return () => socket.off("teams:changed", onChanged);
   }, []);
+
+  // If the team currently open in detail view got deleted elsewhere (or by
+  // the local admin panel, which hits the same API), fall back to the list
+  // instead of rendering a stale/undefined team.
+  useEffect(() => {
+    if (sel !== null && teams.length > 0 && !teams.some((tm) => tm.id === sel)) {
+      setSel(null);
+    }
+  }, [sel, teams]);
 
   async function downloadCard(teamName) {
     if (!cardRef.current) return;
@@ -125,7 +141,7 @@ export function Profile() {
                 <motion.button
                   key={team.id}
                   data-testid={`team-card-${i}`}
-                  onClick={() => setSel(i)}
+                  onClick={() => setSel(team.id)}
                   initial={{ opacity: 0, y: 16 }}
                   animate={{ opacity: 1, y: 0 }}
                   transition={{ delay: i * 0.05 }}
@@ -152,7 +168,8 @@ export function Profile() {
     );
   }
 
-  const team = teams[sel];
+  const team = teams.find((tm) => tm.id === sel);
+  if (!team) return null; // brief frame while the reset effect above fires
   const mainPlayers = team.players.filter((p) => !p.isSubstitute);
   const unit = t(`unit.${DISCIPLINES[team.discipline].unitKey}`);
   const rankFor = (p) => liveElo[p.id] ?? effectivePlayerRank(team.discipline, p);

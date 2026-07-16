@@ -4,6 +4,7 @@ import { useI18n } from "../lib/i18n";
 import { getTeams } from "../lib/api";
 import { avgRating, effectivePlayerRank } from "../lib/demo";
 import { Overline, Input } from "../components/arena";
+import { socket } from "../lib/socket";
 
 const TABS = ["all", "CS2", "Dota 2", "Valorant"];
 
@@ -15,6 +16,9 @@ export function Hall() {
 
   useEffect(() => {
     getTeams().then(setTeams);
+    const onChanged = () => getTeams().then(setTeams);
+    socket.on("teams:changed", onChanged);
+    return () => socket.off("teams:changed", onChanged);
   }, []);
 
   const rows = teams

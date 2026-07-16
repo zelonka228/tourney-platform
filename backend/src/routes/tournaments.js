@@ -48,6 +48,21 @@ function buildAllRows(bracketType, teamIds) {
 // just raw teamId foreign keys.
 const TEAMS_WITH_TEAM = { include: { team: true } };
 
+// Two channels, same underlying "something about tournaments changed"
+// event: a global broadcast for list-level pages (Landing stats, the
+// tournament picker) that don't care which tournament, and a room-scoped
+// one for whoever's currently looking at that specific tournament's page
+// (mirrors the existing match:updated room in matches.js). Both are plain
+// "go refetch" signals, not payloads to merge — simpler and always
+// consistent with whatever a GET would return right now.
+function notifyTournamentsChanged(req, tournamentId, extra = {}) {
+  const io = req.app.get("io");
+  io.emit("tournaments:changed");
+  if (tournamentId != null) {
+    io.to(`tournament:${tournamentId}`).emit("tournament:updated", { tournamentId, ...extra });
+  }
+}
+
 // GET /api/tournaments → all tournaments with teams
 router.get(
   "/",
@@ -120,6 +135,7 @@ router.post(
       });
     }
 
+    notifyTournamentsChanged(req, result.id);
     res.status(201).json(result);
   })
 );
@@ -157,6 +173,7 @@ router.post(
       where: { id },
       include: { teams: TEAMS_WITH_TEAM, matches: true },
     });
+    notifyTournamentsChanged(req, id);
     res.status(201).json(updated);
   })
 );
@@ -207,6 +224,7 @@ router.put(
       where: { id },
       include: { teams: TEAMS_WITH_TEAM, matches: true },
     });
+    notifyTournamentsChanged(req, id);
     res.json(updated);
   })
 );
@@ -244,6 +262,7 @@ router.put(
       data,
       include: { teams: TEAMS_WITH_TEAM },
     });
+    notifyTournamentsChanged(req, id);
     res.json(tournament);
   })
 );
@@ -257,6 +276,7 @@ router.delete(
     const existing = await prisma.tournament.findUnique({ where: { id } });
     if (!existing) throw new HttpError(404, "Турнір не знайдено.");
     await prisma.tournament.delete({ where: { id } });
+    notifyTournamentsChanged(req, id, { deleted: true });
     res.status(204).end();
   })
 );
@@ -303,6 +323,7 @@ router.post(
     });
 
     const teams = await prisma.tournamentTeam.findMany({ where: { tournamentId: id } });
+    notifyTournamentsChanged(req, id);
     res.status(201).json(teams);
   })
 );
@@ -339,6 +360,7 @@ router.delete(
     ]);
 
     const updated = await prisma.tournament.findUnique({ where: { id }, include: { teams: TEAMS_WITH_TEAM } });
+    notifyTournamentsChanged(req, id);
     res.json(updated);
   })
 );

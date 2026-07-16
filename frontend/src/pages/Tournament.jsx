@@ -1,9 +1,9 @@
 import { useState, useEffect, useLayoutEffect, useMemo, useRef } from "react";
 import { Link, useParams, useNavigate } from "react-router-dom";
 import { AnimatePresence, animate, motion } from "framer-motion";
-import { io } from "socket.io-client";
 import { useI18n } from "../lib/i18n";
 import { useAuth } from "../lib/auth";
+import { socket } from "../lib/socket";
 import {
   getTournament,
   getTournaments,
@@ -23,8 +23,6 @@ import {
   loserDestination,
 } from "../lib/demo";
 import { Btn, Field, Input, Overline, Panel, Select } from "../components/arena";
-
-const SOCKET_URL = import.meta.env.VITE_API_URL ?? "http://localhost:4000";
 
 function useRoundLabel() {
   const { t } = useI18n();
@@ -748,6 +746,9 @@ function TournamentPicker() {
   const [query, setQuery] = useState("");
   useEffect(() => {
     getTournaments().then(setList);
+    const onChanged = () => getTournaments().then(setList);
+    socket.on("tournaments:changed", onChanged);
+    return () => socket.off("tournaments:changed", onChanged);
   }, []);
   const visible = list?.filter((tm) => tm.name.toLowerCase().includes(query.trim().toLowerCase()));
   return (
@@ -829,10 +830,12 @@ export function Tournament() {
     return () => window.removeEventListener("keydown", onKeyDown);
   }, [edit]);
 
-  useEffect(() => {
-    if (!id) return;
-    setTournament(null);
-    setNotFound(false);
+  // Pulled out so the live tournament:updated handler below can re-run the
+  // exact same fetch (bracket generated, team registered/removed, name or
+  // status edited elsewhere — anything that isn't a single match score,
+  // which mergeMatches already handles more surgically) without duplicating
+  // the not-found/tab-landing logic.
+  function loadTournament() {
     getTournament(id).then((tm) => {
       if (!tm) {
         setNotFound(true);
@@ -845,6 +848,14 @@ export function Tournament() {
       // controls live on the teams tab, easy to miss otherwise.
       if (tm.matches.length === 0 && tm.teams.length > 0) setTab("teams");
     });
+  }
+
+  useEffect(() => {
+    if (!id) return;
+    setTournament(null);
+    setNotFound(false);
+    loadTournament();
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [id]);
 
   // Just merges — no pulse-firing here anymore. Each BracketRow instance
@@ -860,20 +871,36 @@ export function Tournament() {
     });
   }
 
-  // Live-оновлення: приєднуємось до кімнати турніру, мерджимо чужі результати
-  // матчів у локальний стан без перезавантаження сторінки (перевірено: дві
-  // вкладки, live-sync без reload).
+  // Live-оновлення: приєднуємось до кімнати турніру на спільному сокеті.
+  // match:updated мерджиться точково (перевірено: дві вкладки, live-sync
+  // без reload). tournament:updated — усе інше, що міняє форму турніру, а
+  // не рахунок одного матчу (сітку згенеровано, команду зареєстровано чи
+  // прибрано, назву/статус відредаговано — зокрема з локальної
+  // admin-панелі, яка б'є в ті самі REST-роути) — просто перезапитує
+  // турнір повністю, найпростіший спосіб лишитись consistent. "deleted"
+  // веде на not-found замість зависання на видаленому турнірі.
   useEffect(() => {
     if (!id) return;
-    const socket = io(SOCKET_URL);
     socket.emit("tournament:join", id);
-    socket.on("match:updated", (payload) => {
+    function onMatchUpdated(payload) {
       if (String(payload.tournamentId) !== String(id)) return;
       mergeMatches(payload.match, payload.advanced, payload.advancedLoser);
-    });
+    }
+    function onTournamentUpdated(payload) {
+      if (String(payload.tournamentId) !== String(id)) return;
+      if (payload.deleted) {
+        setTournament(null);
+        setNotFound(true);
+        return;
+      }
+      loadTournament();
+    }
+    socket.on("match:updated", onMatchUpdated);
+    socket.on("tournament:updated", onTournamentUpdated);
     return () => {
       socket.emit("tournament:leave", id);
-      socket.disconnect();
+      socket.off("match:updated", onMatchUpdated);
+      socket.off("tournament:updated", onTournamentUpdated);
     };
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [id]);
