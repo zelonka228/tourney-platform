@@ -136,6 +136,7 @@ export function seedPositions(size) {
 // вигравала". Тому: немає матчу формату → команда не вигравала → Common,
 // незалежно від team.tournaments.
 export function teamRarity(team) {
+  if (team.rarityOverride) return team.rarityOverride;
   if (!/^1 місце ×\d+$/.test(team.best ?? "")) return "Common";
   const wins = team.tournaments ?? 0;
   if (wins >= 3) return "Legendary";

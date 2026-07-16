@@ -61,7 +61,7 @@ function MatchCard({
   enterScoreLabel,
   byeLabel,
   editLabel,
-  isAdmin,
+  canManageContent,
 }) {
   const a = teamName(m.teamAId);
   const b = teamName(m.teamBId);
@@ -78,8 +78,8 @@ function MatchCard({
   // A done match stays clickable for admins too -- opens the reset flow
   // instead of the score picker (see openEdit) so a misclick isn't a
   // dead end that forces recreating the whole tournament.
-  const editable = isAdmin && m.status === "done";
-  const clickable = isAdmin && (todo || editable);
+  const editable = canManageContent && m.status === "done";
+  const clickable = canManageContent && (todo || editable);
   const pending = (!a || !b) && !isBye;
 
   return (
@@ -209,7 +209,7 @@ function BracketRow({
   championLabel,
   teamName,
   openEdit,
-  isAdmin,
+  canManageContent,
   labels,
   testId,
   // Winners-bracket columns are labeled by match count ("1/2 фіналу",
@@ -382,7 +382,7 @@ function BracketRow({
                   teamName={teamName}
                   openEdit={openEdit}
                   cardRef={setNodeRef(`m-${m.id}`)}
-                  isAdmin={isAdmin}
+                  canManageContent={canManageContent}
                   enterScoreLabel={labels.enterScoreLabel}
                   byeLabel={labels.byeLabel}
                   editLabel={labels.editLabel}
@@ -441,7 +441,7 @@ function DoubleEliminationBracket({
   teamCount,
   teamName,
   openEdit,
-  isAdmin,
+  canManageContent,
   labels,
   t,
 }) {
@@ -664,7 +664,7 @@ function DoubleEliminationBracket({
                 teamName={teamName}
                 openEdit={openEdit}
                 cardRef={setNodeRef(`m-${m.id}`)}
-                isAdmin={isAdmin}
+                canManageContent={canManageContent}
                 enterScoreLabel={labels.enterScoreLabel}
                 byeLabel={labels.byeLabel}
                 editLabel={labels.editLabel}
@@ -730,7 +730,7 @@ function DoubleEliminationBracket({
               teamName={teamName}
               openEdit={openEdit}
               cardRef={setNodeRef(`m-${gf0.id}`)}
-              isAdmin={isAdmin}
+              canManageContent={canManageContent}
               enterScoreLabel={labels.enterScoreLabel}
               byeLabel={labels.byeLabel}
               editLabel={labels.editLabel}
@@ -799,7 +799,7 @@ export function Tournament() {
   const { id } = useParams();
   const nav = useNavigate();
   const { t } = useI18n();
-  const { isAdmin } = useAuth();
+  const { canManageContent } = useAuth();
   const roundLabel = useRoundLabel();
   const [tournament, setTournament] = useState(null);
   const [notFound, setNotFound] = useState(false);
@@ -952,7 +952,7 @@ export function Tournament() {
   );
 
   function openEdit(m) {
-    if (!isAdmin) return;
+    if (!canManageContent) return;
     if (m.teamAId && m.teamBId && m.status === "pending") {
       setEdit({ matchId: m.id, mode: "score", a: teamName(m.teamAId), b: teamName(m.teamBId) });
       setScoreError(null);
@@ -1096,7 +1096,7 @@ export function Tournament() {
             {tournament.name}
           </h1>
         </div>
-        {isAdmin && (
+        {canManageContent && (
           <div className="text-right shrink-0">
             <div className="flex gap-2 justify-end">
               <Btn
@@ -1209,7 +1209,7 @@ export function Tournament() {
           {matches.length === 0 && (
             <Panel clip className="p-6 max-w-md">
               <p className="text-[#a1a1aa] text-sm">{t("tour.notGenerated")}</p>
-              {isAdmin ? (
+              {canManageContent ? (
                 <>
                   {tournament.teams.length > 0 && (
                     <button
@@ -1249,7 +1249,7 @@ export function Tournament() {
                 <span className="font-display font-black text-2xl text-white">{champion}</span>
                 <span className="ml-auto text-volt text-2xl">★</span>
               </motion.div>
-            ) : isAdmin ? (
+            ) : canManageContent ? (
               <p className="text-[#a1a1aa] text-sm mb-6">{t("tour.hint")}</p>
             ) : null)}
 
@@ -1262,7 +1262,7 @@ export function Tournament() {
               championLabel={t("tour.champion")}
               teamName={teamName}
               openEdit={openEdit}
-              isAdmin={isAdmin}
+              canManageContent={canManageContent}
               testId="bracket"
               labels={{
                 enterScoreLabel: t("tour.enterScore"),
@@ -1280,7 +1280,7 @@ export function Tournament() {
               teamCount={teamCount}
               teamName={teamName}
               openEdit={openEdit}
-              isAdmin={isAdmin}
+              canManageContent={canManageContent}
               t={t}
               labels={{
                 enterScoreLabel: t("tour.enterScore"),
@@ -1429,7 +1429,7 @@ export function Tournament() {
       {tab === "teams" && (
         <Panel clip className="p-6 max-w-lg mt-6">
           <Overline>{t("tour.participants")}</Overline>
-          {matches.length === 0 && isAdmin && (
+          {matches.length === 0 && canManageContent && (
             <p className="text-xs text-[#a1a1aa] mt-2">{t("tour.reorderHint")}</p>
           )}
           <div className="mt-4 divide-y divide-[#27272a]/60">
@@ -1446,7 +1446,7 @@ export function Tournament() {
                     {String(tt.seed).padStart(2, "0")}
                   </span>
                   <span className="text-white">{tt.team?.name}</span>
-                  {matches.length === 0 && isAdmin && (
+                  {matches.length === 0 && canManageContent && (
                     <span className="ml-auto flex gap-1">
                       <button
                         data-testid={`participant-up-${tt.teamId}`}
@@ -1483,7 +1483,7 @@ export function Tournament() {
           </p>
           {reorderError && <p className="text-[#ff0055] text-sm mt-3">{reorderError}</p>}
           {removeError && <p className="text-[#ff0055] text-sm mt-3">{removeError}</p>}
-          {matches.length === 0 && isAdmin && tournament.teams.length >= 2 && (
+          {matches.length === 0 && canManageContent && tournament.teams.length >= 2 && (
             <Btn
               variant="primary"
               size="sm"

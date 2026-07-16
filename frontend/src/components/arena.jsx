@@ -54,6 +54,10 @@ export function Input(props) {
   return <input {...props} className={`${controlCls} ${props.className ?? ""}`} />;
 }
 
+export function Textarea(props) {
+  return <textarea {...props} className={`${controlCls} resize-none ${props.className ?? ""}`} />;
+}
+
 export function Select({ children, ...props }) {
   return (
     <div className="relative">

@@ -9,11 +9,13 @@ import { Profile } from "./pages/Profile";
 import { Hall } from "./pages/Hall";
 import { Tournament } from "./pages/Tournament";
 import { Login } from "./pages/Login";
+import { Register } from "./pages/Register";
 import { Account } from "./pages/Account";
+import { AdminUsers } from "./pages/AdminUsers";
 
 const links = [
   { to: "/", key: "nav.home", end: true },
-  { to: "/create", key: "nav.create" },
+  { to: "/create", key: "nav.create", requiresContentManager: true },
   { to: "/tournament", key: "nav.tournament" },
   { to: "/team", key: "nav.team" },
   { to: "/profile", key: "nav.profile" },
@@ -77,7 +79,9 @@ function AuthLink() {
 
 function Header() {
   const { t } = useI18n();
+  const { canManageContent } = useAuth();
   const nav = useNavigate();
+  const visibleLinks = links.filter((l) => !l.requiresContentManager || canManageContent);
   return (
     <header className="sticky top-0 z-40 backdrop-blur-xl bg-void/70 border-b border-[#27272a]">
       <div className="max-w-6xl mx-auto px-5 h-16 flex items-center gap-1">
@@ -92,7 +96,7 @@ function Header() {
           </span>
         </button>
         <nav className="hidden md:flex items-center gap-0.5">
-          {links.map((l) => (
+          {visibleLinks.map((l) => (
             <NavLink
               key={l.to}
               to={l.to}
@@ -115,7 +119,7 @@ function Header() {
       </div>
       {/* mobile nav */}
       <nav className="md:hidden flex items-center gap-0.5 overflow-x-auto px-5 pb-2 border-t border-[#27272a]/60 pt-2">
-        {links.map((l) => (
+        {visibleLinks.map((l) => (
           <NavLink
             key={l.to}
             to={l.to}
@@ -153,7 +157,9 @@ function AnimatedRoutes() {
           <Route path="/profile" element={<Profile />} />
           <Route path="/hall" element={<Hall />} />
           <Route path="/login" element={<Login />} />
+          <Route path="/register" element={<Register />} />
           <Route path="/account" element={<Account />} />
+          <Route path="/admin/users" element={<AdminUsers />} />
         </Routes>
       </motion.div>
     </AnimatePresence>

@@ -3,7 +3,7 @@
 // localStorage so a refresh doesn't log the user out; validated against
 // GET /api/auth/me on mount (catches an expired/tampered token).
 import { createContext, useContext, useEffect, useState, useCallback } from "react";
-import { login as apiLogin, getMe } from "./api";
+import { login as apiLogin, register as apiRegister, getMe } from "./api";
 
 const TOKEN_KEY = "arena_token";
 const AuthContext = createContext(null);
@@ -31,13 +31,25 @@ export function AuthProvider({ children }) {
     return res.user;
   }, []);
 
+  const register = useCallback(async (username, password) => {
+    const res = await apiRegister(username, password);
+    localStorage.setItem(TOKEN_KEY, res.token);
+    setUser(res.user);
+    return res.user;
+  }, []);
+
   const logout = useCallback(() => {
     localStorage.removeItem(TOKEN_KEY);
     setUser(null);
   }, []);
 
+  const isAdmin = user?.role === "admin";
+  const canManageContent = isAdmin || user?.role === "organizer";
+
   return (
-    <AuthContext.Provider value={{ user, loading, login, logout, isAdmin: user?.role === "admin" }}>
+    <AuthContext.Provider
+      value={{ user, setUser, loading, login, register, logout, isAdmin, canManageContent }}
+    >
       {children}
     </AuthContext.Provider>
   );

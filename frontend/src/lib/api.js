@@ -211,8 +211,40 @@ export async function login(username, password) {
   });
 }
 
+export async function register(username, password) {
+  return request("/api/auth/register", {
+    method: "POST",
+    body: JSON.stringify({ username, password }),
+  });
+}
+
 export async function getMe() {
   return request("/api/auth/me");
+}
+
+export async function updateMe(data) {
+  return request("/api/auth/me", { method: "PUT", body: JSON.stringify(data) });
+}
+
+// --- Адмінка: керування акаунтами ---
+
+export async function adminListUsers() {
+  return request("/api/admin/users");
+}
+
+export async function adminUpdateUser(id, data) {
+  return request(`/api/admin/users/${id}`, { method: "PUT", body: JSON.stringify(data) });
+}
+
+export async function adminResetPassword(id, password) {
+  return request(`/api/admin/users/${id}/reset-password`, {
+    method: "POST",
+    body: JSON.stringify({ password }),
+  });
+}
+
+export async function adminDeleteUser(id) {
+  return request(`/api/admin/users/${id}`, { method: "DELETE" });
 }
 
 // --- Гравці ---

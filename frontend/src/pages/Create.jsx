@@ -48,7 +48,7 @@ function seedTeamIds(ids, allTeams, seedType) {
 export function Create() {
   const nav = useNavigate();
   const { t } = useI18n();
-  const { isAdmin } = useAuth();
+  const { canManageContent } = useAuth();
   const [name, setName] = useState("LAN Cup");
   const [bracket, setBracket] = useState("single");
   const [bo, setBo] = useState(3);
@@ -109,7 +109,7 @@ export function Create() {
     }
   }
 
-  if (!isAdmin) {
+  if (!canManageContent) {
     return (
       <div className="py-10" data-testid="create-admin-only">
         <Overline className="text-cyan">// {t("nav.create")}</Overline>

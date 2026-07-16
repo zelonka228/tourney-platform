@@ -10,6 +10,7 @@ import {
   VALORANT_RANKS,
   avgRating,
 } from "../lib/demo";
+import { readCroppedImage } from "../lib/cropImage";
 import { Btn, Field, Input, Overline, Panel, Select } from "../components/arena";
 
 const DEFAULT_RANK = { CS2: 1800, "Dota 2": 3000, Valorant: "Diamond" };
@@ -25,44 +26,17 @@ const defaultPlayers = () => [
 const defaultSubs = () => [{ nick: "spare1", role: "Support", rank: 1800 }];
 const fromDbRank = (d, rank) => (DISCIPLINES[d].kind === "rank" ? rank : Number(rank));
 const LINK_HINT_KEY = { CS2: "team.link.cs2", Valorant: "team.link.valorant" };
-
-const LOGO_SIZE = 256;
-const LOGO_MAX_BYTES = 300 * 1024;
-function readLogoFile(file) {
-  return new Promise((resolve, reject) => {
-    if (!file.type.startsWith("image/")) return reject(new Error("Choose an image."));
-    const img = new Image();
-    const url = URL.createObjectURL(file);
-    img.onload = () => {
-      const c = document.createElement("canvas");
-      c.width = LOGO_SIZE;
-      c.height = LOGO_SIZE;
-      const ctx = c.getContext("2d");
-      const scale = Math.max(LOGO_SIZE / img.width, LOGO_SIZE / img.height);
-      const w = img.width * scale,
-        h = img.height * scale;
-      ctx.drawImage(img, (LOGO_SIZE - w) / 2, (LOGO_SIZE - h) / 2, w, h);
-      URL.revokeObjectURL(url);
-      const data = c.toDataURL("image/jpeg", 0.85);
-      if (data.length > LOGO_MAX_BYTES) return reject(new Error("Image too large."));
-      resolve(data);
-    };
-    img.onerror = () => {
-      URL.revokeObjectURL(url);
-      reject(new Error("Could not read image."));
-    };
-    img.src = url;
-  });
-}
+const RARITY_TIERS = ["Common", "Rare", "Epic", "Legendary"];
 
 export function Team() {
   const nav = useNavigate();
   const { id } = useParams();
   const { t } = useI18n();
-  const { isAdmin } = useAuth();
+  const { isAdmin, canManageContent } = useAuth();
   const [discipline, setDiscipline] = useState(DEFAULT_DISCIPLINE);
   const [name, setName] = useState(DEFAULT_NAME);
   const [logo, setLogo] = useState(null);
+  const [rarityOverride, setRarityOverride] = useState("");
   const [logoError, setLogoError] = useState(null);
   const [saveError, setSaveError] = useState(null);
   const [notFound, setNotFound] = useState(false);
@@ -82,6 +56,7 @@ export function Team() {
       setName(DEFAULT_NAME);
       setDiscipline(DEFAULT_DISCIPLINE);
       setLogo(null);
+      setRarityOverride("");
       setPlayers(defaultPlayers());
       setSubs(defaultSubs());
       return;
@@ -94,6 +69,7 @@ export function Team() {
       setName(tm.name);
       setDiscipline(tm.discipline);
       setLogo(tm.logo ?? null);
+      setRarityOverride(tm.rarityOverride ?? "");
       const map = (sub) =>
         tm.players
           .filter((p) => !!p.isSubstitute === sub)
@@ -135,7 +111,7 @@ export function Team() {
     if (!file) return;
     setLogoError(null);
     try {
-      setLogo(await readLogoFile(file));
+      setLogo(await readCroppedImage(file));
     } catch (err) {
       setLogoError(err.message);
     }
@@ -150,6 +126,7 @@ export function Team() {
       name,
       discipline,
       logo,
+      ...(isAdmin ? { rarityOverride: rarityOverride || null } : {}),
       players: [
         ...players.map((p) => ({
           nick: p.nick,
@@ -273,7 +250,7 @@ export function Team() {
     );
   }
 
-  if (!isAdmin) {
+  if (!canManageContent) {
     return (
       <div className="py-10" data-testid="team-admin-only">
         <Overline className="text-cyan">// {t("nav.team")}</Overline>
@@ -330,6 +307,25 @@ export function Team() {
             </button>
           )}
           {logoError && <p className="text-[#ff0055] text-xs mt-2">{logoError}</p>}
+
+          {isAdmin && (
+            <div className="mt-5 pt-5 border-t border-[#27272a]">
+              <Overline>{t("team.rarity.manual")}</Overline>
+              <Select
+                className="mt-3"
+                data-testid="team-rarity-override"
+                value={rarityOverride}
+                onChange={(e) => setRarityOverride(e.target.value)}
+              >
+                <option value="">{t("team.rarity.auto")}</option>
+                {RARITY_TIERS.map((tier) => (
+                  <option key={tier} value={tier}>
+                    {tier}
+                  </option>
+                ))}
+              </Select>
+            </div>
+          )}
         </Panel>
 
         <Panel clip className="p-6">
