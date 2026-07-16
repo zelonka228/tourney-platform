@@ -17,7 +17,7 @@ const links = [
   { to: "/", key: "nav.home", end: true },
   { to: "/create", key: "nav.create", requiresContentManager: true },
   { to: "/tournament", key: "nav.tournament" },
-  { to: "/team", key: "nav.team" },
+  { to: "/team", key: "nav.team", requiresContentManager: true },
   { to: "/profile", key: "nav.profile" },
   { to: "/hall", key: "nav.hall" },
 ];
