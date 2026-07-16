@@ -1,0 +1,220 @@
+<!doctype html>
+<html lang="uk">
+<head>
+<meta charset="utf-8" />
+<title>Admin Panel — Tourney Platform</title>
+<style>
+  * { box-sizing: border-box; }
+  body {
+    margin: 0;
+    font-family: -apple-system, Segoe UI, Arial, sans-serif;
+    background: #f4f4f5;
+    color: #18181b;
+  }
+  header {
+    background: #18181b;
+    color: #fff;
+    padding: 14px 20px;
+    display: flex;
+    align-items: center;
+    gap: 16px;
+    flex-wrap: wrap;
+  }
+  header h1 { font-size: 16px; margin: 0; font-weight: 600; }
+  header .spacer { flex: 1; }
+  header input {
+    background: #27272a;
+    border: 1px solid #3f3f46;
+    color: #fff;
+    padding: 6px 8px;
+    border-radius: 4px;
+    font-size: 13px;
+  }
+  header .who { font-size: 13px; color: #a1a1aa; }
+  main { max-width: 1100px; margin: 0 auto; padding: 20px; }
+  .login-box {
+    max-width: 340px;
+    margin: 60px auto;
+    background: #fff;
+    border: 1px solid #d4d4d8;
+    border-radius: 8px;
+    padding: 24px;
+  }
+  .login-box h2 { margin-top: 0; font-size: 16px; }
+  label { display: block; font-size: 12px; color: #52525b; margin: 10px 0 4px; }
+  input[type=text], input[type=password], input[type=date], select, textarea {
+    width: 100%;
+    padding: 8px;
+    border: 1px solid #d4d4d8;
+    border-radius: 4px;
+    font-size: 14px;
+    background: #fff;
+    color: #18181b;
+  }
+  button {
+    cursor: pointer;
+    border: 1px solid #d4d4d8;
+    background: #fff;
+    padding: 7px 12px;
+    border-radius: 4px;
+    font-size: 13px;
+    color: #18181b;
+  }
+  button:hover { background: #f4f4f5; }
+  button.primary { background: #18181b; color: #fff; border-color: #18181b; }
+  button.primary:hover { background: #3f3f46; }
+  button.danger { color: #b91c1c; border-color: #fecaca; }
+  button.danger:hover { background: #fef2f2; }
+  button:disabled { opacity: 0.5; cursor: not-allowed; }
+  .tabs { display: flex; gap: 4px; margin-bottom: 16px; border-bottom: 1px solid #d4d4d8; }
+  .tabs button {
+    border: none;
+    border-bottom: 2px solid transparent;
+    border-radius: 0;
+    background: none;
+    padding: 10px 4px;
+    margin-right: 16px;
+    font-size: 14px;
+    color: #71717a;
+  }
+  .tabs button.active { color: #18181b; border-bottom-color: #18181b; font-weight: 600; }
+  .panel { display: none; }
+  .panel.active { display: block; }
+  table { width: 100%; border-collapse: collapse; background: #fff; border: 1px solid #e4e4e7; border-radius: 6px; overflow: hidden; }
+  th, td { text-align: left; padding: 8px 10px; border-bottom: 1px solid #e4e4e7; font-size: 13px; vertical-align: middle; }
+  th { background: #fafafa; color: #52525b; font-weight: 600; font-size: 12px; text-transform: uppercase; letter-spacing: 0.03em; }
+  tr:last-child td { border-bottom: none; }
+  .row-actions { display: flex; gap: 6px; flex-wrap: wrap; }
+  .create-box {
+    background: #fff;
+    border: 1px solid #e4e4e7;
+    border-radius: 6px;
+    padding: 16px;
+    margin-bottom: 16px;
+  }
+  .create-box h3 { margin: 0 0 10px; font-size: 14px; }
+  .create-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(140px, 1fr)); gap: 10px; align-items: end; }
+  .field { display: flex; flex-direction: column; }
+  .msg { font-size: 13px; margin-top: 8px; }
+  .msg.error { color: #b91c1c; }
+  .msg.ok { color: #15803d; }
+  .badge { display: inline-block; padding: 1px 7px; border-radius: 10px; font-size: 11px; border: 1px solid #d4d4d8; }
+  .badge.admin { background: #fef9c3; border-color: #fde047; }
+  .badge.organizer { background: #dbeafe; border-color: #93c5fd; }
+  .badge.user { background: #f4f4f5; }
+  .modal-backdrop {
+    display: none;
+    position: fixed; inset: 0; background: rgba(0,0,0,0.4);
+    align-items: center; justify-content: center; z-index: 50;
+  }
+  .modal-backdrop.open { display: flex; }
+  .modal { background: #fff; border-radius: 8px; padding: 20px; width: 320px; }
+  .modal h3 { margin-top: 0; font-size: 15px; }
+  .team-detail { font-size: 12px; color: #71717a; margin-top: 2px; }
+  select[disabled] { background: #f4f4f5; }
+</style>
+</head>
+<body>
+
+<header>
+  <h1>Admin Panel</h1>
+  <span class="spacer"></span>
+  <label style="margin:0; color:#a1a1aa; font-size:12px;">Backend URL</label>
+  <input id="backendUrlInput" type="text" style="width:280px" />
+  <span id="whoBox" class="who"></span>
+  <button id="logoutBtn" style="display:none">Вийти</button>
+</header>
+
+<main>
+  <div id="loginBox" class="login-box">
+    <h2>Вхід (admin/organizer)</h2>
+    <label>Логін</label>
+    <input id="loginUsername" type="text" autocomplete="username" />
+    <label>Пароль</label>
+    <input id="loginPassword" type="password" autocomplete="current-password" />
+    <button class="primary" id="loginBtn" style="margin-top:14px; width:100%">Увійти</button>
+    <div id="loginMsg" class="msg error"></div>
+  </div>
+
+  <div id="app" style="display:none">
+    <div class="tabs">
+      <button class="tab-btn active" data-tab="users">Користувачі</button>
+      <button class="tab-btn" data-tab="teams">Команди</button>
+      <button class="tab-btn" data-tab="tournaments">Турніри</button>
+    </div>
+
+    <!-- USERS -->
+    <div class="panel active" id="panel-users">
+      <div id="usersMsg" class="msg"></div>
+      <table>
+        <thead><tr><th>Логін</th><th>Роль</th><th>Зареєстрований</th><th style="width:280px">Дії</th></tr></thead>
+        <tbody id="usersBody"></tbody>
+      </table>
+    </div>
+
+    <!-- TEAMS -->
+    <div class="panel" id="panel-teams">
+      <div id="teamsMsg" class="msg"></div>
+      <table>
+        <thead><tr><th>Назва</th><th>Дисципліна</th><th>Турнірів</th><th>Рідкість</th><th style="width:180px">Дії</th></tr></thead>
+        <tbody id="teamsBody"></tbody>
+      </table>
+    </div>
+
+    <!-- TOURNAMENTS -->
+    <div class="panel" id="panel-tournaments">
+      <div class="create-box">
+        <h3>Створити турнір</h3>
+        <div class="create-grid">
+          <div class="field"><label>Назва</label><input id="newTourName" type="text" /></div>
+          <div class="field"><label>Дисципліна</label>
+            <select id="newTourDiscipline"><option>CS2</option><option>Dota 2</option><option>Valorant</option></select>
+          </div>
+          <div class="field"><label>Тип сітки</label>
+            <select id="newTourBracket"><option value="single">На вибування</option><option value="double">Подвійне вибування</option></select>
+          </div>
+          <div class="field"><label>Формат</label>
+            <select id="newTourFormat"><option value="1">BO1</option><option value="3">BO3</option><option value="5">BO5</option></select>
+          </div>
+          <button class="primary" id="createTourBtn">Створити</button>
+        </div>
+        <div id="createTourMsg" class="msg"></div>
+      </div>
+      <div id="tournamentsMsg" class="msg"></div>
+      <table>
+        <thead><tr><th>Назва</th><th>Дисципліна</th><th>Статус</th><th>Команд</th><th style="width:320px">Дії</th></tr></thead>
+        <tbody id="tournamentsBody"></tbody>
+      </table>
+    </div>
+  </div>
+</main>
+
+<div class="modal-backdrop" id="resetModalBackdrop">
+  <div class="modal">
+    <h3>Скинути пароль</h3>
+    <label>Новий пароль</label>
+    <input id="resetPasswordInput" type="password" />
+    <div id="resetMsg" class="msg error"></div>
+    <div class="row-actions" style="margin-top:14px; justify-content:flex-end">
+      <button id="resetCancelBtn">Скасувати</button>
+      <button class="primary" id="resetConfirmBtn">Підтвердити</button>
+    </div>
+  </div>
+</div>
+
+<div class="modal-backdrop" id="registerModalBackdrop">
+  <div class="modal">
+    <h3>Додати команду в турнір</h3>
+    <label>Команда</label>
+    <select id="registerTeamSelect"></select>
+    <div id="registerMsg" class="msg error"></div>
+    <div class="row-actions" style="margin-top:14px; justify-content:flex-end">
+      <button id="registerCancelBtn">Скасувати</button>
+      <button class="primary" id="registerConfirmBtn">Додати</button>
+    </div>
+  </div>
+</div>
+
+<script src="app.js"></script>
+</body>
+</html>
