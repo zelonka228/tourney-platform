@@ -11,9 +11,10 @@ import {
   liveNickFromStats,
   teamRarity,
   DISCIPLINES,
+  DISCIPLINE_LIST,
   VALORANT_RANKS,
 } from "../lib/demo";
-import { Btn, Overline, Panel, Stat, Input } from "../components/arena";
+import { Btn, Overline, Panel, Stat, Input, Select } from "../components/arena";
 import { PlayerStatsWidget } from "../components/PlayerStatsWidget";
 import { TeamCard } from "../components/TeamCard";
 import { AnimatedNumber } from "../components/motion";
@@ -31,6 +32,7 @@ export function Profile() {
   const [sel, setSel] = useState(null);
   const [teams, setTeams] = useState([]);
   const [query, setQuery] = useState("");
+  const [disciplineFilter, setDisciplineFilter] = useState("all");
   // PlayerRow eager-fetches live stats for any linked player on mount (not
   // just on click, see PlayerRow) so the roster row shows the real rank
   // right away instead of a stale manually-entered one. Once fresh stats
@@ -80,19 +82,35 @@ export function Profile() {
           {t("profile.title")}
         </h1>
         <p className="text-[#a1a1aa] mt-2">{t("profile.sub")}</p>
-        {teams.length > 5 && (
-          <Input
-            value={query}
-            data-testid="profile-search"
-            placeholder={t("hall.search")}
-            onChange={(e) => setQuery(e.target.value)}
-            className="mt-4 max-w-sm"
-          />
-        )}
+        <div className="flex flex-wrap gap-3 mt-4">
+          {teams.length > 5 && (
+            <Input
+              value={query}
+              data-testid="profile-search"
+              placeholder={t("hall.search")}
+              onChange={(e) => setQuery(e.target.value)}
+              className="max-w-sm"
+            />
+          )}
+          <Select
+            value={disciplineFilter}
+            data-testid="profile-discipline-filter"
+            onChange={(e) => setDisciplineFilter(e.target.value)}
+            className="max-w-[200px]"
+          >
+            <option value="all">{t("hall.all")}</option>
+            {DISCIPLINE_LIST.map((d) => (
+              <option key={d} value={d}>
+                {d}
+              </option>
+            ))}
+          </Select>
+        </div>
         <div className="grid sm:grid-cols-2 lg:grid-cols-3 gap-4 mt-8">
           {teams
             .map((team, i) => ({ team, i }))
             .filter(({ team }) => team.name.toLowerCase().includes(query.trim().toLowerCase()))
+            .filter(({ team }) => disciplineFilter === "all" || team.discipline === disciplineFilter)
             .map(({ team, i }) => {
               // Рейтинг — середнє лише основного складу, підстави не враховуються.
               // Для CS2-гравців з прив'язаним FACEIT — живий ELO замість

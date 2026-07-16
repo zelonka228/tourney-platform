@@ -2,6 +2,7 @@ import { useEffect, useState } from "react";
 import { useNavigate } from "react-router-dom";
 import { motion } from "framer-motion";
 import { useI18n } from "../lib/i18n";
+import { useAuth } from "../lib/auth";
 import { getTeams, getTournaments, getTournament } from "../lib/api";
 import { Btn, Overline, Panel } from "../components/arena";
 
@@ -40,11 +41,15 @@ function useLiveStats() {
 export function Landing() {
   const nav = useNavigate();
   const { t } = useI18n();
+  const { canManageContent } = useAuth();
   const stats = useLiveStats();
 
   const cards = [
     { to: "/tournament", key: "tournament", tag: "01" },
-    { to: "/team", key: "team", tag: "02" },
+    // Read-only visitors (unauthenticated or role "user") can't create a
+    // team — send them to the team list instead of the create form they'd
+    // just get blocked from anyway.
+    { to: canManageContent ? "/team" : "/profile", key: "team", tag: "02" },
     { to: "/hall", key: "hall", tag: "03" },
   ];
   const statRow = [
