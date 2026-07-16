@@ -881,7 +881,21 @@ export function Tournament() {
   // веде на not-found замість зависання на видаленому турнірі.
   useEffect(() => {
     if (!id) return;
-    socket.emit("tournament:join", id);
+    // Socket.io drops room membership on every disconnect (Render's free
+    // tier isn't perfectly stable, so this isn't rare) and doesn't restore
+    // it on its own — without re-joining on "connect" (which also fires on
+    // every reconnect, not just the first connection), a tab could sit
+    // there looking live while actually missing every update until a full
+    // page reload. Re-running loadTournament() on the same event closes
+    // the other half of that gap: anything that happened while disconnected
+    // and was never delivered gets picked up by a plain refetch instead of
+    // staying silently stale.
+    function onConnect() {
+      socket.emit("tournament:join", id);
+      loadTournament();
+    }
+    if (socket.connected) onConnect();
+    socket.on("connect", onConnect);
     function onMatchUpdated(payload) {
       if (String(payload.tournamentId) !== String(id)) return;
       mergeMatches(payload.match, payload.advanced, payload.advancedLoser);
@@ -899,6 +913,7 @@ export function Tournament() {
     socket.on("tournament:updated", onTournamentUpdated);
     return () => {
       socket.emit("tournament:leave", id);
+      socket.off("connect", onConnect);
       socket.off("match:updated", onMatchUpdated);
       socket.off("tournament:updated", onTournamentUpdated);
     };

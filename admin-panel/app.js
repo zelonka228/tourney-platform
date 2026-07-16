@@ -284,7 +284,10 @@ function renderTeams(teams) {
 
 // --- Tournaments ---
 
-const STATUSES = ["draft", "active", "completed"];
+// Mirrors the backend's real lifecycle (see tournaments.js STATUS_VALUES)
+// — "draft" until the final match is won, then "completed" automatically.
+// No separate "active" state exists anywhere in the app's own logic.
+const STATUSES = ["draft", "completed"];
 
 async function loadTournaments() {
   $("tournamentsMsg").textContent = "";

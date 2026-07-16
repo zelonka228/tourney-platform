@@ -122,8 +122,11 @@ async function main() {
   const regGhost = await call("POST", `/api/tournaments/${tourId}/register`, { teamId: 999999 });
   ok(regGhost.status === 404, "register missing team → 404");
 
-  const putTour = await call("PUT", `/api/tournaments/${tourId}`, { status: "active" });
-  ok(putTour.status === 200 && putTour.data?.status === "active", "PUT /api/tournaments/:id → 200 updated");
+  const putTour = await call("PUT", `/api/tournaments/${tourId}`, { status: "completed" });
+  ok(putTour.status === 200 && putTour.data?.status === "completed", "PUT /api/tournaments/:id → 200 updated");
+
+  const badStatus = await call("PUT", `/api/tournaments/${tourId}`, { status: "active" });
+  ok(badStatus.status === 400, "PUT /api/tournaments/:id with unknown status → 400");
 
   const badFormat = await call("POST", "/api/tournaments", {
     name: "Bad",

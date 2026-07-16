@@ -12,6 +12,14 @@ const router = Router();
 const DISCIPLINE_VALUES = Object.keys(DISCIPLINES); // ["CS2", "Dota 2", "Valorant"]
 const BRACKET_TYPES = ["single", "double"];
 const MATCH_FORMATS = [1, 3, 5];
+// The only two values the app's own logic ever sets: "draft" is the
+// default, "completed" is set automatically when the final match is won
+// (and reverted back to "draft" if that result gets reset — see
+// matches.js). There's no separate "active"/"in progress" state; a
+// tournament with a generated bracket and unplayed matches is still
+// "draft". Nothing before this fix stopped PUT /:id from writing an
+// arbitrary string here.
+const STATUS_VALUES = ["draft", "completed"];
 const NAME_MAX_LEN = 60;
 
 function checkNameLength(name) {
@@ -240,6 +248,7 @@ router.put(
     if (discipline !== undefined) requireEnum("discipline", discipline, DISCIPLINE_VALUES);
     if (bracketType !== undefined) requireEnum("bracketType", bracketType, BRACKET_TYPES);
     if (matchFormat !== undefined) requireEnum("matchFormat", Number(matchFormat), MATCH_FORMATS);
+    if (status !== undefined) requireEnum("status", status, STATUS_VALUES);
     if (name !== undefined) {
       if (name.trim() === "") throw new HttpError(400, "Назва не може бути порожньою.");
       checkNameLength(name);
