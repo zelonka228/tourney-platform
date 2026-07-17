@@ -4,6 +4,7 @@ import { useI18n } from "../lib/i18n";
 import { getTeams } from "../lib/api";
 import { avgRating, effectivePlayerRank } from "../lib/demo";
 import { Overline, Input } from "../components/arena";
+import { Skeleton } from "../components/Skeleton";
 import { socket } from "../lib/socket";
 
 const TABS = ["all", "CS2", "Dota 2", "Valorant"];
@@ -12,10 +13,14 @@ export function Hall() {
   const { t } = useI18n();
   const [disc, setDisc] = useState("all");
   const [teams, setTeams] = useState([]);
+  const [loading, setLoading] = useState(true);
   const [query, setQuery] = useState("");
 
   useEffect(() => {
-    getTeams().then(setTeams);
+    getTeams().then((data) => {
+      setTeams(data);
+      setLoading(false);
+    });
     const onChanged = () => getTeams().then(setTeams);
     socket.on("teams:changed", onChanged);
     return () => socket.off("teams:changed", onChanged);
@@ -111,7 +116,18 @@ export function Hall() {
             </tr>
           </thead>
           <tbody>
-            {rows.map((tm, i) => (
+            {loading &&
+              Array.from({ length: 6 }, (_, i) => (
+                <tr key={i} className="border-b border-[#27272a]/50">
+                  {Array.from({ length: 6 }, (_, c) => (
+                    <td key={c} className="px-4 py-3">
+                      <Skeleton className="h-4 w-full max-w-[120px]" />
+                    </td>
+                  ))}
+                </tr>
+              ))}
+            {!loading &&
+              rows.map((tm, i) => (
               <motion.tr
                 key={tm.id}
                 data-testid={`hall-row-${i}`}

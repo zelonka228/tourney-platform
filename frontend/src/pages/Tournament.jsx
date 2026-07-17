@@ -3,6 +3,7 @@ import { Link, useParams, useNavigate } from "react-router-dom";
 import { AnimatePresence, animate, motion } from "framer-motion";
 import { useI18n } from "../lib/i18n";
 import { useAuth } from "../lib/auth";
+import { useToast } from "../lib/toast";
 import { socket } from "../lib/socket";
 import {
   getTournament,
@@ -801,6 +802,7 @@ export function Tournament() {
   const nav = useNavigate();
   const { t } = useI18n();
   const { canManageContent } = useAuth();
+  const toast = useToast();
   const roundLabel = useRoundLabel();
   const [tournament, setTournament] = useState(null);
   const [notFound, setNotFound] = useState(false);
@@ -1015,8 +1017,10 @@ export function Tournament() {
       const res = await submitMatchScore(edit.matchId, sa, sb);
       mergeMatches(res.match, res.advanced, res.advancedLoser);
       setEdit(null);
+      toast(t("toast.scoreSaved"), "success");
     } catch (e) {
       setScoreError(e.message);
+      toast(e.message, "error");
     }
   }
   async function handleReset() {
@@ -1042,8 +1046,10 @@ export function Tournament() {
     try {
       await deleteTournament(id);
       nav("/tournament");
+      toast(t("toast.tournamentDeleted"), "success");
     } catch (e) {
       setDeleteError(e.message);
+      toast(e.message, "error");
     }
   }
   async function handleSaveInfo() {
@@ -1075,8 +1081,10 @@ export function Tournament() {
     setGenerating(true);
     try {
       setTournament(await generateBracket(id));
+      toast(t("toast.bracketGenerated"), "success");
     } catch (e) {
       setScoreError(e.message);
+      toast(e.message, "error");
     } finally {
       setGenerating(false);
     }

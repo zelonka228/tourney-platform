@@ -135,6 +135,8 @@ export function seedPositions(size) {
 // реальній перемозі — це єдиний надійний сигнал "команда взагалі колись
 // вигравала". Тому: немає матчу формату → команда не вигравала → Common,
 // незалежно від team.tournaments.
+export const RARITY_TIERS = ["Common", "Rare", "Epic", "Legendary"];
+
 export function teamRarity(team) {
   if (team.rarityOverride) return team.rarityOverride;
   if (!/^1 місце ×\d+$/.test(team.best ?? "")) return "Common";

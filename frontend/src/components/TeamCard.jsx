@@ -4,7 +4,8 @@
 // Задум і всі числові координати — з підтверджених макетів у
 // .superpowers/brainstorm (final-full-demo-v5.html для CS2, push-quality-v6.html
 // для Dota-самоцвіту), перенесені сюди 1:1 де це можливо.
-import { forwardRef, useEffect, useImperativeHandle, useRef, useState } from "react";
+import { forwardRef, useImperativeHandle, useMemo, useRef, useState } from "react";
+import { motion } from "framer-motion";
 import { useI18n } from "../lib/i18n";
 import {
   avgRating,
@@ -28,6 +29,22 @@ import dotaStrengthUrl from "../assets/dota-strength.png";
 import dotaAgilityUrl from "../assets/dota-agility.png";
 import dotaIntelligenceUrl from "../assets/dota-intelligence.png";
 import dotaUniversalUrl from "../assets/dota-universal.png";
+import packSealUrl from "../assets/pack-seal.png";
+import { isPackOpened, markPackOpened } from "../lib/openedPacks";
+import laserSoundUrl from "../assets/sounds/pack-laser.wav";
+import shatterSoundUrl from "../assets/sounds/pack-shatter.wav";
+import whooshSoundUrl from "../assets/sounds/pack-whoosh.wav";
+
+// Кожен виклик створює новий Audio — так кілька паків можна відкрити
+// одночасно (кожен зі своїм звуком, що не обриває сусідній), і той самий
+// звук можна програти повторно без очікування, поки попередній дограє.
+// .catch — браузер іноді блокує autoplay без явного user gesture, але клік
+// по паку сам є user gesture, тому це радше страховка, ніж очікувана подія.
+function playSound(url, volume = 0.6) {
+  const audio = new Audio(url);
+  audio.volume = volume;
+  audio.play().catch(() => {});
+}
 
 // Значення за редкістю. Раніше застосовувались виключно як CSS custom
 // properties (--tier-color тощо) через inline style на батьківському
@@ -47,8 +64,73 @@ const TIER_VALUES = {
   Legendary: { color: "#ffd23f", glow: "rgba(255,178,50,0.5)", width: "3px", grain: "0.035" },
 };
 
-const GEN_TRANSITION = "transform 1.1s cubic-bezier(.16,1.2,.3,1), opacity 0.4s ease";
-const FLIP_TRANSITION = "transform 0.8s cubic-bezier(.2,.8,.2,1)";
+// Розкриття паку навмисно однакове на вигляд для будь-якої команди (сірий
+// нейтральний конверт, без кольору тіра) — гравець не повинен здогадатись
+// про рідкість ДО кліку. Різниця між тірами проявляється лише в самий момент
+// розльоту частинок під час перевороту картки, той самий підхід, що в
+// лутбоксах FIFA/CS2: кожен тір відчутно інший (кількість/розліт осколків),
+// але це видно тільки як частина самого розкриття, не заздалегідь.
+// Дистанції навмисно невеликі й консервативні (макс. shardDist+shardLen
+// ~114px від медальйону на y=130) — щоб ефект завжди лишався всередині
+// картки 320×600 і не вилазив за верхній край чи рамку.
+const TIER_BURST = {
+  Common: { shards: 5, shardDist: 46, shardLen: 12, duration: 0.55 },
+  Rare: { shards: 9, shardDist: 60, shardLen: 15, duration: 0.65 },
+  Epic: { shards: 12, shardDist: 74, shardLen: 18, duration: 0.8 },
+  Legendary: { shards: 16, shardDist: 92, shardLen: 22, duration: 0.95 },
+};
+
+// Розрив паку — не дві половинки, а сітка дрібних фрагментів (лазерне
+// розсічення на шматки), що розлітаються врізнобіч від центру картки.
+// Кожен фрагмент — це div з тим самим фоновим зображенням паку, зсунутим
+// (backgroundPosition) так, щоб показувати саме свій шматок — той самий
+// прийом, що й у css-спрайтах, тільки навпаки (одна картинка ріжеться на N
+// вікон замість N картинок в одній).
+const SHATTER_COLS = 6;
+const SHATTER_ROWS = 9;
+const TILE_W = 320 / SHATTER_COLS;
+const TILE_H = 600 / SHATTER_ROWS;
+const SHATTER_IDLE = { x: 0, y: 0, rotate: 0, opacity: 1, scale: 1 };
+const SHATTER_DURATION = 0.55;
+
+// pack-seal.png — 1024×1536 (не рівно 320×600!), тому фон фрагментів має
+// відтворювати те саме "cover"-масштабування й обрізку по центру, що
+// browser сам робив для суцільного паку (background-size: cover). Інакше
+// backgroundSize із фіксованим 320×600 просто розтягує/сплющує картинку під
+// неправильні пропорції — саме це й було зіпсовано в попередній версії.
+const PACK_IMG_W = 1024;
+const PACK_IMG_H = 1536;
+const PACK_COVER_SCALE = Math.max(320 / PACK_IMG_W, 600 / PACK_IMG_H);
+const PACK_COVER_W = PACK_IMG_W * PACK_COVER_SCALE;
+const PACK_COVER_H = PACK_IMG_H * PACK_COVER_SCALE;
+const PACK_OFFSET_X = (PACK_COVER_W - 320) / 2;
+const PACK_OFFSET_Y = (PACK_COVER_H - 600) / 2;
+
+// Лазерний промінь, що "розрізає" пак у першу мить розриву — діагональна
+// яскрава смуга пробігає зліва направо, mix-blend-mode screen дає ефект
+// прожига, а не просто білої заливки.
+const LASER_TRANSITION = { duration: 0.26, ease: "easeIn" };
+
+// Скільки повних обертів картка робить під час вильоту з паку, помножене на
+// 360 і зупинене саме на кратному 360 значенні (перед завжди на 0 за
+// власним rotateY, зад — на 180 всередині себе) — щоб фінальний кадр вильоту
+// показував ПЕРЕД без візуального "стрибка" при переході на подальші ручні
+// перевороти (ті просто додають/віднімають 180 від цієї бази).
+const BASE_ROTATE = 1080;
+
+const SPIN_TIMES = [0, 0.32, 0.62, 0.85, 1];
+const SPIN_KEYFRAMES = {
+  rotateY: [180, 560, 920, 1050, BASE_ROTATE],
+  scale: [0.12, 0.4, 0.85, 1.08, 1],
+  y: [46, 14, -10, 3, 0],
+  opacity: [0, 1, 1, 1, 1],
+};
+const SPIN_TRANSITION = {
+  duration: 1.3,
+  times: SPIN_TIMES,
+  ease: ["easeIn", "circOut", "circOut", "backOut"],
+};
+const FLIP_TRANSITION = { duration: 0.7, ease: [0.2, 0.8, 0.2, 1] };
 
 const uid = (team) => String(team.id ?? team.name).replace(/[^a-zA-Z0-9]/g, "");
 
@@ -58,21 +140,48 @@ export const TeamCard = forwardRef(function TeamCard({ team }, ref) {
   const { t } = useI18n();
   const frontRef = useRef(null);
   const backRef = useRef(null);
-  const [generated, setGenerated] = useState(false);
+  // Пак, який цей браузер вже відкривав раніше (localStorage, без бекенду —
+  // команди тут нікому не належать), одразу стартує в "opened"/revealed без
+  // програвання анімації розкриття заново.
+  const alreadyOpened = useMemo(() => isPackOpened(team.id), [team.id]);
   const [flipped, setFlipped] = useState(false);
-  const [entered, setEntered] = useState(false);
-  const [transition, setTransition] = useState(GEN_TRANSITION);
+  // closed -> tearing (пак розсікається лазером на фрагменти, що розлітаються)
+  // -> flash -> opened (картка летить з обертами й гальмує) -> revealed=true.
+  const [packPhase, setPackPhase] = useState(alreadyOpened ? "opened" : "closed");
+  const [burst, setBurst] = useState(false);
+  const [revealed, setRevealed] = useState(alreadyOpened);
 
   useImperativeHandle(ref, () => (flipped ? backRef.current : frontRef.current), [flipped]);
 
-  useEffect(() => {
-    if (!generated) return;
-    // Подвійний rAF — щоб браузер встиг зафіксувати стартовий "крихітний"
-    // стан у DOM перед тим, як ми поставимо transition і кінцевий transform,
-    // інакше CSS-перехід не запуститься (стрибне одразу в кінцевий стан).
-    const id = requestAnimationFrame(() => requestAnimationFrame(() => setEntered(true)));
-    return () => cancelAnimationFrame(id);
-  }, [generated]);
+  // Сітка фрагментів для розриву паку — рахується один раз при монтуванні
+  // (пак відкривається рівно один раз за життя цього компонента), кожен
+  // фрагмент летить у своєму напрямку від центру картки (160,300) з власною
+  // випадковою дистанцією/обертанням/невеликою затримкою для органічності.
+  const shatterTiles = useMemo(() => {
+    const tiles = [];
+    for (let row = 0; row < SHATTER_ROWS; row++) {
+      for (let col = 0; col < SHATTER_COLS; col++) {
+        const cx = col * TILE_W + TILE_W / 2;
+        const cy = row * TILE_H + TILE_H / 2;
+        let dx = cx - 160;
+        let dy = cy - 300;
+        const mag = Math.hypot(dx, dy) || 1;
+        dx /= mag;
+        dy /= mag;
+        const travel = 70 + Math.random() * 150;
+        tiles.push({
+          id: `${row}-${col}`,
+          left: col * TILE_W,
+          top: row * TILE_H,
+          tx: dx * travel,
+          ty: dy * travel,
+          rotate: (Math.random() * 2 - 1) * 70,
+          delay: Math.random() * 0.05,
+        });
+      }
+    }
+    return tiles;
+  }, []);
 
   const mainPlayers = team.players.filter((p) => !p.isSubstitute);
   const unit = t(`unit.${DISCIPLINES[team.discipline].unitKey}`);
@@ -86,53 +195,164 @@ export const TeamCard = forwardRef(function TeamCard({ team }, ref) {
   const Back = DISCIPLINE_BACK[team.discipline] ?? GenericBack;
 
   function handleFlip() {
-    if (!entered) return;
-    setTransition(FLIP_TRANSITION);
+    if (!revealed) return;
     setFlipped((v) => !v);
   }
+
+  // Клік по паку: лазерний промінь розсікає пак -> сітка фрагментів
+  // розлітається врізнобіч і гасне -> коротка вспишка -> пак зникає, картка
+  // вилітає з обертами. Таймінг нижче збігається з SHATTER_DURATION (0.55s),
+  // інакше пак зникне раніше/пізніше, ніж фрагменти встигнуть розлетітись.
+  function handlePackClick() {
+    playSound(laserSoundUrl, 0.55);
+    playSound(shatterSoundUrl, 0.45);
+    setPackPhase("tearing");
+    setTimeout(() => setPackPhase("flash"), SHATTER_DURATION * 1000);
+    setTimeout(() => {
+      setPackPhase("opened");
+      playSound(whooshSoundUrl, 0.5);
+    }, SHATTER_DURATION * 1000 + 170);
+  }
+
+  // Кінець вильоту-з-обертами (перший виклик; далі onAnimationComplete
+  // спрацьовує і на ручних перевертаннях, але revealed вже true — нема ефекту).
+  function handleSpinComplete() {
+    if (revealed) return;
+    setRevealed(true);
+    setBurst(true);
+    markPackOpened(team.id);
+    setTimeout(() => setBurst(false), TIER_BURST[rarity].duration * 1000 + 150);
+  }
+
+  const showPack = packPhase === "closed" || packPhase === "tearing";
+  const showFlash = packPhase === "flash";
+  const showCard = packPhase === "opened";
+  const tearing = packPhase === "tearing";
 
   return (
     <div className="flex flex-col items-center gap-3">
       <div style={{ perspective: "1200px", width: 320, height: 600, position: "relative" }}>
-        {!generated && (
-          <button
-            type="button"
-            data-testid="team-card-generate"
-            onClick={() => setGenerated(true)}
-            className="absolute inset-0 z-10 border-2 border-dashed border-[#3f3f46] grid place-items-center text-[#a1a1aa] font-mono text-xs uppercase tracking-widest hover:border-cyan hover:text-cyan transition-colors bg-void"
+        {showPack && (
+          <motion.div
+            className="absolute inset-0"
+            style={{ zIndex: 10 }}
+            // Повільне "дихання" паку в стані спокою — запрошує клікнути, поки
+            // не почався розріз. Зупиняється сама щойно tearing=true, бо
+            // animate перемикається на нейтральний стан без repeat.
+            animate={
+              !tearing
+                ? {
+                    scale: [1, 1.02, 1],
+                    filter: [
+                      "drop-shadow(0 0 10px rgba(0,240,255,0.18))",
+                      "drop-shadow(0 0 28px rgba(0,240,255,0.5))",
+                      "drop-shadow(0 0 10px rgba(0,240,255,0.18))",
+                    ],
+                  }
+                : { scale: 1, filter: "drop-shadow(0 0 10px rgba(0,240,255,0.18))" }
+            }
+            transition={
+              !tearing
+                ? { duration: 2.4, repeat: Infinity, ease: "easeInOut" }
+                : { duration: 0.15 }
+            }
           >
-            {t("profile.card.generate")}
-          </button>
+            {shatterTiles.map((tl) => (
+              <motion.div
+                key={tl.id}
+                className="absolute"
+                style={{
+                  left: tl.left,
+                  top: tl.top,
+                  width: TILE_W + 0.5,
+                  height: TILE_H + 0.5,
+                  backgroundImage: `url(${packSealUrl})`,
+                  backgroundSize: `${PACK_COVER_W}px ${PACK_COVER_H}px`,
+                  backgroundPosition: `-${tl.left + PACK_OFFSET_X}px -${tl.top + PACK_OFFSET_Y}px`,
+                }}
+                animate={
+                  tearing
+                    ? { x: tl.tx, y: tl.ty, rotate: tl.rotate, opacity: 0, scale: 0.6 }
+                    : SHATTER_IDLE
+                }
+                transition={
+                  tearing
+                    ? { duration: SHATTER_DURATION, delay: tl.delay, ease: "easeOut" }
+                    : { duration: 0.15 }
+                }
+              />
+            ))}
+            {/* Лазерний розріз — яскрава діагональна смуга пробігає по паку в
+                першу мить розриву, mix-blend-mode screen дає ефект прожига. */}
+            <motion.div
+              className="absolute inset-0 pointer-events-none"
+              style={{
+                background:
+                  "linear-gradient(100deg, transparent 44%, #00f0ff 49%, #fff 50%, #00f0ff 51%, transparent 56%)",
+                mixBlendMode: "screen",
+              }}
+              initial={{ opacity: 0, x: "-70%" }}
+              animate={tearing ? { opacity: [0, 1, 0], x: ["-70%", "70%"] } : { opacity: 0 }}
+              transition={tearing ? LASER_TRANSITION : { duration: 0.1 }}
+            />
+            <button
+              type="button"
+              data-testid="team-card-generate"
+              aria-label={t("profile.card.generate")}
+              onClick={handlePackClick}
+              disabled={tearing}
+              className="absolute inset-0 bg-transparent border-none cursor-pointer"
+            />
+          </motion.div>
         )}
-        <div
-          onClick={handleFlip}
-          data-testid="team-card-flip"
-          style={{
-            position: "relative",
-            width: "100%",
-            height: "100%",
-            transformStyle: "preserve-3d",
-            transition,
-            transform: entered
-              ? `scale(1) rotateY(${flipped ? 180 : 0}deg)`
-              : "scale(0.05) rotateY(0deg)",
-            opacity: entered ? 1 : 0,
-            cursor: generated ? "pointer" : "default",
-          }}
-        >
-          <Front
-            ref={frontRef}
-            team={team}
-            rarity={rarity}
-            rating={rating}
-            unit={unit}
-            mainPlayers={mainPlayers}
-            tier={tier}
+        {showFlash && (
+          <motion.div
+            className="absolute inset-0 z-20 pointer-events-none rounded-md"
+            style={{ background: "radial-gradient(circle, #fff 0%, rgba(255,255,255,0) 72%)" }}
+            initial={{ opacity: 0, scale: 0.6 }}
+            animate={{ opacity: [0, 1, 0], scale: [0.6, 1.4, 1.6] }}
+            transition={{ duration: 0.17, ease: "easeOut" }}
           />
-          <Back ref={backRef} team={team} rarity={rarity} tier={tier} />
-        </div>
+        )}
+        {showCard && (
+          <motion.div
+            onClick={handleFlip}
+            data-testid="team-card-flip"
+            style={{
+              position: "relative",
+              width: "100%",
+              height: "100%",
+              transformStyle: "preserve-3d",
+              cursor: revealed ? "pointer" : "default",
+            }}
+            initial={
+              alreadyOpened
+                ? { rotateY: BASE_ROTATE, scale: 1, y: 0, opacity: 1 }
+                : { rotateY: 180, scale: 0.12, y: 46, opacity: 0 }
+            }
+            animate={
+              revealed
+                ? { rotateY: flipped ? BASE_ROTATE + 180 : BASE_ROTATE, scale: 1, y: 0, opacity: 1 }
+                : SPIN_KEYFRAMES
+            }
+            transition={revealed ? FLIP_TRANSITION : SPIN_TRANSITION}
+            onAnimationComplete={handleSpinComplete}
+          >
+            <Front
+              ref={frontRef}
+              team={team}
+              rarity={rarity}
+              rating={rating}
+              unit={unit}
+              mainPlayers={mainPlayers}
+              tier={tier}
+            />
+            <Back ref={backRef} team={team} rarity={rarity} tier={tier} />
+          </motion.div>
+        )}
+        {burst && <BurstParticles tier={tier} rarity={rarity} />}
       </div>
-      {generated && (
+      {revealed && (
         <p className="text-[11px] font-mono text-[#52525b] uppercase tracking-widest">
           {t("profile.card.flipHint")}
         </p>
@@ -140,6 +360,89 @@ export const TeamCard = forwardRef(function TeamCard({ team }, ref) {
     </div>
   );
 });
+
+// ---------------------------------------------------------------------------
+// Ефект розкриття рідкості — три шари замість хаотичних точок (ті виглядали
+// як випадкове сміття на картці): тонована спалах-заливка, ударна хвиля-кільце
+// й акуратні "осколки"-стрики (короткі світні риски, що летять по прямій, а
+// не безформні цятки). Усе навмисно тримається в межах ~114px від медальйону
+// (TIER_BURST), щоб нічого не вилазило за рамку картки. Показується лише в
+// момент розкриття (не раніше) — єдине, що фактично видає рідкість команди.
+function BurstParticles({ tier, rarity }) {
+  const cfg = TIER_BURST[rarity] ?? TIER_BURST.Common;
+  const shards = useMemo(
+    () =>
+      Array.from({ length: cfg.shards }, (_, i) => {
+        const angle = (i / cfg.shards) * 360 + (Math.random() * 14 - 7);
+        return {
+          id: i,
+          angle,
+          dist: cfg.shardDist * (0.75 + Math.random() * 0.3),
+          len: cfg.shardLen * (0.8 + Math.random() * 0.4),
+        };
+      }),
+    [cfg]
+  );
+  return (
+    <div style={{ position: "absolute", inset: 0, zIndex: 30, pointerEvents: "none", overflow: "hidden" }}>
+      {/* Точка вильоту — медальйон з лого команди (cy=130 у Front-компонентах). */}
+      <div style={{ position: "absolute", left: "50%", top: 130, width: 0, height: 0 }}>
+        <motion.div
+          initial={{ opacity: 0, scale: 0.3 }}
+          animate={{ opacity: [0, 0.55, 0], scale: [0.3, 1, 1.15] }}
+          transition={{ duration: cfg.duration * 0.7, ease: "easeOut" }}
+          style={{
+            position: "absolute",
+            left: -110,
+            top: -110,
+            width: 220,
+            height: 220,
+            borderRadius: "50%",
+            background: `radial-gradient(circle, ${tier.color}55 0%, transparent 70%)`,
+          }}
+        />
+        <motion.div
+          initial={{ opacity: 0.9, scale: 0.25 }}
+          animate={{ opacity: 0, scale: 1 }}
+          transition={{ duration: cfg.duration, ease: "circOut" }}
+          style={{
+            position: "absolute",
+            left: -95,
+            top: -95,
+            width: 190,
+            height: 190,
+            borderRadius: "50%",
+            border: `2px solid ${tier.color}`,
+            boxShadow: `0 0 18px ${tier.glow}`,
+          }}
+        />
+        {shards.map((s) => {
+          const rad = (s.angle * Math.PI) / 180;
+          return (
+            <motion.span
+              key={s.id}
+              initial={{ x: 0, y: 0, opacity: 1 }}
+              animate={{ x: Math.cos(rad) * s.dist, y: Math.sin(rad) * s.dist, opacity: 0 }}
+              transition={{ duration: cfg.duration, ease: "easeOut" }}
+              style={{
+                position: "absolute",
+                left: 0,
+                top: 0,
+                width: s.len,
+                height: 3,
+                borderRadius: 2,
+                background: `linear-gradient(90deg, ${tier.color}, transparent)`,
+                transformOrigin: "left center",
+                transform: `rotate(${s.angle}deg)`,
+                boxShadow: `0 0 6px ${tier.glow}`,
+              }}
+            />
+          );
+        })}
+      </div>
+    </div>
+  );
+}
 
 // ---------------------------------------------------------------------------
 // Спільна рамка з тонкими кутовими скобами та ромбовими шипами по кутах —

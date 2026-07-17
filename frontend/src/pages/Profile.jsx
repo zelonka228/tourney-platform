@@ -1,9 +1,9 @@
 import { useEffect, useRef, useState } from "react";
 import { Link } from "react-router-dom";
 import { motion } from "framer-motion";
-import { toPng } from "html-to-image";
 import { useI18n } from "../lib/i18n";
 import { getTeams, getPlayerStats } from "../lib/api";
+import { downloadTeamCard } from "../lib/exportCard";
 import { socket } from "../lib/socket";
 import {
   avgRating,
@@ -11,6 +11,7 @@ import {
   liveRankFromStats,
   liveNickFromStats,
   teamRarity,
+  RARITY_TIERS,
   DISCIPLINES,
   DISCIPLINE_LIST,
   VALORANT_RANKS,
@@ -19,8 +20,9 @@ import { Btn, Overline, Panel, Stat, Input, Select } from "../components/arena";
 import { PlayerStatsWidget } from "../components/PlayerStatsWidget";
 import { TeamCard } from "../components/TeamCard";
 import { AnimatedNumber } from "../components/motion";
-
-const RARITY_TIERS = ["Common", "Rare", "Epic", "Legendary"];
+import { Skeleton } from "../components/Skeleton";
+import { ScaleToFit } from "../components/ScaleToFit";
+import { TeamMatchHistory } from "../components/TeamMatchHistory";
 
 // Ranks (Valorant) don't have a natural "count up" — but avgRating already
 // resolves them to a numeric VALORANT_RANKS index under the hood, so the
@@ -35,6 +37,7 @@ export function Profile() {
   // from under whoever has a detail view open.
   const [sel, setSel] = useState(null);
   const [teams, setTeams] = useState([]);
+  const [loading, setLoading] = useState(true);
   const [query, setQuery] = useState("");
   const [disciplineFilter, setDisciplineFilter] = useState("all");
   // PlayerRow eager-fetches live stats for any linked player on mount (not
@@ -52,7 +55,10 @@ export function Profile() {
   const cardRef = useRef(null);
 
   useEffect(() => {
-    getTeams().then(setTeams);
+    getTeams().then((data) => {
+      setTeams(data);
+      setLoading(false);
+    });
     const onChanged = () => getTeams().then(setTeams);
     socket.on("teams:changed", onChanged);
     return () => socket.off("teams:changed", onChanged);
@@ -68,25 +74,10 @@ export function Profile() {
   }, [sel, teams]);
 
   async function downloadCard(teamName) {
-    if (!cardRef.current) return;
     setCardSaving(true);
-    // The back face keeps its own rotateY(180deg) in its inline style at all
-    // times (it's what cancels the parent flip container's rotation so the
-    // back reads right-side-up when flipped). html-to-image snapshots this
-    // node in isolation, without that parent, so the un-cancelled rotateY
-    // mirrors the whole export. Clearing it just for the snapshot (and
-    // restoring right after) keeps the live flip visual intact.
-    const el = cardRef.current;
-    const prevTransform = el.style.transform;
-    el.style.transform = "none";
     try {
-      const dataUrl = await toPng(el);
-      const a = document.createElement("a");
-      a.href = dataUrl;
-      a.download = `${teamName}-card.png`;
-      a.click();
+      await downloadTeamCard(cardRef.current, teamName);
     } finally {
-      el.style.transform = prevTransform;
       setCardSaving(false);
     }
   }
@@ -123,7 +114,18 @@ export function Profile() {
           </Select>
         </div>
         <div className="grid sm:grid-cols-2 lg:grid-cols-3 gap-4 mt-8">
-          {teams
+          {loading &&
+            Array.from({ length: 6 }, (_, i) => (
+              <div key={i} className="p-5 flex items-center gap-4 border border-[#27272a] clip-corner">
+                <Skeleton className="w-12 h-12 shrink-0" />
+                <div className="min-w-0 flex-1">
+                  <Skeleton className="h-4 w-3/4" />
+                  <Skeleton className="h-3 w-1/2 mt-2" />
+                </div>
+              </div>
+            ))}
+          {!loading &&
+            teams
             .map((team, i) => ({ team, i }))
             .filter(({ team }) => team.name.toLowerCase().includes(query.trim().toLowerCase()))
             .filter(({ team }) => disciplineFilter === "all" || team.discipline === disciplineFilter)
@@ -279,13 +281,24 @@ export function Profile() {
               ))}
             </div>
           </Panel>
+          <Panel clip className="p-6" data-testid="team-match-history-panel">
+            <Overline>{t("matchHistory.title")}</Overline>
+            <div className="mt-3">
+              <TeamMatchHistory
+                teamId={team.id}
+                teamsById={Object.fromEntries(teams.map((tm) => [tm.id, tm]))}
+              />
+            </div>
+          </Panel>
           <Panel
             clip
             className="p-6 flex flex-col items-center gap-4"
             data-testid="team-card-panel"
           >
             <Overline className="self-start">{t("profile.card.open")}</Overline>
-            <TeamCard ref={cardRef} team={team} />
+            <ScaleToFit width={320}>
+              <TeamCard ref={cardRef} team={team} />
+            </ScaleToFit>
             <Btn
               variant="primary"
               data-testid="team-card-download"
@@ -364,11 +377,13 @@ function PlayerRow({ p, discipline, onLiveElo }) {
           className={`w-1.5 h-1.5 rotate-45 shrink-0 ${clickable ? "bg-cyan group-hover:shadow-[0_0_6px_#00f0ff]" : "bg-cyan/60"}`}
         />
         <div className="min-w-0">
-          <div
-            className={`text-sm truncate ${clickable ? "text-white group-hover:text-cyan transition-colors" : "text-white"}`}
+          <Link
+            to={`/player/${p.id}`}
+            onClick={(e) => e.stopPropagation()}
+            className={`text-sm truncate block hover:underline hover:text-cyan ${clickable ? "text-white group-hover:text-cyan transition-colors" : "text-white"}`}
           >
             {displayNick}
-          </div>
+          </Link>
           <div className="text-[11px] font-mono text-[#a1a1aa]">{p.role}</div>
         </div>
         <span className="ml-auto font-mono text-sm text-cyan">{displayRank}</span>

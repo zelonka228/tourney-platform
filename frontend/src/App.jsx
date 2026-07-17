@@ -2,10 +2,13 @@ import { BrowserRouter, NavLink, Route, Routes, useNavigate, useLocation } from 
 import { AnimatePresence, motion, MotionConfig } from "framer-motion";
 import { I18nProvider, useI18n } from "./lib/i18n";
 import { AuthProvider, useAuth } from "./lib/auth";
+import { ToastProvider } from "./lib/toast";
 import { Landing } from "./pages/Landing";
 import { Create } from "./pages/Create";
 import { Team } from "./pages/Team";
 import { Profile } from "./pages/Profile";
+import { Player } from "./pages/Player";
+import { Collection } from "./pages/Collection";
 import { Hall } from "./pages/Hall";
 import { Tournament } from "./pages/Tournament";
 import { Login } from "./pages/Login";
@@ -19,6 +22,7 @@ const links = [
   { to: "/tournament", key: "nav.tournament" },
   { to: "/team", key: "nav.team", requiresContentManager: true },
   { to: "/profile", key: "nav.profile" },
+  { to: "/collection", key: "nav.collection" },
   { to: "/hall", key: "nav.hall" },
 ];
 
@@ -155,6 +159,8 @@ function AnimatedRoutes() {
           <Route path="/tournament/:id?" element={<Tournament />} />
           <Route path="/team/:id?" element={<Team />} />
           <Route path="/profile" element={<Profile />} />
+          <Route path="/player/:id" element={<Player />} />
+          <Route path="/collection" element={<Collection />} />
           <Route path="/hall" element={<Hall />} />
           <Route path="/login" element={<Login />} />
           <Route path="/register" element={<Register />} />
@@ -185,11 +191,13 @@ export default function App() {
   return (
     <I18nProvider>
       <AuthProvider>
-        <MotionConfig reducedMotion="user">
-          <BrowserRouter>
-            <Shell />
-          </BrowserRouter>
-        </MotionConfig>
+        <ToastProvider>
+          <MotionConfig reducedMotion="user">
+            <BrowserRouter>
+              <Shell />
+            </BrowserRouter>
+          </MotionConfig>
+        </ToastProvider>
       </AuthProvider>
     </I18nProvider>
   );
