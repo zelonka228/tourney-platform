@@ -40,7 +40,21 @@ export function ScaleToFit({ width, children }) {
   return (
     <div
       ref={outerRef}
-      style={{ width: "100%", height: naturalHeight * scale, display: "flex", justifyContent: "center" }}
+      style={{
+        width: "100%",
+        height: naturalHeight * scale,
+        display: "flex",
+        justifyContent: "center",
+        // transform: scale() below only shrinks the CHILD visually — it does
+        // NOT shrink its layout box, so the un-transformed 320px-wide inner
+        // div still overflows this flex container on narrow (mobile)
+        // viewports and inflates every ancestor's scrollWidth, causing
+        // page-level horizontal scroll even though the card LOOKS correctly
+        // sized. Clipping here is a no-op visually (the scaled content
+        // already fits within the outer's real width) and just stops that
+        // invisible overflow from propagating up.
+        overflow: "hidden",
+      }}
     >
       <div ref={innerRef} style={{ width, transform: `scale(${scale})`, transformOrigin: "top center" }}>
         {children}

@@ -73,7 +73,7 @@ function CollectionCard({ team }) {
   }
 
   return (
-    <Panel clip className="p-6 flex flex-col items-center gap-4">
+    <Panel clip className="p-6 flex flex-col items-center gap-4 min-w-0 w-full">
       <Overline className="self-start w-full truncate">{team.name}</Overline>
       <ScaleToFit width={320}>
         <TeamCard ref={cardRef} team={team} />

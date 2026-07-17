@@ -200,7 +200,7 @@ export function Profile() {
       </h1>
 
       <div className="grid lg:grid-cols-[340px_1fr] gap-6 mt-8 items-start">
-        <Panel clip>
+        <Panel clip className="min-w-0">
           <div className="flex items-center gap-4 p-5 border-b border-[#27272a]">
             <Logo logo={team.logo} className="w-14 h-14" />
             <div>
@@ -249,7 +249,7 @@ export function Profile() {
           </div>
         </Panel>
 
-        <div className="space-y-4">
+        <div className="space-y-4 min-w-0">
           <Panel clip className="p-6">
             <Overline>{t("profile.rating")}</Overline>
             <div className="font-mono text-5xl text-cyan mt-4">
@@ -292,7 +292,7 @@ export function Profile() {
           </Panel>
           <Panel
             clip
-            className="p-6 flex flex-col items-center gap-4"
+            className="p-6 flex flex-col items-center gap-4 min-w-0 w-full"
             data-testid="team-card-panel"
           >
             <Overline className="self-start">{t("profile.card.open")}</Overline>
