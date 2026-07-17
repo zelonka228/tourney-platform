@@ -1,5 +1,5 @@
 import { BrowserRouter, NavLink, Route, Routes, useNavigate, useLocation } from "react-router-dom";
-import { AnimatePresence, motion, MotionConfig } from "framer-motion";
+import { AnimatePresence, motion, MotionConfig, useReducedMotion } from "framer-motion";
 import { I18nProvider, useI18n } from "./lib/i18n";
 import { AuthProvider, useAuth } from "./lib/auth";
 import { Landing } from "./pages/Landing";
@@ -138,10 +138,42 @@ function Header() {
   );
 }
 
+const ROUTE_ELEMENTS = (
+  <>
+    <Route path="/" element={<Landing />} />
+    <Route path="/create" element={<Create />} />
+    <Route path="/tournament/:id?" element={<Tournament />} />
+    <Route path="/team/:id?" element={<Team />} />
+    <Route path="/profile" element={<Profile />} />
+    <Route path="/hall" element={<Hall />} />
+    <Route path="/login" element={<Login />} />
+    <Route path="/register" element={<Register />} />
+    <Route path="/account" element={<Account />} />
+    <Route path="/admin/users" element={<AdminUsers />} />
+  </>
+);
+
 function AnimatedRoutes() {
   const location = useLocation();
+  // AnimatePresence's exit-complete tracking is what unmounts the old page
+  // and lets the new one take its place — but with prefers-reduced-motion
+  // active (MotionConfig above respects it, per-user, by design), Framer
+  // Motion collapses the exit transition to zero duration, and that
+  // tracking can then just never fire: reproduced consistently (both
+  // locally and on the deployed build) as login/register succeeding —
+  // correct token issued, URL already changed to /account — while the old
+  // page stayed stuck on screen forever, looking exactly like the account
+  // had vanished. Tried dropping mode="wait" first; the exiting page still
+  // never got removed, just left sitting there under the new one. Given
+  // reduced motion means these users see no transition anyway, skip the
+  // animated mount/unmount for them entirely and render plain, instant
+  // Routes — nothing here depends on an animation callback firing.
+  const reducedMotion = useReducedMotion();
+  if (reducedMotion) {
+    return <Routes location={location}>{ROUTE_ELEMENTS}</Routes>;
+  }
   return (
-    <AnimatePresence mode="wait">
+    <AnimatePresence>
       <motion.div
         key={location.pathname}
         initial={{ opacity: 0, y: 12 }}
@@ -149,18 +181,7 @@ function AnimatedRoutes() {
         exit={{ opacity: 0, y: -8 }}
         transition={{ duration: 0.28, ease: [0.22, 1, 0.36, 1] }}
       >
-        <Routes location={location}>
-          <Route path="/" element={<Landing />} />
-          <Route path="/create" element={<Create />} />
-          <Route path="/tournament/:id?" element={<Tournament />} />
-          <Route path="/team/:id?" element={<Team />} />
-          <Route path="/profile" element={<Profile />} />
-          <Route path="/hall" element={<Hall />} />
-          <Route path="/login" element={<Login />} />
-          <Route path="/register" element={<Register />} />
-          <Route path="/account" element={<Account />} />
-          <Route path="/admin/users" element={<AdminUsers />} />
-        </Routes>
+        <Routes location={location}>{ROUTE_ELEMENTS}</Routes>
       </motion.div>
     </AnimatePresence>
   );
