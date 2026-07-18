@@ -92,7 +92,7 @@ export function PlayerStatsWidget({ status, data, error, onRetry }) {
     stats.kd != null && { v: stats.kd.toFixed(2), l: "K/D" },
     stats.hsPercent != null && { v: `${Math.round(stats.hsPercent)}%`, l: "HS%" },
     stats.winratePercent != null && { v: `${Math.round(stats.winratePercent)}%`, l: "WIN%" },
-    stats.winStreak != null && { v: stats.winStreak, l: "STREAK" },
+    stats.winStreak != null && { v: stats.winStreak, l: t("profile.streak").toUpperCase() },
   ].filter(Boolean);
 
   return (

@@ -523,6 +523,7 @@ const faceStyle = (extra) => ({
 
 // ---------------------------------------------------------------------------
 const CardFront = forwardRef(function CardFront({ team, rarity, rating, unit, mainPlayers, tier }, ref) {
+  const { t } = useI18n();
   const id = uid(team);
   return (
     <div ref={ref} style={faceStyle({ background: "transparent" })}>
@@ -604,20 +605,23 @@ const CardFront = forwardRef(function CardFront({ team, rarity, rating, unit, ma
           }}
         >
           <span>
-            WINRATE <b style={{ color: "#f4f4f5", fontFamily: "'JetBrains Mono', monospace" }}>{team.winrate ?? "—"}</b>
+            {t("profile.winrate").toUpperCase()}{" "}
+            <b style={{ color: "#f4f4f5", fontFamily: "'JetBrains Mono', monospace" }}>{team.winrate ?? "—"}</b>
           </span>
           <span>
-            СТРІК <b style={{ color: "#f4f4f5", fontFamily: "'JetBrains Mono', monospace" }}>{team.streak ?? "—"}</b>
+            {t("profile.streak").toUpperCase()}{" "}
+            <b style={{ color: "#f4f4f5", fontFamily: "'JetBrains Mono', monospace" }}>{team.streak ?? "—"}</b>
           </span>
           <span>
-            ТУРНІРІВ <b style={{ color: "#f4f4f5", fontFamily: "'JetBrains Mono', monospace" }}>{team.tournaments}</b>
+            {t("profile.tournaments").toUpperCase()}{" "}
+            <b style={{ color: "#f4f4f5", fontFamily: "'JetBrains Mono', monospace" }}>{team.tournaments}</b>
           </span>
         </div>
 
         <div style={{ width: "78%", height: 1, background: tier.color, opacity: 0.3, marginTop: 18 }} />
 
         <div style={{ fontFamily: "'JetBrains Mono', monospace", fontSize: 9, letterSpacing: "0.15em", color: "#71717a", marginTop: 14 }}>
-          СКЛАД · {unit.toUpperCase()}
+          {t("profile.roster").toUpperCase()} · {unit.toUpperCase()}
         </div>
 
         <div style={{ width: "80%", marginTop: 8 }}>
@@ -769,6 +773,7 @@ const dotaHexGrid = (id, opacity, color) => (
 // характер, ніж Unbounded у CS2 чи Bebas Neue у Valorant), той самий
 // контент-флоу (top:194), що й CardFront/ValorantFront.
 const DotaFront = forwardRef(function DotaFront({ team, rarity, rating, unit, mainPlayers, tier }, ref) {
+  const { t } = useI18n();
   const id = uid(team);
   return (
     <div ref={ref} style={faceStyle({ background: "transparent" })}>
@@ -846,20 +851,23 @@ const DotaFront = forwardRef(function DotaFront({ team, rarity, rating, unit, ma
           }}
         >
           <span>
-            WINRATE <b style={{ color: "#f4f4f5", fontFamily: "'JetBrains Mono', monospace" }}>{team.winrate ?? "—"}</b>
+            {t("profile.winrate").toUpperCase()}{" "}
+            <b style={{ color: "#f4f4f5", fontFamily: "'JetBrains Mono', monospace" }}>{team.winrate ?? "—"}</b>
           </span>
           <span>
-            СТРІК <b style={{ color: "#f4f4f5", fontFamily: "'JetBrains Mono', monospace" }}>{team.streak ?? "—"}</b>
+            {t("profile.streak").toUpperCase()}{" "}
+            <b style={{ color: "#f4f4f5", fontFamily: "'JetBrains Mono', monospace" }}>{team.streak ?? "—"}</b>
           </span>
           <span>
-            ТУРНІРІВ <b style={{ color: "#f4f4f5", fontFamily: "'JetBrains Mono', monospace" }}>{team.tournaments}</b>
+            {t("profile.tournaments").toUpperCase()}{" "}
+            <b style={{ color: "#f4f4f5", fontFamily: "'JetBrains Mono', monospace" }}>{team.tournaments}</b>
           </span>
         </div>
 
         <div style={{ width: "78%", height: 1, background: tier.color, opacity: 0.3, marginTop: 16 }} />
 
         <div style={{ fontFamily: "'JetBrains Mono', monospace", fontSize: 9, letterSpacing: "0.15em", color: "#71717a", marginTop: 12 }}>
-          СКЛАД · {unit.toUpperCase()}
+          {t("profile.roster").toUpperCase()} · {unit.toUpperCase()}
         </div>
 
         <div style={{ width: "80%", marginTop: 7 }}>
@@ -1022,6 +1030,7 @@ const ValorantFront = forwardRef(function ValorantFront(
   { team, rarity, rating, unit, mainPlayers, tier },
   ref
 ) {
+  const { t } = useI18n();
   const id = uid(team);
   return (
     <div ref={ref} style={faceStyle({ background: "transparent" })}>
@@ -1100,20 +1109,23 @@ const ValorantFront = forwardRef(function ValorantFront(
           }}
         >
           <span>
-            WINRATE <b style={{ color: "#f4f4f5", fontFamily: "'JetBrains Mono', monospace" }}>{team.winrate ?? "—"}</b>
+            {t("profile.winrate").toUpperCase()}{" "}
+            <b style={{ color: "#f4f4f5", fontFamily: "'JetBrains Mono', monospace" }}>{team.winrate ?? "—"}</b>
           </span>
           <span>
-            СТРІК <b style={{ color: "#f4f4f5", fontFamily: "'JetBrains Mono', monospace" }}>{team.streak ?? "—"}</b>
+            {t("profile.streak").toUpperCase()}{" "}
+            <b style={{ color: "#f4f4f5", fontFamily: "'JetBrains Mono', monospace" }}>{team.streak ?? "—"}</b>
           </span>
           <span>
-            ТУРНІРІВ <b style={{ color: "#f4f4f5", fontFamily: "'JetBrains Mono', monospace" }}>{team.tournaments}</b>
+            {t("profile.tournaments").toUpperCase()}{" "}
+            <b style={{ color: "#f4f4f5", fontFamily: "'JetBrains Mono', monospace" }}>{team.tournaments}</b>
           </span>
         </div>
 
         <div style={{ width: "80%", height: 1, background: tier.color, opacity: 0.3, marginTop: 16 }} />
 
         <div style={{ fontFamily: "'JetBrains Mono', monospace", fontSize: 9, letterSpacing: "0.15em", color: "#71717a", marginTop: 12 }}>
-          СКЛАД · {unit.toUpperCase()}
+          {t("profile.roster").toUpperCase()} · {unit.toUpperCase()}
         </div>
 
         <div style={{ width: "84%", marginTop: 6 }}>
