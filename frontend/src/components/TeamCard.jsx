@@ -5,7 +5,7 @@
 // .superpowers/brainstorm (final-full-demo-v5.html для CS2, push-quality-v6.html
 // для Dota-самоцвіту), перенесені сюди 1:1 де це можливо.
 import { forwardRef, useImperativeHandle, useMemo, useRef, useState } from "react";
-import { motion, useReducedMotion } from "framer-motion";
+import { motion } from "framer-motion";
 import { useI18n } from "../lib/i18n";
 import {
   avgRating,
@@ -138,7 +138,6 @@ const uid = (team) => String(team.id ?? team.name).replace(/[^a-zA-Z0-9]/g, "");
 // (видимої) сторони картки, а не на обгортку з 3D-трансформацією.
 export const TeamCard = forwardRef(function TeamCard({ team }, ref) {
   const { t } = useI18n();
-  const reducedMotion = useReducedMotion();
   const frontRef = useRef(null);
   const backRef = useRef(null);
   // Пак, який цей браузер вже відкривав раніше (localStorage, без бекенду —
@@ -212,28 +211,17 @@ export const TeamCard = forwardRef(function TeamCard({ team }, ref) {
     setTimeout(() => {
       setPackPhase("opened");
       playSound(whooshSoundUrl, 0.5);
-      // MotionConfig reducedMotion="user" (App.jsx) can leave a multi-keyframe
-      // animate (SPIN_KEYFRAMES below) stuck on its initial frame forever for
-      // reduced-motion users — its onAnimationComplete then never fires, so
-      // revealed/markPackOpened would never happen and the card could never be
-      // flipped. Skip straight to the settled/revealed state for these users
-      // instead of waiting on that callback.
-      if (reducedMotion) revealCard();
     }, SHATTER_DURATION * 1000 + 170);
-  }
-
-  function revealCard() {
-    if (revealed) return;
-    setRevealed(true);
-    setBurst(true);
-    markPackOpened(team.id);
-    setTimeout(() => setBurst(false), TIER_BURST[rarity].duration * 1000 + 150);
   }
 
   // Кінець вильоту-з-обертами (перший виклик; далі onAnimationComplete
   // спрацьовує і на ручних перевертаннях, але revealed вже true — нема ефекту).
   function handleSpinComplete() {
-    revealCard();
+    if (revealed) return;
+    setRevealed(true);
+    setBurst(true);
+    markPackOpened(team.id);
+    setTimeout(() => setBurst(false), TIER_BURST[rarity].duration * 1000 + 150);
   }
 
   const showPack = packPhase === "closed" || packPhase === "tearing";
@@ -330,51 +318,25 @@ export const TeamCard = forwardRef(function TeamCard({ team }, ref) {
           <motion.div
             onClick={handleFlip}
             data-testid="team-card-flip"
-            style={
-              reducedMotion
-                ? {
-                    // Framer Motion's own reducedMotion handling (MotionConfig in
-                    // App.jsx) does not reliably apply a rotateY change here in
-                    // testing — the flip (and, before packPhase reached "opened",
-                    // the reveal spin) just never visually completed. Bypassing
-                    // animate entirely and driving the transform straight off
-                    // React state is the same fix already applied to routing in
-                    // App.jsx for these users.
-                    position: "relative",
-                    width: "100%",
-                    height: "100%",
-                    transformStyle: "preserve-3d",
-                    cursor: revealed ? "pointer" : "default",
-                    rotateY: flipped ? BASE_ROTATE + 180 : BASE_ROTATE,
-                    scale: 1,
-                    y: 0,
-                    opacity: 1,
-                  }
-                : {
-                    position: "relative",
-                    width: "100%",
-                    height: "100%",
-                    transformStyle: "preserve-3d",
-                    cursor: revealed ? "pointer" : "default",
-                  }
+            style={{
+              position: "relative",
+              width: "100%",
+              height: "100%",
+              transformStyle: "preserve-3d",
+              cursor: revealed ? "pointer" : "default",
+            }}
+            initial={
+              alreadyOpened
+                ? { rotateY: BASE_ROTATE, scale: 1, y: 0, opacity: 1 }
+                : { rotateY: 180, scale: 0.12, y: 46, opacity: 0 }
             }
-            {...(reducedMotion
-              ? {}
-              : {
-                  initial: alreadyOpened
-                    ? { rotateY: BASE_ROTATE, scale: 1, y: 0, opacity: 1 }
-                    : { rotateY: 180, scale: 0.12, y: 46, opacity: 0 },
-                  animate: revealed
-                    ? {
-                        rotateY: flipped ? BASE_ROTATE + 180 : BASE_ROTATE,
-                        scale: 1,
-                        y: 0,
-                        opacity: 1,
-                      }
-                    : SPIN_KEYFRAMES,
-                  transition: revealed ? FLIP_TRANSITION : SPIN_TRANSITION,
-                  onAnimationComplete: handleSpinComplete,
-                })}
+            animate={
+              revealed
+                ? { rotateY: flipped ? BASE_ROTATE + 180 : BASE_ROTATE, scale: 1, y: 0, opacity: 1 }
+                : SPIN_KEYFRAMES
+            }
+            transition={revealed ? FLIP_TRANSITION : SPIN_TRANSITION}
+            onAnimationComplete={handleSpinComplete}
           >
             <Front
               ref={frontRef}

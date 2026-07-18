@@ -3,14 +3,7 @@
 // Both respect MotionConfig(reducedMotion="user") set in App.jsx: framer
 // automatically simplifies/skips these when the OS asks for less motion.
 import { useEffect, useRef } from "react";
-import {
-  motion,
-  useInView,
-  useMotionValue,
-  useReducedMotion,
-  useSpring,
-  useTransform,
-} from "framer-motion";
+import { motion, useInView, useMotionValue, useSpring, useTransform } from "framer-motion";
 
 // Counts up to `value`. Non-numeric values (e.g. the "—" placeholder shown
 // before live stats load) render as plain text — there's nothing to animate
@@ -32,7 +25,6 @@ import {
 export function AnimatedNumber({ value, className = "", format, immediate = false }) {
   const ref = useRef(null);
   const inView = useInView(ref, { once: true, margin: "-10% 0px" });
-  const reducedMotion = useReducedMotion();
   const motionValue = useMotionValue(0);
   const spring = useSpring(motionValue, { stiffness: 60, damping: 18 });
   const display = useTransform(spring, (v) => (format ? format(v) : Math.round(v).toLocaleString()));
@@ -45,16 +37,6 @@ export function AnimatedNumber({ value, className = "", format, immediate = fals
     return (
       <span ref={ref} className={className}>
         {value}
-      </span>
-    );
-  }
-  // The spring's frame-by-frame convergence isn't guaranteed to ever resolve
-  // for reduced-motion users (the same class of stuck-animation issue fixed
-  // in App.jsx for route transitions) — just show the final value directly.
-  if (reducedMotion) {
-    return (
-      <span ref={ref} className={className}>
-        {format ? format(value) : Math.round(value).toLocaleString()}
       </span>
     );
   }
