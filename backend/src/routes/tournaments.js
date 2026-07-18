@@ -254,8 +254,25 @@ router.put(
       checkNameLength(name);
     }
 
-    const existing = await prisma.tournament.findUnique({ where: { id } });
+    const existing = await prisma.tournament.findUnique({
+      where: { id },
+      include: { _count: { select: { matches: true } } },
+    });
     if (!existing) throw new HttpError(404, "Турнір не знайдено.");
+
+    // bracketType/matchFormat drive how the Match rows were generated (bracket
+    // shape, and which scorelines isValidScore accepts) — changing either
+    // once matches exist would desync already-generated/played matches from
+    // the tournament's own settings, same class of problem the register/
+    // reorder guards above already prevent for the team list.
+    if (existing._count.matches > 0) {
+      if (bracketType !== undefined && bracketType !== existing.bracketType) {
+        throw new HttpError(409, "Сітку вже згенеровано, тип сітки більше не можна змінити.");
+      }
+      if (matchFormat !== undefined && Number(matchFormat) !== existing.matchFormat) {
+        throw new HttpError(409, "Сітку вже згенеровано, формат матчів більше не можна змінити.");
+      }
+    }
 
     const data = {
       ...(name !== undefined ? { name } : {}),
