@@ -45,6 +45,17 @@ export function ScaleToFit({ width, children }) {
         height: naturalHeight * scale,
         display: "flex",
         justifyContent: "center",
+        // Flex containers default to align-items:stretch — without overriding
+        // it, this div's explicit height (0 on the very first render, before
+        // naturalHeight is measured) stretches `inner` down to match it too,
+        // clobbering inner's own natural auto-height. That fed back into the
+        // ResizeObserver below reading inner.offsetHeight as 0 forever (it's
+        // *actually* 0 by then, not just unmeasured), so naturalHeight never
+        // left 0 and the card never appeared at all, on any screen size —
+        // verified live: adding this alone fixed offsetHeight from 0 to the
+        // real 630 without touching anything else. flex-start lets inner
+        // size itself from its own content regardless of outer's height.
+        alignItems: "flex-start",
         // transform: scale() below only shrinks the CHILD visually — it does
         // NOT shrink its layout box, so the un-transformed 320px-wide inner
         // div still overflows this flex container on narrow (mobile)
