@@ -258,9 +258,9 @@ export function Team() {
           {t("team.title")}
         </h1>
         <Panel clip className="p-6 mt-8 max-w-md">
-          <p className="text-[#a1a1aa] text-sm">{t("auth.adminOnly")}</p>
+          <p className="text-[#a1a1aa] text-sm">{t("auth.contentManagerOnly")}</p>
           <Link to="/login" className="block mt-4 text-cyan text-sm hover:underline">
-            {t("auth.signInToEdit")}
+            {t("auth.signInToEditContent")}
           </Link>
         </Panel>
       </div>
