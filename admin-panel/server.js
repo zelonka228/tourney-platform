@@ -6,7 +6,7 @@ import { createServer } from "node:http";
 import { readFile } from "node:fs/promises";
 import { exec } from "node:child_process";
 import { fileURLToPath } from "node:url";
-import { dirname, join, extname } from "node:path";
+import { dirname, join, extname, resolve, sep } from "node:path";
 
 const __dirname = dirname(fileURLToPath(import.meta.url));
 const PORT = 5588;
@@ -14,9 +14,25 @@ const PORT = 5588;
 const MIME = { ".html": "text/html", ".js": "text/javascript", ".css": "text/css" };
 
 const server = createServer(async (req, res) => {
-  const path = req.url === "/" ? "/index.html" : req.url;
+  // req.url is attacker-controlled input (even on a "local-only" tool — any
+  // page open in the same browser, or any other local process, can hit this
+  // port). Decode it and resolve `..` segments, then verify the result is
+  // still inside __dirname before touching the filesystem — otherwise
+  // "/../../backend/.env" walks straight out of this directory and serves
+  // arbitrary files from disk (confirmed: leaked JWT_SECRET + API keys).
+  let decodedPath;
   try {
-    const filePath = join(__dirname, path);
+    decodedPath = decodeURIComponent((req.url === "/" ? "/index.html" : req.url).split("?")[0]);
+  } catch {
+    res.writeHead(400);
+    return res.end("Bad request");
+  }
+  const filePath = resolve(__dirname, "." + decodedPath);
+  if (filePath !== __dirname && !filePath.startsWith(__dirname + sep)) {
+    res.writeHead(403);
+    return res.end("Forbidden");
+  }
+  try {
     const data = await readFile(filePath);
     res.writeHead(200, { "Content-Type": MIME[extname(filePath)] || "text/plain" });
     res.end(data);
