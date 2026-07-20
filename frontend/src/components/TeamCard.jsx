@@ -5,7 +5,13 @@
 // .superpowers/brainstorm (final-full-demo-v5.html для CS2, push-quality-v6.html
 // для Dota-самоцвіту), перенесені сюди 1:1 де це можливо.
 import { forwardRef, useImperativeHandle, useMemo, useRef, useState } from "react";
-import { motion } from "framer-motion";
+import {
+  motion,
+  useMotionValue,
+  useSpring,
+  useTransform,
+  useReducedMotion,
+} from "framer-motion";
 import { useI18n } from "../lib/i18n";
 import {
   avgRating,
@@ -140,6 +146,54 @@ export const TeamCard = forwardRef(function TeamCard({ team }, ref) {
   const { t } = useI18n();
   const frontRef = useRef(null);
   const backRef = useRef(null);
+  const reducedMotion = useReducedMotion();
+
+  // Holographic tilt — mouse position (0..1 within the card) drives a small
+  // rotateX/rotateY on a wrapper AROUND the existing pack/flip motion.div,
+  // so it composes with (rather than fights) that div's own `animate`-driven
+  // rotateY. Springs give the tilt a bit of physical lag instead of snapping
+  // straight to the cursor, and settle back to flat (0.5, 0.5 -> 0deg both
+  // axes) on mouse-leave for free, since that's just their rest value.
+  // Never wired up at all when reduced-motion is on — mouseX/mouseY simply
+  // never change from center, so the card stays flat with no code branching
+  // needed at render time (see the earlier reduced-motion incident in this
+  // file's history: a tool built entirely around continuous mouse-driven
+  // transforms like this one is exactly the kind of thing that must not
+  // silently animate for users who asked their OS not to).
+  const mouseX = useMotionValue(0.5);
+  const mouseY = useMotionValue(0.5);
+  const tiltX = useSpring(useTransform(mouseY, [0, 1], [9, -9]), {
+    stiffness: 300,
+    damping: 30,
+  });
+  const tiltY = useSpring(useTransform(mouseX, [0, 1], [-9, 9]), {
+    stiffness: 300,
+    damping: 30,
+  });
+  const sheenBackground = useTransform([mouseX, mouseY], ([mx, my]) =>
+    `radial-gradient(circle at ${mx * 100}% ${my * 100}%, rgba(255,255,255,0.55), transparent 45%),
+     linear-gradient(${115 + mx * 60}deg, transparent 35%, rgba(0,240,255,0.35) 45%, rgba(223,255,0,0.3) 50%, rgba(233,75,214,0.3) 55%, transparent 65%)`
+  );
+
+  const [hovering, setHovering] = useState(false);
+
+  // Sheen visibility piggybacks on the same mousemove handler that already
+  // drives the tilt, rather than a separate onMouseEnter — mouseenter is a
+  // notoriously easy event to lose track of (it doesn't bubble, and browsers
+  // vary on exactly when it re-fires for pointer paths that re-enter the
+  // same element), whereas mousemove reliably fires on every real hover.
+  function handleTiltMove(e) {
+    if (reducedMotion) return;
+    const rect = e.currentTarget.getBoundingClientRect();
+    mouseX.set((e.clientX - rect.left) / rect.width);
+    mouseY.set((e.clientY - rect.top) / rect.height);
+    setHovering(true);
+  }
+  function handleTiltLeave() {
+    mouseX.set(0.5);
+    mouseY.set(0.5);
+    setHovering(false);
+  }
   // Пак, який цей браузер вже відкривав раніше (localStorage, без бекенду —
   // команди тут нікому не належать), одразу стартує в "opened"/revealed без
   // програвання анімації розкриття заново.
@@ -327,38 +381,70 @@ export const TeamCard = forwardRef(function TeamCard({ team }, ref) {
         )}
         {showCard && (
           <motion.div
-            onClick={handleFlip}
-            data-testid="team-card-flip"
+            onMouseMove={revealed ? handleTiltMove : undefined}
+            onMouseLeave={revealed ? handleTiltLeave : undefined}
             style={{
               position: "relative",
               width: "100%",
               height: "100%",
               transformStyle: "preserve-3d",
-              cursor: revealed ? "pointer" : "default",
+              rotateX: tiltX,
+              rotateY: tiltY,
             }}
-            initial={
-              alreadyOpened
-                ? { rotateY: BASE_ROTATE, scale: 1, y: 0, opacity: 1 }
-                : { rotateY: 180, scale: 0.12, y: 46, opacity: 0 }
-            }
-            animate={
-              revealed
-                ? { rotateY: flipped ? BASE_ROTATE + 180 : BASE_ROTATE, scale: 1, y: 0, opacity: 1 }
-                : SPIN_KEYFRAMES
-            }
-            transition={revealed ? FLIP_TRANSITION : SPIN_TRANSITION}
-            onAnimationComplete={handleSpinComplete}
           >
-            <Front
-              ref={frontRef}
-              team={team}
-              rarity={rarity}
-              rating={rating}
-              unit={unit}
-              mainPlayers={mainPlayers}
-              tier={tier}
-            />
-            <Back ref={backRef} team={team} rarity={rarity} tier={tier} />
+            <motion.div
+              onClick={handleFlip}
+              data-testid="team-card-flip"
+              style={{
+                position: "relative",
+                width: "100%",
+                height: "100%",
+                transformStyle: "preserve-3d",
+                cursor: revealed ? "pointer" : "default",
+              }}
+              initial={
+                alreadyOpened
+                  ? { rotateY: BASE_ROTATE, scale: 1, y: 0, opacity: 1 }
+                  : { rotateY: 180, scale: 0.12, y: 46, opacity: 0 }
+              }
+              animate={
+                revealed
+                  ? { rotateY: flipped ? BASE_ROTATE + 180 : BASE_ROTATE, scale: 1, y: 0, opacity: 1 }
+                  : SPIN_KEYFRAMES
+              }
+              transition={revealed ? FLIP_TRANSITION : SPIN_TRANSITION}
+              onAnimationComplete={handleSpinComplete}
+            >
+              <Front
+                ref={frontRef}
+                team={team}
+                rarity={rarity}
+                rating={rating}
+                unit={unit}
+                mainPlayers={mainPlayers}
+                tier={tier}
+              />
+              <Back ref={backRef} team={team} rarity={rarity} tier={tier} />
+            </motion.div>
+            {/* Foil-card light sheen — flat overlay (not part of the 3D
+                surface itself, same trick most "holographic card" web demos
+                use), brightening and tracking the cursor only while actively
+                hovering. Never rendered for reduced-motion, same reasoning
+                as the tilt above. */}
+            {!reducedMotion && (
+              <motion.div
+                aria-hidden
+                style={{
+                  position: "absolute",
+                  inset: 0,
+                  background: sheenBackground,
+                  mixBlendMode: "color-dodge",
+                  pointerEvents: "none",
+                }}
+                animate={{ opacity: hovering ? 0.55 : 0 }}
+                transition={{ duration: 0.25 }}
+              />
+            )}
           </motion.div>
         )}
         {burst && <BurstParticles tier={tier} rarity={rarity} />}
