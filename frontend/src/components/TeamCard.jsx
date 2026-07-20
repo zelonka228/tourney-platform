@@ -151,7 +151,18 @@ export const TeamCard = forwardRef(function TeamCard({ team }, ref) {
   const [burst, setBurst] = useState(false);
   const [revealed, setRevealed] = useState(alreadyOpened);
 
-  useImperativeHandle(ref, () => (flipped ? backRef.current : frontRef.current), [flipped]);
+  // { node, face } замість голого DOM-вузла — face потрібен лише на
+  // виклику (downloadTeamCard), щоб ім'я файлу відрізняло перед/зад,
+  // інакше збереження заду перезаписувало б щойно збережений перед
+  // (той самий teamName-card.png для обох).
+  useImperativeHandle(
+    ref,
+    () => ({
+      node: flipped ? backRef.current : frontRef.current,
+      face: flipped ? "back" : "front",
+    }),
+    [flipped]
+  );
 
   // Сітка фрагментів для розриву паку — рахується один раз при монтуванні
   // (пак відкривається рівно один раз за життя цього компонента), кожен
