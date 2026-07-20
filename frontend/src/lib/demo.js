@@ -137,9 +137,15 @@ export function seedPositions(size) {
 // незалежно від team.tournaments.
 export const RARITY_TIERS = ["Common", "Rare", "Epic", "Legendary"];
 
+// Бекенд пише team.best у форматі "1 місце ×N" виключно при реальній
+// перемозі у фіналі — єдиний надійний сигнал "команда колись вигравала".
+export function hasTournamentWin(team) {
+  return /^1 місце ×\d+$/.test(team?.best ?? "");
+}
+
 export function teamRarity(team) {
   if (team.rarityOverride) return team.rarityOverride;
-  if (!/^1 місце ×\d+$/.test(team.best ?? "")) return "Common";
+  if (!hasTournamentWin(team)) return "Common";
   const wins = team.tournaments ?? 0;
   if (wins >= 3) return "Legendary";
   if (wins === 2) return "Epic";

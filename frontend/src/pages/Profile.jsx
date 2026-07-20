@@ -23,6 +23,7 @@ import { AnimatedNumber } from "../components/motion";
 import { Skeleton } from "../components/Skeleton";
 import { ScaleToFit } from "../components/ScaleToFit";
 import { TeamMatchHistory } from "../components/TeamMatchHistory";
+import { TeamAchievements } from "../components/TeamAchievements";
 
 // Ranks (Valorant) don't have a natural "count up" — but avgRating already
 // resolves them to a numeric VALORANT_RANKS index under the hood, so the
@@ -279,6 +280,15 @@ export function Profile() {
                   {tier}
                 </span>
               ))}
+            </div>
+          </Panel>
+          <Panel clip className="p-6" data-testid="team-achievements-panel">
+            <Overline>{t("achievements.title")}</Overline>
+            <div className="mt-4">
+              <TeamAchievements
+                team={team}
+                teamsById={Object.fromEntries(teams.map((tm) => [tm.id, tm]))}
+              />
             </div>
           </Panel>
           <Panel clip className="p-6" data-testid="team-match-history-panel">
