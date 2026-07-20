@@ -10,8 +10,38 @@ let token = localStorage.getItem(LS_TOKEN) || null;
 let backendUrl = localStorage.getItem(LS_BACKEND) || DEFAULT_BACKEND_URL;
 let currentUser = null;
 let teamsCache = [];
+let usersCache = [];
+let tournamentsCache = [];
 
 const $ = (id) => document.getElementById(id);
+
+// Small square thumbnail for a base64 dataURL avatar/logo, or a dim
+// diamond placeholder when none is set — same visual convention as the
+// main site's <Logo> fallback (Profile.jsx), just plain DOM here since
+// this panel has no framework.
+function avatarEl(src) {
+  if (src) {
+    const img = document.createElement("img");
+    img.className = "avatar";
+    img.src = src;
+    img.alt = "";
+    return img;
+  }
+  const div = document.createElement("div");
+  div.className = "avatar-placeholder";
+  div.innerHTML = "<span></span>";
+  return div;
+}
+
+function nameCell(avatarSrc, text) {
+  const td = document.createElement("td");
+  td.className = "name-cell";
+  td.appendChild(avatarEl(avatarSrc));
+  const span = document.createElement("span");
+  span.textContent = text;
+  td.appendChild(span);
+  return td;
+}
 
 function setBackendUrl(url) {
   backendUrl = url.replace(/\/$/, "");
@@ -74,7 +104,14 @@ function logout() {
 function onLoggedIn() {
   $("loginBox").style.display = "none";
   $("app").style.display = "block";
-  $("whoBox").textContent = `${currentUser.username} (${currentUser.role})`;
+  $("whoBox").innerHTML = "";
+  $("whoBox").append(
+    `${currentUser.username} `,
+    Object.assign(document.createElement("span"), {
+      className: "role-tag",
+      textContent: `(${currentUser.role})`,
+    })
+  );
   $("logoutBtn").style.display = "inline-block";
   loadUsers();
   loadTeams();
@@ -113,22 +150,32 @@ const ROLES = ["admin", "organizer", "user"];
 async function loadUsers() {
   $("usersMsg").textContent = "";
   try {
-    const users = await apiFetch("/api/admin/users");
-    renderUsers(users);
+    usersCache = await apiFetch("/api/admin/users");
+    applyUsersFilter();
   } catch (e) {
     $("usersMsg").textContent = e.message;
     $("usersMsg").className = "msg error";
   }
 }
 
+function applyUsersFilter() {
+  const q = $("usersFilter").value.trim().toLowerCase();
+  const filtered = q ? usersCache.filter((u) => u.username.toLowerCase().includes(q)) : usersCache;
+  $("usersCount").textContent = `${filtered.length} / ${usersCache.length}`;
+  renderUsers(filtered);
+}
+
 function renderUsers(users) {
   const body = $("usersBody");
   body.innerHTML = "";
+  if (users.length === 0) {
+    body.innerHTML = '<tr class="empty-row"><td colspan="4">Нікого не знайдено</td></tr>';
+    return;
+  }
   for (const u of users) {
     const tr = document.createElement("tr");
 
-    const tdName = document.createElement("td");
-    tdName.textContent = u.username;
+    const tdName = nameCell(u.avatar, u.username);
 
     const tdRole = document.createElement("td");
     const roleSelect = document.createElement("select");
@@ -215,23 +262,32 @@ const RARITIES = ["", "Common", "Rare", "Epic", "Legendary"];
 async function loadTeams() {
   $("teamsMsg").textContent = "";
   try {
-    const teams = await apiFetch("/api/teams");
-    teamsCache = teams;
-    renderTeams(teams);
+    teamsCache = await apiFetch("/api/teams");
+    applyTeamsFilter();
   } catch (e) {
     $("teamsMsg").textContent = e.message;
     $("teamsMsg").className = "msg error";
   }
 }
 
+function applyTeamsFilter() {
+  const q = $("teamsFilter").value.trim().toLowerCase();
+  const filtered = q ? teamsCache.filter((t) => t.name.toLowerCase().includes(q)) : teamsCache;
+  $("teamsCount").textContent = `${filtered.length} / ${teamsCache.length}`;
+  renderTeams(filtered);
+}
+
 function renderTeams(teams) {
   const body = $("teamsBody");
   body.innerHTML = "";
+  if (teams.length === 0) {
+    body.innerHTML = '<tr class="empty-row"><td colspan="5">Нічого не знайдено</td></tr>';
+    return;
+  }
   for (const t of teams) {
     const tr = document.createElement("tr");
 
-    const tdName = document.createElement("td");
-    tdName.textContent = t.name;
+    const tdName = nameCell(t.logo, t.name);
 
     const tdDisc = document.createElement("td");
     tdDisc.textContent = t.discipline;
@@ -292,17 +348,30 @@ const STATUSES = ["draft", "completed"];
 async function loadTournaments() {
   $("tournamentsMsg").textContent = "";
   try {
-    const tours = await apiFetch("/api/tournaments");
-    renderTournaments(tours);
+    tournamentsCache = await apiFetch("/api/tournaments");
+    applyTournamentsFilter();
   } catch (e) {
     $("tournamentsMsg").textContent = e.message;
     $("tournamentsMsg").className = "msg error";
   }
 }
 
+function applyTournamentsFilter() {
+  const q = $("tournamentsFilter").value.trim().toLowerCase();
+  const filtered = q
+    ? tournamentsCache.filter((tr) => tr.name.toLowerCase().includes(q))
+    : tournamentsCache;
+  $("tournamentsCount").textContent = `${filtered.length} / ${tournamentsCache.length}`;
+  renderTournaments(filtered);
+}
+
 function renderTournaments(tours) {
   const body = $("tournamentsBody");
   body.innerHTML = "";
+  if (tours.length === 0) {
+    body.innerHTML = '<tr class="empty-row"><td colspan="5">Нічого не знайдено</td></tr>';
+    return;
+  }
   for (const tour of tours) {
     const tr = document.createElement("tr");
 
@@ -470,5 +539,8 @@ $("resetConfirmBtn").addEventListener("click", confirmReset);
 $("registerCancelBtn").addEventListener("click", closeRegisterModal);
 $("registerConfirmBtn").addEventListener("click", confirmRegister);
 $("createTourBtn").addEventListener("click", createTournament);
+$("usersFilter").addEventListener("input", applyUsersFilter);
+$("teamsFilter").addEventListener("input", applyTeamsFilter);
+$("tournamentsFilter").addEventListener("input", applyTournamentsFilter);
 initTabs();
 restoreSession();

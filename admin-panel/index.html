@@ -2,137 +2,256 @@
 <html lang="uk">
 <head>
 <meta charset="utf-8" />
-<title>Admin Panel — Tourney Platform</title>
+<meta name="viewport" content="width=device-width, initial-scale=1" />
+<title>Admin Panel — TourneyForge</title>
+<link rel="preconnect" href="https://fonts.googleapis.com" />
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+<link
+  rel="stylesheet"
+  href="https://fonts.googleapis.com/css2?family=Unbounded:wght@600;700;800&family=IBM+Plex+Sans:wght@400;500;600;700&family=JetBrains+Mono:wght@400;500;700&display=swap"
+/>
 <style>
+  :root {
+    --void: #09090b;
+    --surface: #18181b;
+    --surface-2: #27272a;
+    --surface-3: #3f3f46;
+    --cyan: #00f0ff;
+    --volt: #dfff00;
+    --danger: #ff0055;
+    --ink: #fafafa;
+    --mut: #a1a1aa;
+    --faint: #71717a;
+    --faintest: #52525b;
+  }
   * { box-sizing: border-box; }
   body {
     margin: 0;
-    font-family: -apple-system, Segoe UI, Arial, sans-serif;
-    background: #f4f4f5;
-    color: #18181b;
+    font-family: "IBM Plex Sans", -apple-system, Segoe UI, Arial, sans-serif;
+    background: var(--void);
+    color: var(--ink);
+    background-image:
+      radial-gradient(circle at 15% 0%, rgba(0, 240, 255, 0.06), transparent 45%),
+      radial-gradient(circle at 85% 100%, rgba(223, 255, 0, 0.04), transparent 45%);
+    background-attachment: fixed;
+    min-height: 100vh;
+  }
+  .mono { font-family: "JetBrains Mono", ui-monospace, monospace; }
+  .overline {
+    font-family: "JetBrains Mono", monospace;
+    font-size: 11px;
+    text-transform: uppercase;
+    letter-spacing: 0.14em;
+    color: var(--faint);
   }
   header {
-    background: #18181b;
-    color: #fff;
-    padding: 14px 20px;
+    background: rgba(9, 9, 11, 0.85);
+    backdrop-filter: blur(14px);
+    border-bottom: 1px solid var(--surface-2);
+    padding: 14px 24px;
     display: flex;
     align-items: center;
     gap: 16px;
     flex-wrap: wrap;
+    position: sticky;
+    top: 0;
+    z-index: 40;
   }
-  header h1 { font-size: 16px; margin: 0; font-weight: 600; }
+  .brand { display: flex; align-items: center; gap: 10px; }
+  .brand .dot {
+    width: 10px; height: 10px; background: var(--cyan);
+    transform: rotate(45deg);
+    box-shadow: 0 0 12px rgba(0, 240, 255, 0.5);
+  }
+  header h1 {
+    font-family: "Unbounded", sans-serif;
+    font-size: 15px; margin: 0; font-weight: 700; letter-spacing: -0.01em;
+  }
+  header h1 span { color: var(--faint); font-weight: 500; }
   header .spacer { flex: 1; }
-  header input {
-    background: #27272a;
-    border: 1px solid #3f3f46;
-    color: #fff;
-    padding: 6px 8px;
-    border-radius: 4px;
-    font-size: 13px;
+  .backend-field { display: flex; align-items: center; gap: 8px; }
+  .backend-field label.overline { white-space: nowrap; }
+  header input.mono {
+    background: var(--surface);
+    border: 1px solid var(--surface-2);
+    color: var(--mut);
+    padding: 7px 10px;
+    border-radius: 3px;
+    font-size: 12px;
+    width: 260px;
+    transition: border-color 0.15s;
   }
-  header .who { font-size: 13px; color: #a1a1aa; }
-  main { max-width: 1100px; margin: 0 auto; padding: 20px; }
+  header input.mono:focus { outline: none; border-color: var(--cyan); color: var(--ink); }
+  .who { font-size: 12px; color: var(--mut); font-family: "JetBrains Mono", monospace; }
+  .who .role-tag { color: var(--volt); }
+  main { max-width: 1180px; margin: 0 auto; padding: 28px 24px 60px; }
+
   .login-box {
-    max-width: 340px;
-    margin: 60px auto;
-    background: #fff;
-    border: 1px solid #d4d4d8;
-    border-radius: 8px;
-    padding: 24px;
+    max-width: 360px;
+    margin: 80px auto;
+    background: var(--surface);
+    border: 1px solid var(--surface-2);
+    clip-path: polygon(0 0, 100% 0, 100% calc(100% - 16px), calc(100% - 16px) 100%, 0 100%);
+    padding: 28px;
   }
-  .login-box h2 { margin-top: 0; font-size: 16px; }
-  label { display: block; font-size: 12px; color: #52525b; margin: 10px 0 4px; }
+  .login-box h2 {
+    margin: 0 0 4px;
+    font-family: "Unbounded", sans-serif;
+    font-size: 18px;
+    font-weight: 700;
+  }
+  .login-box .sub { color: var(--faint); font-size: 12px; margin-bottom: 20px; }
+
+  label.overline { display: block; margin: 14px 0 6px; }
+  label.overline:first-of-type { margin-top: 0; }
   input[type=text], input[type=password], input[type=date], select, textarea {
     width: 100%;
-    padding: 8px;
-    border: 1px solid #d4d4d8;
-    border-radius: 4px;
+    padding: 10px 11px;
+    border: 1px solid var(--surface-2);
+    border-radius: 3px;
     font-size: 14px;
-    background: #fff;
-    color: #18181b;
+    background: var(--void);
+    color: var(--ink);
+    font-family: inherit;
+    transition: border-color 0.15s;
   }
+  input:focus, select:focus, textarea:focus {
+    outline: none;
+    border-color: var(--cyan);
+    box-shadow: 0 0 0 1px var(--cyan);
+  }
+  select { cursor: pointer; }
+  td select { width: auto; min-width: 118px; }
+
   button {
     cursor: pointer;
-    border: 1px solid #d4d4d8;
-    background: #fff;
-    padding: 7px 12px;
-    border-radius: 4px;
-    font-size: 13px;
-    color: #18181b;
+    border: 1px solid var(--surface-3);
+    background: transparent;
+    color: var(--ink);
+    padding: 8px 14px;
+    border-radius: 3px;
+    font-size: 12px;
+    font-family: "JetBrains Mono", monospace;
+    text-transform: uppercase;
+    letter-spacing: 0.04em;
+    transition: border-color 0.15s, color 0.15s, background-color 0.15s;
   }
-  button:hover { background: #f4f4f5; }
-  button.primary { background: #18181b; color: #fff; border-color: #18181b; }
-  button.primary:hover { background: #3f3f46; }
-  button.danger { color: #b91c1c; border-color: #fecaca; }
-  button.danger:hover { background: #fef2f2; }
-  button:disabled { opacity: 0.5; cursor: not-allowed; }
-  .tabs { display: flex; gap: 4px; margin-bottom: 16px; border-bottom: 1px solid #d4d4d8; }
+  button:hover { border-color: var(--cyan); color: var(--cyan); }
+  button.primary {
+    background: var(--cyan); color: var(--void); border-color: var(--cyan); font-weight: 700;
+  }
+  button.primary:hover { filter: brightness(1.1); color: var(--void); border-color: var(--cyan); }
+  button.danger { color: var(--danger); border-color: rgba(255, 0, 85, 0.35); }
+  button.danger:hover { background: rgba(255, 0, 85, 0.1); border-color: var(--danger); }
+  button:disabled { opacity: 0.4; cursor: not-allowed; }
+  button.small { padding: 5px 10px; font-size: 11px; }
+
+  .tabs { display: flex; gap: 4px; margin-bottom: 22px; border-bottom: 1px solid var(--surface-2); }
   .tabs button {
-    border: none;
-    border-bottom: 2px solid transparent;
-    border-radius: 0;
-    background: none;
-    padding: 10px 4px;
-    margin-right: 16px;
-    font-size: 14px;
-    color: #71717a;
+    border: none; border-bottom: 2px solid transparent; border-radius: 0;
+    background: none; padding: 10px 4px; margin-right: 22px;
+    font-size: 13px; color: var(--faint); text-transform: none; letter-spacing: 0;
+    font-family: "IBM Plex Sans", sans-serif; font-weight: 500;
   }
-  .tabs button.active { color: #18181b; border-bottom-color: #18181b; font-weight: 600; }
+  .tabs button:hover { color: var(--mut); border-color: transparent; }
+  .tabs button.active { color: var(--cyan); border-bottom-color: var(--cyan); font-weight: 600; }
+
   .panel { display: none; }
   .panel.active { display: block; }
-  table { width: 100%; border-collapse: collapse; background: #fff; border: 1px solid #e4e4e7; border-radius: 6px; overflow: hidden; }
-  th, td { text-align: left; padding: 8px 10px; border-bottom: 1px solid #e4e4e7; font-size: 13px; vertical-align: middle; }
-  th { background: #fafafa; color: #52525b; font-weight: 600; font-size: 12px; text-transform: uppercase; letter-spacing: 0.03em; }
-  tr:last-child td { border-bottom: none; }
-  .row-actions { display: flex; gap: 6px; flex-wrap: wrap; }
-  .create-box {
-    background: #fff;
-    border: 1px solid #e4e4e7;
-    border-radius: 6px;
-    padding: 16px;
-    margin-bottom: 16px;
+
+  .toolbar { display: flex; gap: 10px; align-items: center; margin-bottom: 14px; flex-wrap: wrap; }
+  .toolbar input[type=text] { max-width: 260px; }
+  .toolbar .count { font-family: "JetBrains Mono", monospace; font-size: 11px; color: var(--faintest); }
+
+  .card {
+    background: var(--surface);
+    border: 1px solid var(--surface-2);
   }
-  .create-box h3 { margin: 0 0 10px; font-size: 14px; }
-  .create-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(140px, 1fr)); gap: 10px; align-items: end; }
+  .table-wrap { overflow-x: auto; border: 1px solid var(--surface-2); }
+  table { width: 100%; min-width: 640px; border-collapse: collapse; background: var(--surface); border: none; }
+  th, td { text-align: left; padding: 10px 12px; border-bottom: 1px solid var(--surface-2); font-size: 13px; vertical-align: middle; }
+  th {
+    background: rgba(255, 255, 255, 0.02);
+    color: var(--faint);
+    font-weight: 600; font-size: 10.5px;
+    text-transform: uppercase; letter-spacing: 0.08em;
+    font-family: "JetBrains Mono", monospace;
+  }
+  tr:last-child td { border-bottom: none; }
+  tbody tr:hover { background: rgba(255, 255, 255, 0.02); }
+  .row-actions { display: flex; gap: 6px; flex-wrap: wrap; }
+  .empty-row td { text-align: center; color: var(--faintest); padding: 28px 12px; font-size: 13px; }
+
+  .avatar {
+    width: 32px; height: 32px; border-radius: 3px; object-fit: cover;
+    border: 1px solid var(--surface-2); display: block; background: var(--void);
+  }
+  .avatar-placeholder {
+    width: 32px; height: 32px; border-radius: 3px; border: 1px solid var(--surface-2);
+    background: var(--void); display: flex; align-items: center; justify-content: center;
+  }
+  .avatar-placeholder span {
+    width: 8px; height: 8px; border: 1px solid rgba(0, 240, 255, 0.4); transform: rotate(45deg);
+  }
+  .name-cell { display: flex; align-items: center; gap: 10px; }
+
+  .create-box {
+    background: var(--surface);
+    border: 1px solid var(--surface-2);
+    padding: 18px;
+    margin-bottom: 18px;
+  }
+  .create-box h3 {
+    margin: 0 0 14px; font-size: 12px; color: var(--mut);
+    font-family: "JetBrains Mono", monospace; text-transform: uppercase; letter-spacing: 0.1em;
+  }
+  .create-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(150px, 1fr)); gap: 12px; align-items: end; }
   .field { display: flex; flex-direction: column; }
-  .msg { font-size: 13px; margin-top: 8px; }
-  .msg.error { color: #b91c1c; }
-  .msg.ok { color: #15803d; }
-  .badge { display: inline-block; padding: 1px 7px; border-radius: 10px; font-size: 11px; border: 1px solid #d4d4d8; }
-  .badge.admin { background: #fef9c3; border-color: #fde047; }
-  .badge.organizer { background: #dbeafe; border-color: #93c5fd; }
-  .badge.user { background: #f4f4f5; }
+
+  .msg { font-size: 12px; margin-top: 10px; font-family: "JetBrains Mono", monospace; }
+  .msg.error { color: var(--danger); }
+  .msg.ok { color: var(--cyan); }
+
   .modal-backdrop {
     display: none;
-    position: fixed; inset: 0; background: rgba(0,0,0,0.4);
+    position: fixed; inset: 0; background: rgba(0, 0, 0, 0.6); backdrop-filter: blur(4px);
     align-items: center; justify-content: center; z-index: 50;
   }
   .modal-backdrop.open { display: flex; }
-  .modal { background: #fff; border-radius: 8px; padding: 20px; width: 320px; }
-  .modal h3 { margin-top: 0; font-size: 15px; }
-  .team-detail { font-size: 12px; color: #71717a; margin-top: 2px; }
-  select[disabled] { background: #f4f4f5; }
+  .modal {
+    background: var(--surface); border: 1px solid var(--surface-2);
+    padding: 22px; width: 340px;
+    clip-path: polygon(0 0, 100% 0, 100% calc(100% - 14px), calc(100% - 14px) 100%, 0 100%);
+  }
+  .modal h3 { margin: 0 0 4px; font-family: "Unbounded", sans-serif; font-size: 15px; }
+  select[disabled] { background: var(--surface-2); color: var(--faint); }
 </style>
 </head>
 <body>
 
 <header>
-  <h1>Admin Panel</h1>
+  <div class="brand">
+    <span class="dot"></span>
+    <h1>ADMIN <span>· tourneyforge</span></h1>
+  </div>
   <span class="spacer"></span>
-  <label style="margin:0; color:#a1a1aa; font-size:12px;">Backend URL</label>
-  <input id="backendUrlInput" type="text" style="width:280px" />
+  <div class="backend-field">
+    <label class="overline" style="margin:0">Backend URL</label>
+    <input id="backendUrlInput" type="text" class="mono" />
+  </div>
   <span id="whoBox" class="who"></span>
   <button id="logoutBtn" style="display:none">Вийти</button>
 </header>
 
 <main>
   <div id="loginBox" class="login-box">
-    <h2>Вхід (admin/organizer)</h2>
-    <label>Логін</label>
+    <h2>Вхід</h2>
+    <p class="sub">Для admin / organizer акаунтів</p>
+    <label class="overline">Логін</label>
     <input id="loginUsername" type="text" autocomplete="username" />
-    <label>Пароль</label>
+    <label class="overline">Пароль</label>
     <input id="loginPassword" type="password" autocomplete="current-password" />
-    <button class="primary" id="loginBtn" style="margin-top:14px; width:100%">Увійти</button>
+    <button class="primary" id="loginBtn" style="margin-top:18px; width:100%">Увійти</button>
     <div id="loginMsg" class="msg error"></div>
   </div>
 
@@ -145,20 +264,32 @@
 
     <!-- USERS -->
     <div class="panel active" id="panel-users">
+      <div class="toolbar">
+        <input id="usersFilter" type="text" placeholder="Пошук за логіном…" />
+        <span class="count" id="usersCount"></span>
+      </div>
       <div id="usersMsg" class="msg"></div>
-      <table>
-        <thead><tr><th>Логін</th><th>Роль</th><th>Зареєстрований</th><th style="width:280px">Дії</th></tr></thead>
-        <tbody id="usersBody"></tbody>
-      </table>
+      <div class="table-wrap">
+        <table>
+          <thead><tr><th>Користувач</th><th>Роль</th><th>Зареєстрований</th><th style="width:230px">Дії</th></tr></thead>
+          <tbody id="usersBody"></tbody>
+        </table>
+      </div>
     </div>
 
     <!-- TEAMS -->
     <div class="panel" id="panel-teams">
+      <div class="toolbar">
+        <input id="teamsFilter" type="text" placeholder="Пошук за назвою…" />
+        <span class="count" id="teamsCount"></span>
+      </div>
       <div id="teamsMsg" class="msg"></div>
-      <table>
-        <thead><tr><th>Назва</th><th>Дисципліна</th><th>Турнірів</th><th>Рідкість</th><th style="width:180px">Дії</th></tr></thead>
-        <tbody id="teamsBody"></tbody>
-      </table>
+      <div class="table-wrap">
+        <table>
+          <thead><tr><th>Команда</th><th>Дисципліна</th><th>Турнірів</th><th>Рідкість</th><th style="width:140px">Дії</th></tr></thead>
+          <tbody id="teamsBody"></tbody>
+        </table>
+      </div>
     </div>
 
     <!-- TOURNAMENTS -->
@@ -166,25 +297,31 @@
       <div class="create-box">
         <h3>Створити турнір</h3>
         <div class="create-grid">
-          <div class="field"><label>Назва</label><input id="newTourName" type="text" /></div>
-          <div class="field"><label>Дисципліна</label>
+          <div class="field"><label class="overline">Назва</label><input id="newTourName" type="text" /></div>
+          <div class="field"><label class="overline">Дисципліна</label>
             <select id="newTourDiscipline"><option>CS2</option><option>Dota 2</option><option>Valorant</option></select>
           </div>
-          <div class="field"><label>Тип сітки</label>
+          <div class="field"><label class="overline">Тип сітки</label>
             <select id="newTourBracket"><option value="single">На вибування</option><option value="double">Подвійне вибування</option></select>
           </div>
-          <div class="field"><label>Формат</label>
+          <div class="field"><label class="overline">Формат</label>
             <select id="newTourFormat"><option value="1">BO1</option><option value="3">BO3</option><option value="5">BO5</option></select>
           </div>
           <button class="primary" id="createTourBtn">Створити</button>
         </div>
         <div id="createTourMsg" class="msg"></div>
       </div>
+      <div class="toolbar">
+        <input id="tournamentsFilter" type="text" placeholder="Пошук за назвою…" />
+        <span class="count" id="tournamentsCount"></span>
+      </div>
       <div id="tournamentsMsg" class="msg"></div>
-      <table>
-        <thead><tr><th>Назва</th><th>Дисципліна</th><th>Статус</th><th>Команд</th><th style="width:320px">Дії</th></tr></thead>
-        <tbody id="tournamentsBody"></tbody>
-      </table>
+      <div class="table-wrap">
+        <table>
+          <thead><tr><th>Турнір</th><th>Дисципліна</th><th>Статус</th><th>Команд</th><th style="width:280px">Дії</th></tr></thead>
+          <tbody id="tournamentsBody"></tbody>
+        </table>
+      </div>
     </div>
   </div>
 </main>
@@ -192,10 +329,10 @@
 <div class="modal-backdrop" id="resetModalBackdrop">
   <div class="modal">
     <h3>Скинути пароль</h3>
-    <label>Новий пароль</label>
+    <label class="overline">Новий пароль</label>
     <input id="resetPasswordInput" type="password" />
     <div id="resetMsg" class="msg error"></div>
-    <div class="row-actions" style="margin-top:14px; justify-content:flex-end">
+    <div class="row-actions" style="margin-top:16px; justify-content:flex-end">
       <button id="resetCancelBtn">Скасувати</button>
       <button class="primary" id="resetConfirmBtn">Підтвердити</button>
     </div>
@@ -205,10 +342,10 @@
 <div class="modal-backdrop" id="registerModalBackdrop">
   <div class="modal">
     <h3>Додати команду в турнір</h3>
-    <label>Команда</label>
+    <label class="overline">Команда</label>
     <select id="registerTeamSelect"></select>
     <div id="registerMsg" class="msg error"></div>
-    <div class="row-actions" style="margin-top:14px; justify-content:flex-end">
+    <div class="row-actions" style="margin-top:16px; justify-content:flex-end">
       <button id="registerCancelBtn">Скасувати</button>
       <button class="primary" id="registerConfirmBtn">Додати</button>
     </div>
