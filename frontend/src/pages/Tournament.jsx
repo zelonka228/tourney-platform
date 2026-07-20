@@ -1,4 +1,12 @@
-import { useState, useEffect, useLayoutEffect, useMemo, useRef } from "react";
+import {
+  useState,
+  useEffect,
+  useLayoutEffect,
+  useMemo,
+  useRef,
+  forwardRef,
+  useImperativeHandle,
+} from "react";
 import { Link, useParams, useNavigate } from "react-router-dom";
 import { AnimatePresence, animate, motion } from "framer-motion";
 import { useI18n } from "../lib/i18n";
@@ -24,6 +32,7 @@ import {
   loserDestination,
 } from "../lib/demo";
 import { Btn, Field, Input, Overline, Panel, Select } from "../components/arena";
+import { downloadBracket } from "../lib/exportBracket";
 
 function useRoundLabel() {
   const { t } = useI18n();
@@ -200,27 +209,30 @@ function MatchCard({
 // separate grand-final block (see Tournament()) instead of drawing a wire
 // across brackets — cross-bracket wire geometry got complicated fast for
 // comparatively little visual payoff.
-function BracketRow({
-  matches,
-  nextMatchFor,
-  showChampionNode,
-  champion,
-  championLabel,
-  teamName,
-  openEdit,
-  canManageContent,
-  labels,
-  testId,
-  // Winners-bracket columns are labeled by match count ("1/2 фіналу",
-  // "фінал", ...) — that reads naturally since the count shrinks every
-  // round exactly like a single-elimination bracket. Losers-bracket rounds
-  // don't shrink the same way (see docs/03-double-elimination-spec.md — a
-  // "drop" round can have the SAME match count as the round before it), so
-  // reusing that count-based label produces confusing repeats (multiple
-  // columns all reading "фінал"). Pass `roundLabelFor(round)` to override
-  // with a plain "раунд N" instead — only the losers section does.
-  roundLabelFor,
-}) {
+const BracketRow = forwardRef(function BracketRow(
+  {
+    matches,
+    nextMatchFor,
+    showChampionNode,
+    champion,
+    championLabel,
+    teamName,
+    openEdit,
+    canManageContent,
+    labels,
+    testId,
+    // Winners-bracket columns are labeled by match count ("1/2 фіналу",
+    // "фінал", ...) — that reads naturally since the count shrinks every
+    // round exactly like a single-elimination bracket. Losers-bracket rounds
+    // don't shrink the same way (see docs/03-double-elimination-spec.md — a
+    // "drop" round can have the SAME match count as the round before it), so
+    // reusing that count-based label produces confusing repeats (multiple
+    // columns all reading "фінал"). Pass `roundLabelFor(round)` to override
+    // with a plain "раунд N" instead — only the losers section does.
+    roundLabelFor,
+  },
+  ref
+) {
   const roundLabel = useRoundLabel();
   const labelFor = roundLabelFor ?? ((round, count) => roundLabel(count));
   const totalRounds = matches.length ? Math.max(...matches.map((m) => m.round)) + 1 : 0;
@@ -233,6 +245,12 @@ function BracketRow({
   const decidedIdsRef = useRef(new Set());
   const [connectors, setConnectors] = useState([]);
   const [svgSize, setSvgSize] = useState({ w: 0, h: 0 });
+
+  // Exposes the scrollable bracket container itself (not a wrapper) so a
+  // parent can export the full, un-clipped bracket as an image — its
+  // scrollWidth/scrollHeight are exactly what the wire SVG below already
+  // sizes itself to.
+  useImperativeHandle(ref, () => bracketRef.current, []);
 
   const setNodeRef = (key) => (el) => {
     if (el) nodeRefs.current.set(key, el);
@@ -422,7 +440,7 @@ function BracketRow({
       )}
     </div>
   );
-}
+});
 
 // Double elimination's own bracket renderer — unlike BracketRow (used for
 // single elimination, and previously reused 3x here before this existed),
@@ -433,17 +451,20 @@ function BracketRow({
 // off every winners match), and both brackets' champions converging into
 // the grand final — instead of three visually disconnected mini-brackets
 // stacked with dead space between them.
-function DoubleEliminationBracket({
-  winnersMatches,
-  losersMatches,
-  gf0,
-  teamCount,
-  teamName,
-  openEdit,
-  canManageContent,
-  labels,
-  t,
-}) {
+const DoubleEliminationBracket = forwardRef(function DoubleEliminationBracket(
+  {
+    winnersMatches,
+    losersMatches,
+    gf0,
+    teamCount,
+    teamName,
+    openEdit,
+    canManageContent,
+    labels,
+    t,
+  },
+  ref
+) {
   const roundLabel = useRoundLabel();
   const lbRoundLabelFor = (r) => `${t("tour.res.round")} ${r + 1}`;
 
@@ -455,6 +476,8 @@ function DoubleEliminationBracket({
   const decidedIdsRef = useRef(new Set());
   const [connectors, setConnectors] = useState([]);
   const [svgSize, setSvgSize] = useState({ w: 0, h: 0 });
+
+  useImperativeHandle(ref, () => bracketRef.current, []);
   // The gap between the winners-row block and the losers-row block below it
   // — a guaranteed-empty horizontal band, regardless of how many columns
   // either row has. Every winners→losers "loss" wire routes its horizontal
@@ -739,7 +762,7 @@ function DoubleEliminationBracket({
       </div>
     </div>
   );
-}
+});
 
 function TournamentPicker() {
   const { t } = useI18n();
@@ -819,6 +842,17 @@ export function Tournament() {
   const [infoError, setInfoError] = useState(null);
   const [removingTeamId, setRemovingTeamId] = useState(null);
   const [removeError, setRemoveError] = useState(null);
+  const [bracketSaving, setBracketSaving] = useState(false);
+  const bracketRef = useRef(null);
+
+  async function downloadBracketImage() {
+    setBracketSaving(true);
+    try {
+      await downloadBracket(bracketRef.current, tournament.name);
+    } finally {
+      setBracketSaving(false);
+    }
+  }
 
   // Escape closes whichever modal is open (score picker or reset confirm) —
   // both render as plain Panels, not a <dialog>, so this has to be handled
@@ -1303,8 +1337,23 @@ export function Tournament() {
               <p className="text-[#a1a1aa] text-sm mb-6">{t("tour.hint")}</p>
             ) : null)}
 
+          {matches.length > 0 && (
+            <div className="flex justify-end mb-4">
+              <Btn
+                size="sm"
+                variant="ghost"
+                data-testid="download-bracket-btn"
+                disabled={bracketSaving}
+                onClick={downloadBracketImage}
+              >
+                {bracketSaving ? "…" : t("tour.downloadBracket")}
+              </Btn>
+            </div>
+          )}
+
           {matches.length > 0 && !isDouble && (
             <BracketRow
+              ref={bracketRef}
               matches={winnersMatches}
               nextMatchFor={nextInWinners}
               showChampionNode
@@ -1324,6 +1373,7 @@ export function Tournament() {
 
           {matches.length > 0 && isDouble && (
             <DoubleEliminationBracket
+              ref={bracketRef}
               winnersMatches={winnersMatches}
               losersMatches={losersMatches}
               gf0={gf0}
