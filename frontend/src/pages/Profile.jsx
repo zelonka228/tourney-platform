@@ -1,5 +1,5 @@
 import { useEffect, useRef, useState } from "react";
-import { Link } from "react-router-dom";
+import { Link, useNavigate, useParams } from "react-router-dom";
 import { motion } from "framer-motion";
 import { useI18n } from "../lib/i18n";
 import { getTeams, getPlayerStats } from "../lib/api";
@@ -33,10 +33,13 @@ const rankFormat = (v) => VALORANT_RANKS[Math.max(0, Math.min(Math.round(v), VAL
 
 export function Profile() {
   const { t } = useI18n();
-  // A team id (not an array index) — an index would silently point at the
-  // wrong team (or crash) once live updates start reshuffling `teams` out
-  // from under whoever has a detail view open.
-  const [sel, setSel] = useState(null);
+  const nav = useNavigate();
+  // Team id lives in the URL (/profile/:id) so a detail view is a real,
+  // shareable/back-button-able link, not just in-memory state — used by the
+  // header search and the head-to-head comparison page to link straight to
+  // a team. `sel` derives from it rather than duplicating it in state.
+  const { id } = useParams();
+  const sel = id ? Number(id) : null;
   const [teams, setTeams] = useState([]);
   const [loading, setLoading] = useState(true);
   const [query, setQuery] = useState("");
@@ -70,8 +73,9 @@ export function Profile() {
   // instead of rendering a stale/undefined team.
   useEffect(() => {
     if (sel !== null && teams.length > 0 && !teams.some((tm) => tm.id === sel)) {
-      setSel(null);
+      nav("/profile");
     }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [sel, teams]);
 
   async function downloadCard(teamName) {
@@ -144,7 +148,7 @@ export function Profile() {
                 <motion.button
                   key={team.id}
                   data-testid={`team-card-${i}`}
-                  onClick={() => setSel(team.id)}
+                  onClick={() => nav(`/profile/${team.id}`)}
                   initial={{ opacity: 0, y: 16 }}
                   animate={{ opacity: 1, y: 0 }}
                   transition={{ delay: i * 0.05 }}
@@ -187,7 +191,7 @@ export function Profile() {
           size="sm"
           variant="ghost"
           data-testid="profile-back-btn"
-          onClick={() => setSel(null)}
+          onClick={() => nav("/profile")}
         >
           {t("profile.back")}
         </Btn>

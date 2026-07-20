@@ -15,6 +15,7 @@ import { Login } from "./pages/Login";
 import { Register } from "./pages/Register";
 import { Account } from "./pages/Account";
 import { AdminUsers } from "./pages/AdminUsers";
+import { GlobalSearch } from "./components/GlobalSearch";
 
 const links = [
   { to: "/", key: "nav.home", end: true },
@@ -117,6 +118,8 @@ function Header() {
           ))}
         </nav>
         <span className="flex-1" />
+        <GlobalSearch />
+        <span className="w-2" />
         <AuthLink />
         <span className="w-2" />
         <LangSwitch />
@@ -148,7 +151,7 @@ const ROUTE_ELEMENTS = (
     <Route path="/create" element={<Create />} />
     <Route path="/tournament/:id?" element={<Tournament />} />
     <Route path="/team/:id?" element={<Team />} />
-    <Route path="/profile" element={<Profile />} />
+    <Route path="/profile/:id?" element={<Profile />} />
     <Route path="/player/:id" element={<Player />} />
     <Route path="/collection" element={<Collection />} />
     <Route path="/hall" element={<Hall />} />

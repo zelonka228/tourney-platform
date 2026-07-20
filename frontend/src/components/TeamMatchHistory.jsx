@@ -21,7 +21,7 @@ export function TeamMatchHistory({ teamId, teamsById }) {
           <div className="min-w-0 flex-1">
             <div className="text-sm text-white truncate">
               {m.opponentId ? (
-                <Link to={`/team/${m.opponentId}`} className="hover:underline hover:text-cyan">
+                <Link to={`/profile/${m.opponentId}`} className="hover:underline hover:text-cyan">
                   {m.opponentName ?? t("matchHistory.unknownOpponent")}
                 </Link>
               ) : (

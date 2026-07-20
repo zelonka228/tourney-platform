@@ -74,7 +74,7 @@ export function Player() {
 
   return (
     <div className="py-10" data-testid="player-page">
-      <Link to={`/team/${team.id}`} className="text-cyan text-sm font-mono hover:underline">
+      <Link to={`/profile/${team.id}`} className="text-cyan text-sm font-mono hover:underline">
         ← {team.name}
       </Link>
 
