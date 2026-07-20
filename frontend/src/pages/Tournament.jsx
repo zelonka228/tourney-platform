@@ -476,7 +476,18 @@ const DoubleEliminationBracket = forwardRef(function DoubleEliminationBracket(
   ref
 ) {
   const roundLabel = useRoundLabel();
-  const lbRoundLabelFor = (r) => `${t("tour.res.round")} ${r + 1}`;
+  // Losers-bracket round counts don't shrink monotonically to 1 the way a
+  // single-elimination bracket's do (a "drop" round can repeat the previous
+  // round's match count — see the comment on BracketRow's roundLabelFor), so
+  // "this round has 1 match" can't be used to detect its last round the way
+  // the winners side does below. Compare the round index directly instead.
+  const losersTotalRounds = losersMatches.length
+    ? Math.max(...losersMatches.map((m) => m.round)) + 1
+    : 0;
+  const lbRoundLabelFor = (r) =>
+    r === losersTotalRounds - 1
+      ? t("tour.bracket.losersFinal")
+      : `${t("tour.res.round")} ${r + 1}`;
 
   const bracketRef = useRef(null);
   const svgRef = useRef(null);
@@ -749,7 +760,15 @@ const DoubleEliminationBracket = forwardRef(function DoubleEliminationBracket(
           <div ref={wbRowRef}>
             <BracketLabel className="mb-2 text-[#9a9aa3]">{t("tour.bracket.winners")}</BracketLabel>
             <div className="flex gap-10">
-              {renderRounds(winnersMatches, (r, count) => roundLabel(count))}
+              {renderRounds(winnersMatches, (r, count) =>
+                // A single remaining match always means "last round of this
+                // bracket" (match counts strictly halve down to 1 here,
+                // unlike the losers side) — but calling it plain "Final" reads
+                // as the tournament's final when it's really just the
+                // winners bracket's own decider, one step before the grand
+                // final actually settles the tournament.
+                count === 1 ? t("tour.bracket.winnersFinal") : roundLabel(count)
+              )}
             </div>
           </div>
           <div ref={lbRowRef}>
@@ -761,8 +780,11 @@ const DoubleEliminationBracket = forwardRef(function DoubleEliminationBracket(
           <div className="flex flex-col justify-center min-w-[220px]">
             <BracketLabel className="mb-2 text-volt">{t("tour.bracket.final")}</BracketLabel>
             {/* WB champion vs LB champion, one match — whoever wins is the
-                tournament champion outright, no reset/second match. */}
-            <BracketLabel className="mb-1 text-[#9a9aa3]">{roundLabel(1)}</BracketLabel>
+                tournament champion outright, no reset/second match. No
+                separate round sub-label here (there used to be a plain
+                "Фінал" underneath) — it just repeated what this heading
+                already says and read like two different finals stacked
+                back to back. */}
             <MatchCard
               m={gf0}
               teamName={teamName}
