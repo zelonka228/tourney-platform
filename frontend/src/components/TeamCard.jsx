@@ -170,9 +170,13 @@ export const TeamCard = forwardRef(function TeamCard({ team }, ref) {
     stiffness: 300,
     damping: 30,
   });
+  // Narrow, sharp-edged band (42-58%) reads as a crisp light streak
+  // catching the foil, not a broad soft smear — the first version's wide
+  // 35-65% span with color-dodge blended into a hazy rainbow smudge that
+  // fought the card's own tier color instead of complementing it.
   const sheenBackground = useTransform([mouseX, mouseY], ([mx, my]) =>
-    `radial-gradient(circle at ${mx * 100}% ${my * 100}%, rgba(255,255,255,0.55), transparent 45%),
-     linear-gradient(${115 + mx * 60}deg, transparent 35%, rgba(0,240,255,0.35) 45%, rgba(223,255,0,0.3) 50%, rgba(233,75,214,0.3) 55%, transparent 65%)`
+    `radial-gradient(circle at ${mx * 100}% ${my * 100}%, rgba(255,255,255,0.3), transparent 28%),
+     linear-gradient(${115 + mx * 60}deg, transparent 42%, rgba(0,240,255,0.45) 47%, rgba(255,255,255,0.55) 49%, rgba(223,255,0,0.4) 51%, rgba(233,75,214,0.4) 53%, transparent 58%)`
   );
 
   const [hovering, setHovering] = useState(false);
@@ -438,10 +442,15 @@ export const TeamCard = forwardRef(function TeamCard({ team }, ref) {
                   position: "absolute",
                   inset: 0,
                   background: sheenBackground,
-                  mixBlendMode: "color-dodge",
+                  // soft-light instead of color-dodge — dodge brightens
+                  // everything under the gradient toward white, which is
+                  // what turned this into a washed-out fog. soft-light only
+                  // gently lifts/darkens, closer to how a real glossy
+                  // surface catches light without blowing out the art.
+                  mixBlendMode: "soft-light",
                   pointerEvents: "none",
                 }}
-                animate={{ opacity: hovering ? 0.55 : 0 }}
+                animate={{ opacity: hovering ? 0.85 : 0 }}
                 transition={{ duration: 0.25 }}
               />
             )}
