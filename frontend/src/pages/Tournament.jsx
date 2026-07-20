@@ -375,6 +375,16 @@ const BracketRow = forwardRef(function BracketRow(
             data-src={c.sourceId}
             d={c.d}
             className={"wire" + (c.live ? " live" : "")}
+            // Also set as plain attributes, not just via the CSS class above:
+            // html-to-image clones this SVG in isolation from the document's
+            // <html> :root, so `var(--cyan)`/`var(--surface-2)` from the CSS
+            // class don't resolve there and the wire silently rendered with
+            // no stroke at all in exported PNGs. A CSS class always wins the
+            // cascade over a plain attribute, so this changes nothing live —
+            // it's purely the fallback the exporter actually ends up using.
+            fill="none"
+            strokeWidth="1.5"
+            stroke={c.live ? "#00F0FF" : "#27272a"}
           />
         ))}
       </svg>
@@ -717,6 +727,12 @@ const DoubleEliminationBracket = forwardRef(function DoubleEliminationBracket(
             data-src={c.sourceId}
             d={c.d}
             className={"wire" + (c.live ? " live" : "") + (c.loser ? " wire-loser" : "")}
+            // See BracketRow's identical comment: plain attributes as a
+            // fallback for html-to-image's export, which can't resolve the
+            // CSS class's var(--cyan)/var(--danger) in its isolated clone.
+            fill="none"
+            strokeWidth="1.5"
+            stroke={c.live ? (c.loser ? "#FF0055" : "#00F0FF") : "#27272a"}
           />
         ))}
       </svg>
