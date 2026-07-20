@@ -110,12 +110,29 @@ function Header() {
               end={l.end}
               data-testid={`nav-${l.to === "/" ? "home" : l.to.slice(1)}`}
               className={({ isActive }) =>
-                `px-3 py-2 text-[13px] font-medium rounded-sm transition-colors ${
-                  isActive ? "text-cyan bg-cyan/10" : "text-[#a1a1aa] hover:text-white"
+                `relative px-3 py-2 text-[13px] font-medium rounded-sm transition-colors ${
+                  isActive ? "text-cyan" : "text-[#a1a1aa] hover:text-white"
                 }`
               }
             >
-              {t(l.key)}
+              {({ isActive }) => (
+                <>
+                  {/* Same layoutId across every link — only the active one
+                      ever renders it, so switching tabs is a single shared
+                      element sliding to its new spot (Framer Motion's FLIP
+                      transition) instead of one pill disappearing while a
+                      new one fades in elsewhere. Respects reduced-motion
+                      automatically via the app-wide MotionConfig. */}
+                  {isActive && (
+                    <motion.span
+                      layoutId="nav-active-pill"
+                      className="absolute inset-0 bg-cyan/10 rounded-sm -z-10"
+                      transition={{ type: "spring", stiffness: 500, damping: 35 }}
+                    />
+                  )}
+                  {t(l.key)}
+                </>
+              )}
             </NavLink>
           ))}
         </nav>
@@ -134,12 +151,27 @@ function Header() {
             to={l.to}
             end={l.end}
             className={({ isActive }) =>
-              `whitespace-nowrap px-3 py-1.5 text-xs rounded-sm transition-colors ${
-                isActive ? "text-cyan bg-cyan/10" : "text-[#a1a1aa]"
+              `relative whitespace-nowrap px-3 py-1.5 text-xs rounded-sm transition-colors ${
+                isActive ? "text-cyan" : "text-[#a1a1aa]"
               }`
             }
           >
-            {t(l.key)}
+            {({ isActive }) => (
+              <>
+                {/* Separate layoutId from the desktop pill above — both
+                    navs are always mounted at once (CSS just hides one via
+                    the md: breakpoint), so sharing an id would fight over
+                    which one Framer Motion actually animates. */}
+                {isActive && (
+                  <motion.span
+                    layoutId="nav-active-pill-mobile"
+                    className="absolute inset-0 bg-cyan/10 rounded-sm -z-10"
+                    transition={{ type: "spring", stiffness: 500, damping: 35 }}
+                  />
+                )}
+                {t(l.key)}
+              </>
+            )}
           </NavLink>
         ))}
       </nav>
