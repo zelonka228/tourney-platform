@@ -95,7 +95,11 @@ describe("teamRarity — the field's own name (best/tournaments) can lie, only t
   it("Rare/Epic/Legendary scale with tournaments only once best confirms a real win", () => {
     expect(teamRarity({ best: "1 місце ×1", tournaments: 1 })).toBe("Rare");
     expect(teamRarity({ best: "1 місце ×2", tournaments: 2 })).toBe("Epic");
-    expect(teamRarity({ best: "1 місце ×5", tournaments: 5 })).toBe("Legendary");
+    // Legendary's bar sits at 8, not 3 — 5 and 7 wins are still (a lot of)
+    // Epic, only 8+ crosses into Legendary. See the comment on teamRarity.
+    expect(teamRarity({ best: "1 місце ×5", tournaments: 5 })).toBe("Epic");
+    expect(teamRarity({ best: "1 місце ×7", tournaments: 7 })).toBe("Epic");
+    expect(teamRarity({ best: "1 місце ×8", tournaments: 8 })).toBe("Legendary");
   });
 });
 

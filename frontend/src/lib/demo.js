@@ -143,12 +143,17 @@ export function hasTournamentWin(team) {
   return /^1 місце ×\d+$/.test(team?.best ?? "");
 }
 
+// Legendary raised from >=3 to >=8 (2026-07-21, user feedback: with the
+// original bar most winning teams ended up Legendary — checked live data,
+// 7 of 11 seeded teams qualified — leaving nothing for it to signal.
+// Widening the Epic band instead of just nudging the Legendary number by
+// one or two keeps the curve gradual rather than creating a second cliff.
 export function teamRarity(team) {
   if (team.rarityOverride) return team.rarityOverride;
   if (!hasTournamentWin(team)) return "Common";
   const wins = team.tournaments ?? 0;
-  if (wins >= 3) return "Legendary";
-  if (wins === 2) return "Epic";
+  if (wins >= 8) return "Legendary";
+  if (wins >= 2) return "Epic";
   return "Rare";
 }
 
