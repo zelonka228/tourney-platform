@@ -15,6 +15,7 @@ import { Login } from "./pages/Login";
 import { Register } from "./pages/Register";
 import { Account } from "./pages/Account";
 import { AdminUsers } from "./pages/AdminUsers";
+import { Compare } from "./pages/Compare";
 import { GlobalSearch } from "./components/GlobalSearch";
 
 const links = [
@@ -25,6 +26,7 @@ const links = [
   { to: "/profile", key: "nav.profile" },
   { to: "/collection", key: "nav.collection" },
   { to: "/hall", key: "nav.hall" },
+  { to: "/compare", key: "nav.compare" },
 ];
 
 function LangSwitch() {
@@ -155,6 +157,7 @@ const ROUTE_ELEMENTS = (
     <Route path="/player/:id" element={<Player />} />
     <Route path="/collection" element={<Collection />} />
     <Route path="/hall" element={<Hall />} />
+    <Route path="/compare" element={<Compare />} />
     <Route path="/login" element={<Login />} />
     <Route path="/register" element={<Register />} />
     <Route path="/account" element={<Account />} />

@@ -195,9 +195,17 @@ export function Profile() {
         >
           {t("profile.back")}
         </Btn>
-        <Link to={`/team/${team.id}`} className="text-cyan text-sm font-mono hover:underline">
-          {t("profile.edit")}
-        </Link>
+        <div className="flex items-center gap-4">
+          <Link
+            to={`/compare?a=${team.id}`}
+            className="text-cyan text-sm font-mono hover:underline"
+          >
+            {t("compare.title")}
+          </Link>
+          <Link to={`/team/${team.id}`} className="text-cyan text-sm font-mono hover:underline">
+            {t("profile.edit")}
+          </Link>
+        </div>
       </div>
 
       <h1 className="font-display font-black text-4xl sm:text-5xl tracking-tighter text-white mt-6">
