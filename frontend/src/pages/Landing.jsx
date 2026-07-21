@@ -5,6 +5,7 @@ import { useI18n } from "../lib/i18n";
 import { useAuth } from "../lib/auth";
 import { getTeams, getTournaments, getTournament } from "../lib/api";
 import { Btn, Overline, Panel } from "../components/arena";
+import { ParticleField } from "../components/ParticleField";
 import { socket } from "../lib/socket";
 
 const container = { hidden: {}, show: { transition: { staggerChildren: 0.08 } } };
@@ -76,6 +77,7 @@ export function Landing() {
           />
           <div className="absolute inset-0 bg-gradient-to-r from-void via-void/85 to-void/30" />
           <div className="absolute inset-0 scanlines" />
+          <ParticleField />
         </div>
         <motion.div
           variants={container}

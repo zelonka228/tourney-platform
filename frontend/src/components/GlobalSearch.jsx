@@ -3,6 +3,7 @@ import { useNavigate } from "react-router-dom";
 import { AnimatePresence, motion } from "framer-motion";
 import { useI18n } from "../lib/i18n";
 import { getTeams, getTournaments } from "../lib/api";
+import { isFavorite, onFavoritesChanged } from "../lib/favorites";
 
 const MAX_PER_SECTION = 5;
 
@@ -28,7 +29,10 @@ export function GlobalSearch() {
   const [teams, setTeams] = useState(null); // null = not fetched yet
   const [tournaments, setTournaments] = useState(null);
   const [activeIndex, setActiveIndex] = useState(0);
+  const [favoritesTick, setFavoritesTick] = useState(0);
   const inputRef = useRef(null);
+
+  useEffect(() => onFavoritesChanged(() => setFavoritesTick((v) => v + 1)), []);
 
   // Ctrl/Cmd+K opens from anywhere; Escape closes. Registered once for the
   // whole app rather than per-page, so it works no matter what route is
@@ -66,11 +70,26 @@ export function GlobalSearch() {
   }, [open]);
 
   const q = query.trim().toLowerCase();
+  // Shown as their own section only when idle (no query) — once someone's
+  // actually searching, name matching already surfaces a favorited team
+  // like any other and a second copy of it up top would just be clutter.
+  // eslint-disable-next-line no-unused-vars
+  const favoriteTeamResults = useMemo(() => {
+    if (!teams || q) return [];
+    return teams.filter((tm) => isFavorite(tm.id)).slice(0, MAX_PER_SECTION);
+    // favoritesTick forces recompute when a favorite is toggled elsewhere
+    // while this panel happens to be open — isFavorite() itself reads
+    // localStorage fresh, it just needs a reason to re-run.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [teams, q, favoritesTick]);
   const teamResults = useMemo(() => {
     if (!teams) return [];
-    if (!q) return teams.slice(0, MAX_PER_SECTION);
+    if (!q) {
+      const favIds = new Set(favoriteTeamResults.map((tm) => tm.id));
+      return teams.filter((tm) => !favIds.has(tm.id)).slice(0, MAX_PER_SECTION);
+    }
     return teams.filter((tm) => tm.name.toLowerCase().includes(q)).slice(0, MAX_PER_SECTION);
-  }, [teams, q]);
+  }, [teams, q, favoriteTeamResults]);
   const tournamentResults = useMemo(() => {
     if (!tournaments) return [];
     if (!q) return tournaments.slice(0, MAX_PER_SECTION);
@@ -78,13 +97,15 @@ export function GlobalSearch() {
   }, [tournaments, q]);
 
   // One flat list backs keyboard up/down/enter regardless of which section
-  // a result visually sits in.
+  // a result visually sits in. Favorites lead, matching their position on
+  // screen.
   const flatResults = useMemo(
     () => [
+      ...favoriteTeamResults.map((tm) => ({ kind: "team", item: tm })),
       ...teamResults.map((tm) => ({ kind: "team", item: tm })),
       ...tournamentResults.map((tr) => ({ kind: "tournament", item: tr })),
     ],
-    [teamResults, tournamentResults]
+    [favoriteTeamResults, teamResults, tournamentResults]
   );
 
   useEffect(() => {
@@ -171,6 +192,27 @@ export function GlobalSearch() {
                   </p>
                 )}
 
+                {favoriteTeamResults.length > 0 && (
+                  <SearchSection label={t("search.favorites")}>
+                    {favoriteTeamResults.map((tm) => {
+                      const flatIdx = flatResults.findIndex(
+                        (r) => r.kind === "team" && r.item.id === tm.id
+                      );
+                      return (
+                        <SearchRow
+                          key={`fav-${tm.id}`}
+                          active={flatIdx === activeIndex}
+                          onMouseEnter={() => setActiveIndex(flatIdx)}
+                          onClick={() => go({ kind: "team", item: tm })}
+                          title={tm.name}
+                          subtitle={tm.discipline}
+                          favorite
+                        />
+                      );
+                    })}
+                  </SearchSection>
+                )}
+
                 {teamResults.length > 0 && (
                   <SearchSection label={t("search.teams")}>
                     {teamResults.map((tm) => {
@@ -185,6 +227,7 @@ export function GlobalSearch() {
                           onClick={() => go({ kind: "team", item: tm })}
                           title={tm.name}
                           subtitle={tm.discipline}
+                          favorite={isFavorite(tm.id)}
                         />
                       );
                     })}
@@ -230,7 +273,7 @@ function SearchSection({ label, children }) {
   );
 }
 
-function SearchRow({ active, onMouseEnter, onClick, title, subtitle }) {
+function SearchRow({ active, onMouseEnter, onClick, title, subtitle, favorite }) {
   return (
     <button
       type="button"
@@ -245,6 +288,7 @@ function SearchRow({ active, onMouseEnter, onClick, title, subtitle }) {
         <span className="block text-sm truncate">{title}</span>
         <span className="block text-[11px] font-mono text-[#52525b] truncate">{subtitle}</span>
       </span>
+      {favorite && <span className="text-volt text-sm shrink-0">★</span>}
     </button>
   );
 }

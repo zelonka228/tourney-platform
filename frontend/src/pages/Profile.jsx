@@ -24,6 +24,7 @@ import { Skeleton } from "../components/Skeleton";
 import { ScaleToFit } from "../components/ScaleToFit";
 import { TeamMatchHistory } from "../components/TeamMatchHistory";
 import { TeamAchievements } from "../components/TeamAchievements";
+import { isFavorite, toggleFavorite, onFavoritesChanged } from "../lib/favorites";
 
 // Ranks (Valorant) don't have a natural "count up" — but avgRating already
 // resolves them to a numeric VALORANT_RANKS index under the hood, so the
@@ -57,6 +58,12 @@ export function Profile() {
   const [liveElo, setLiveElo] = useState({});
   const [cardSaving, setCardSaving] = useState(false);
   const cardRef = useRef(null);
+  // Favorites live in localStorage (lib/favorites.js), outside React state —
+  // this tick just forces a re-render/re-sort when they change, since
+  // isFavorite() itself is read fresh on every render rather than cached.
+  const [favoritesTick, setFavoritesTick] = useState(0);
+
+  useEffect(() => onFavoritesChanged(() => setFavoritesTick((v) => v + 1)), []);
 
   useEffect(() => {
     getTeams().then((data) => {
@@ -130,11 +137,19 @@ export function Profile() {
               </div>
             ))}
           {!loading &&
+            // favoritesTick isn't read here — it's just what makes this
+            // render re-run when favorites change elsewhere, since
+            // isFavorite() below reads localStorage fresh every call rather
+            // than caching in React state.
+            favoritesTick >= 0 &&
             teams
-            .map((team, i) => ({ team, i }))
-            .filter(({ team }) => team.name.toLowerCase().includes(query.trim().toLowerCase()))
-            .filter(({ team }) => disciplineFilter === "all" || team.discipline === disciplineFilter)
-            .map(({ team, i }) => {
+              .map((team, i) => ({ team, i }))
+              .filter(({ team }) => team.name.toLowerCase().includes(query.trim().toLowerCase()))
+              .filter(({ team }) => disciplineFilter === "all" || team.discipline === disciplineFilter)
+              // Favorites first — Array.sort is stable, so ties (both or
+              // neither favorited) keep the original relative order.
+              .sort((a, b) => isFavorite(b.team.id) - isFavorite(a.team.id))
+              .map(({ team, i }) => {
               // Рейтинг — середнє лише основного складу, підстави не враховуються.
               // Для CS2-гравців з прив'язаним FACEIT — живий ELO замість
               // застарілого вручну введеного значення (з кешу останнього фетчу).
@@ -144,21 +159,37 @@ export function Profile() {
                   .filter((p) => !p.isSubstitute)
                   .map((p) => effectivePlayerRank(team.discipline, p))
               );
+              // A plain button (not `role="button"` on this outer element)
+              // can't contain the star's own real <button> without nesting
+              // interactive controls — invalid HTML, and it showed up in
+              // the accessibility tree as a button-inside-a-button. Div +
+              // role/tabIndex/onKeyDown reproduces button semantics for the
+              // "click anywhere on the card" behavior while leaving the
+              // star free to be a normal, independently-focusable button.
               return (
-                <motion.button
+                <motion.div
                   key={team.id}
+                  role="button"
+                  tabIndex={0}
                   data-testid={`team-card-${i}`}
                   onClick={() => nav(`/profile/${team.id}`)}
+                  onKeyDown={(e) => {
+                    if (e.key === "Enter" || e.key === " ") {
+                      e.preventDefault();
+                      nav(`/profile/${team.id}`);
+                    }
+                  }}
                   initial={{ opacity: 0, y: 16 }}
                   animate={{ opacity: 1, y: 0 }}
                   transition={{ delay: i * 0.05 }}
                   whileHover={{ y: -4 }}
-                  className="text-left"
+                  className="text-left cursor-pointer"
                 >
                   <Panel
                     clip
-                    className="p-5 flex items-center gap-4 hover:border-cyan transition-colors"
+                    className="relative p-5 flex items-center gap-4 hover:border-cyan transition-colors"
                   >
+                    <FavoriteStar teamId={team.id} />
                     <Logo logo={team.logo} className="w-12 h-12" />
                     <div className="min-w-0">
                       <h3 className="font-display font-bold text-white truncate">{team.name}</h3>
@@ -167,7 +198,7 @@ export function Profile() {
                       </p>
                     </div>
                   </Panel>
-                </motion.button>
+                </motion.div>
               );
             })}
         </div>
@@ -208,9 +239,12 @@ export function Profile() {
         </div>
       </div>
 
-      <h1 className="font-display font-black text-4xl sm:text-5xl tracking-tighter text-white mt-6">
-        {team.name}
-      </h1>
+      <div className="flex items-center gap-3 mt-6">
+        <h1 className="font-display font-black text-4xl sm:text-5xl tracking-tighter text-white">
+          {team.name}
+        </h1>
+        <FavoriteStar teamId={team.id} size="lg" />
+      </div>
 
       <div className="grid lg:grid-cols-[340px_1fr] gap-6 mt-8 items-start">
         <Panel clip className="min-w-0">
@@ -426,6 +460,59 @@ function PlayerRow({ p, discipline, onLiveElo }) {
         />
       )}
     </div>
+  );
+}
+
+// Small = absolutely positioned corner badge for the team-list card grid
+// (whole card is a button that navigates, so this stops propagation and
+// sits on top via its own z-index). Large = inline next to the H1 on the
+// detail view. Same toggle logic either way, just different placement.
+function FavoriteStar({ teamId, size = "sm" }) {
+  const { t } = useI18n();
+  const [fav, setFav] = useState(() => isFavorite(teamId));
+
+  useEffect(() => setFav(isFavorite(teamId)), [teamId]);
+
+  function handleClick(e) {
+    e.stopPropagation();
+    e.preventDefault();
+    setFav(toggleFavorite(teamId));
+  }
+
+  const label = t(fav ? "profile.unfavorite" : "profile.favorite");
+
+  if (size === "lg") {
+    return (
+      <button
+        type="button"
+        onClick={handleClick}
+        data-testid="favorite-star-detail"
+        aria-label={label}
+        aria-pressed={fav}
+        title={label}
+        className={`text-3xl leading-none transition-transform hover:scale-110 ${
+          fav ? "text-volt" : "text-[#3f3f46] hover:text-[#71717a]"
+        }`}
+      >
+        ★
+      </button>
+    );
+  }
+
+  return (
+    <button
+      type="button"
+      onClick={handleClick}
+      data-testid="favorite-star"
+      aria-label={label}
+      aria-pressed={fav}
+      title={label}
+      className={`absolute top-2 right-2 z-10 w-7 h-7 grid place-items-center rounded-sm text-lg leading-none transition-colors ${
+        fav ? "text-volt" : "text-[#3f3f46] hover:text-[#71717a]"
+      }`}
+    >
+      ★
+    </button>
   );
 }
 
