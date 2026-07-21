@@ -1,0 +1,102 @@
+<svg width="1200" height="480" viewBox="0 0 1200 480" xmlns="http://www.w3.org/2000/svg">
+  <defs>
+    <filter id="glow" x="-60%" y="-60%" width="220%" height="220%">
+      <feGaussianBlur stdDeviation="2.6" result="blur"/>
+      <feMerge>
+        <feMergeNode in="blur"/>
+        <feMergeNode in="SourceGraphic"/>
+      </feMerge>
+    </filter>
+    <pattern id="scan2" width="4" height="4" patternUnits="userSpaceOnUse">
+      <rect width="4" height="1" fill="#00F0FF" opacity="0.04"/>
+    </pattern>
+  </defs>
+
+  <rect width="1200" height="480" fill="#09090B"/>
+  <rect width="1200" height="480" fill="url(#scan2)"/>
+
+  <!-- ============ tile template: 360x200, 20px gaps, clipped top-right corner ============ -->
+
+  <!-- Tile 1 — Турнірна сітка -->
+  <g transform="translate(40,40)">
+    <path d="M0,0 H336 L360,24 V200 H0 Z" fill="#18181B" stroke="#27272A"/>
+    <g stroke="#00F0FF" stroke-width="1.6" fill="none" filter="url(#glow)">
+      <path d="M32,60 H64 V90 H96"/>
+      <path d="M32,110 H64 V90"/>
+      <path d="M96,90 V130 H128"/>
+    </g>
+    <g stroke="#3f3f46" stroke-width="1.4" fill="none">
+      <path d="M32,150 H64 V130 H96"/>
+    </g>
+    <circle cx="128" cy="130" r="3" fill="#DFFF00" filter="url(#glow)"/>
+    <text x="32" y="34" font-family="Arial, sans-serif" font-size="19" font-weight="700" fill="#FAFAFA">Турнірна сітка</text>
+    <text x="32" y="178" font-family="Arial, sans-serif" font-size="13" fill="#A1A1AA">Single / double elimination, live через WebSocket</text>
+  </g>
+
+  <!-- Tile 2 — RPG-картки -->
+  <g transform="translate(420,40)">
+    <path d="M0,0 H336 L360,24 V200 H0 Z" fill="#18181B" stroke="#27272A"/>
+    <g filter="url(#glow)">
+      <path d="M60,60 L90,90 L60,150 L30,90 Z" fill="none" stroke="#E94BD6" stroke-width="1.8"/>
+      <path d="M30,90 H90 M60,60 L45,90 M60,60 L75,90" stroke="#E94BD6" stroke-width="1" opacity="0.6"/>
+    </g>
+    <rect x="110" y="70" width="30" height="8" rx="1" fill="#27272A"/>
+    <rect x="110" y="86" width="46" height="8" rx="1" fill="#27272A"/>
+    <rect x="110" y="102" width="22" height="8" rx="1" fill="#27272A"/>
+    <text x="32" y="34" font-family="Arial, sans-serif" font-size="19" font-weight="700" fill="#FAFAFA">RPG-картки команд</text>
+    <text x="32" y="178" font-family="Arial, sans-serif" font-size="13" fill="#A1A1AA">Рідкість, голо-нахил під курсором, PNG-експорт</text>
+  </g>
+
+  <!-- Tile 3 — 3D-трофей -->
+  <g transform="translate(800,40)">
+    <path d="M0,0 H336 L360,24 V200 H0 Z" fill="#18181B" stroke="#27272A"/>
+    <g filter="url(#glow)" stroke="#DFFF00" stroke-width="1.4" fill="none">
+      <path d="M60,55 L95,75 V115 L60,135 L25,115 V75 Z"/>
+      <path d="M60,55 V135 M25,75 L95,115 M95,75 L25,115"/>
+    </g>
+    <circle cx="60" cy="95" r="46" stroke="#3f3f46" stroke-width="1" fill="none" opacity="0.6"/>
+    <text x="32" y="34" font-family="Arial, sans-serif" font-size="19" font-weight="700" fill="#FAFAFA">3D-сцена трофея</text>
+    <text x="32" y="178" font-family="Arial, sans-serif" font-size="13" fill="#A1A1AA">WebGL-нагорода чемпіону, лінивий чанк</text>
+  </g>
+
+  <!-- Tile 4 — Живий рейтинг -->
+  <g transform="translate(40,260)">
+    <path d="M0,0 H336 L360,24 V200 H0 Z" fill="#18181B" stroke="#27272A"/>
+    <g filter="url(#glow)">
+      <rect x="28" y="120" width="14" height="30" fill="#00F0FF"/>
+      <rect x="50" y="95" width="14" height="55" fill="#00F0FF"/>
+      <rect x="72" y="70" width="14" height="80" fill="#DFFF00"/>
+      <rect x="94" y="105" width="14" height="45" fill="#00F0FF"/>
+      <rect x="116" y="85" width="14" height="65" fill="#00F0FF"/>
+    </g>
+    <line x1="28" y1="150" x2="130" y2="150" stroke="#3f3f46" stroke-width="1"/>
+    <text x="32" y="34" font-family="Arial, sans-serif" font-size="19" font-weight="700" fill="#FAFAFA">Живий рейтинг</text>
+    <text x="32" y="178" font-family="Arial, sans-serif" font-size="13" fill="#A1A1AA">FACEIT ELO · MMR · звання Valorant</text>
+  </g>
+
+  <!-- Tile 5 — Ролі й адмінка -->
+  <g transform="translate(420,260)">
+    <path d="M0,0 H336 L360,24 V200 H0 Z" fill="#18181B" stroke="#27272A"/>
+    <g filter="url(#glow)" stroke="#00F0FF" stroke-width="1.6" fill="none">
+      <path d="M60,58 L92,70 V100 C92,124 78,140 60,148 C42,140 28,124 28,100 V70 Z"/>
+    </g>
+    <circle cx="60" cy="96" r="8" fill="#18181B" stroke="#DFFF00" stroke-width="1.4"/>
+    <rect x="57" y="100" width="6" height="12" fill="#DFFF00"/>
+    <text x="32" y="34" font-family="Arial, sans-serif" font-size="19" font-weight="700" fill="#FAFAFA">Ролі й адмінка</text>
+    <text x="32" y="178" font-family="Arial, sans-serif" font-size="13" fill="#A1A1AA">admin / organizer / user + окрема адмін-панель</text>
+  </g>
+
+  <!-- Tile 6 — 3 мови -->
+  <g transform="translate(800,260)">
+    <path d="M0,0 H336 L360,24 V200 H0 Z" fill="#18181B" stroke="#27272A"/>
+    <g filter="url(#glow)" stroke="#E94BD6" stroke-width="1.4" fill="none">
+      <circle cx="60" cy="100" r="42"/>
+      <ellipse cx="60" cy="100" rx="18" ry="42"/>
+      <line x1="18" y1="100" x2="102" y2="100"/>
+      <line x1="25" y1="76" x2="95" y2="76"/>
+      <line x1="25" y1="124" x2="95" y2="124"/>
+    </g>
+    <text x="32" y="34" font-family="Arial, sans-serif" font-size="19" font-weight="700" fill="#FAFAFA">Локалізація</text>
+    <text x="32" y="178" font-family="Arial, sans-serif" font-size="13" fill="#A1A1AA">Українська · Русский · English</text>
+  </g>
+</svg>
