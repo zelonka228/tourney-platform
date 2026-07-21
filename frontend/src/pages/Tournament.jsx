@@ -6,6 +6,8 @@ import {
   useRef,
   forwardRef,
   useImperativeHandle,
+  lazy,
+  Suspense,
 } from "react";
 import { Link, useParams, useNavigate } from "react-router-dom";
 import { AnimatePresence, animate, motion } from "framer-motion";
@@ -33,6 +35,14 @@ import {
 } from "../lib/demo";
 import { Btn, Field, Input, Overline, Panel, Select } from "../components/arena";
 import { downloadBracket } from "../lib/exportBracket";
+
+// Lazy — three.js + @react-three/fiber/drei are heavy (real WebGL scene, not
+// a small widget) and only ever needed by someone who clicks the trophy on a
+// tournament that already has a champion, which is a small fraction of page
+// views. Nobody pays for this bundle just by loading the bracket tab.
+const VictoryScene = lazy(() =>
+  import("../components/VictoryScene").then((m) => ({ default: m.VictoryScene }))
+);
 
 function useRoundLabel() {
   const { t } = useI18n();
@@ -882,6 +892,7 @@ export function Tournament() {
   const [removeError, setRemoveError] = useState(null);
   const [bracketSaving, setBracketSaving] = useState(false);
   const bracketRef = useRef(null);
+  const [showTrophy, setShowTrophy] = useState(false);
 
   async function downloadBracketImage() {
     setBracketSaving(true);
@@ -1369,11 +1380,25 @@ export function Tournament() {
               >
                 <span className="overline text-volt">{t("tour.champion")}</span>
                 <span className="font-display font-black text-2xl text-white">{champion}</span>
-                <span className="ml-auto text-volt text-2xl">★</span>
+                <button
+                  type="button"
+                  onClick={() => setShowTrophy(true)}
+                  data-testid="open-victory-scene"
+                  aria-label={t("tour.viewTrophy")}
+                  className="ml-auto text-volt text-2xl hover:scale-110 transition-transform"
+                >
+                  ★
+                </button>
               </motion.div>
             ) : canManageContent ? (
               <p className="text-[#a1a1aa] text-sm mb-6">{t("tour.hint")}</p>
             ) : null)}
+
+          {showTrophy && (
+            <Suspense fallback={null}>
+              <VictoryScene championName={champion} onClose={() => setShowTrophy(false)} />
+            </Suspense>
+          )}
 
           {matches.length > 0 && (
             <div className="flex justify-end mb-4">
