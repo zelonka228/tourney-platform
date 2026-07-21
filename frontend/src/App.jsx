@@ -15,6 +15,7 @@ import { Login } from "./pages/Login";
 import { Register } from "./pages/Register";
 import { Account } from "./pages/Account";
 import { AdminUsers } from "./pages/AdminUsers";
+import { SignalGridBg, EmberDriftBg, StatBarsBg, ContourLinesBg } from "./components/PageBackgrounds";
 import { Compare } from "./pages/Compare";
 import { GlobalSearch } from "./components/GlobalSearch";
 
@@ -231,10 +232,22 @@ function AnimatedRoutes() {
   );
 }
 
+// Ambient per-page canvas background — a different motif per section so
+// each page reads as its own space rather than a copy-pasted hero effect.
+function RouteBackground() {
+  const { pathname } = useLocation();
+  if (pathname.startsWith("/tournament")) return <SignalGridBg />;
+  if (pathname.startsWith("/collection")) return <EmberDriftBg />;
+  if (pathname.startsWith("/hall")) return <StatBarsBg />;
+  if (pathname.startsWith("/profile") || pathname.startsWith("/compare")) return <ContourLinesBg />;
+  return null;
+}
+
 function Shell() {
   const { t } = useI18n();
   return (
     <div className="grain min-h-screen relative">
+      <RouteBackground />
       <Header />
       <main className="max-w-6xl mx-auto px-5 relative z-10">
         <AnimatedRoutes />
