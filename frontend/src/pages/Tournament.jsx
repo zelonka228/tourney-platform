@@ -32,6 +32,7 @@ import {
   winTarget,
   lbWinnerDestination,
   loserDestination,
+  DISCIPLINE_LIST,
 } from "../lib/demo";
 import { Btn, Field, Input, Overline, Panel, Select } from "../components/arena";
 import { downloadBracket } from "../lib/exportBracket";
@@ -812,9 +813,12 @@ const DoubleEliminationBracket = forwardRef(function DoubleEliminationBracket(
   );
 });
 
+const TOURNAMENT_DISCIPLINE_TABS = ["all", ...DISCIPLINE_LIST];
+
 function TournamentPicker() {
   const { t } = useI18n();
   const [list, setList] = useState(null);
+  const [disc, setDisc] = useState("all");
   const [query, setQuery] = useState("");
   useEffect(() => {
     getTournaments().then(setList);
@@ -822,7 +826,9 @@ function TournamentPicker() {
     socket.on("tournaments:changed", onChanged);
     return () => socket.off("tournaments:changed", onChanged);
   }, []);
-  const visible = list?.filter((tm) => tm.name.toLowerCase().includes(query.trim().toLowerCase()));
+  const visible = list
+    ?.filter((tm) => disc === "all" || tm.discipline === disc)
+    .filter((tm) => tm.name.toLowerCase().includes(query.trim().toLowerCase()));
   return (
     <div className="py-10" data-testid="tournament-picker">
       <h1 className="font-display font-black text-4xl sm:text-5xl tracking-tighter text-white">
@@ -837,14 +843,34 @@ function TournamentPicker() {
           </Link>
         </p>
       )}
-      {list && list.length > 5 && (
-        <Input
-          value={query}
-          data-testid="tournament-search"
-          placeholder={t("tour.search")}
-          onChange={(e) => setQuery(e.target.value)}
-          className="mt-4 max-w-sm"
-        />
+      {list && list.length > 0 && (
+        <div className="flex flex-wrap items-center gap-3 mt-6">
+          <div className="flex flex-wrap gap-2">
+            {TOURNAMENT_DISCIPLINE_TABS.map((d) => (
+              <button
+                key={d}
+                data-testid={`tournament-tab-${d}`}
+                onClick={() => setDisc(d)}
+                className={`px-4 py-2 text-xs font-mono uppercase tracking-widest rounded-sm border transition-colors ${
+                  disc === d
+                    ? "border-cyan text-cyan bg-cyan/10"
+                    : "border-[#27272a] text-[#a1a1aa] hover:text-white"
+                }`}
+              >
+                {d === "all" ? t("hall.all") : d}
+              </button>
+            ))}
+          </div>
+          {list.length > 5 && (
+            <Input
+              value={query}
+              data-testid="tournament-search"
+              placeholder={t("tour.search")}
+              onChange={(e) => setQuery(e.target.value)}
+              className="sm:ml-auto sm:w-64"
+            />
+          )}
+        </div>
       )}
       {visible?.length === 0 && list.length > 0 && (
         <p className="text-[#52525b] text-sm mt-4">{t("create.noMatch")}</p>
@@ -1280,6 +1306,7 @@ export function Tournament() {
               <Input
                 type="date"
                 value={infoForm.date}
+                min={new Date().toISOString().slice(0, 10)}
                 data-testid="tournament-edit-date"
                 onChange={(e) => setInfoForm((f) => ({ ...f, date: e.target.value }))}
               />
