@@ -7,7 +7,7 @@ import { DISCIPLINE_LIST, RARITY_TIERS, teamRarity } from "../lib/demo";
 import { Overline, Panel, Btn, Input, Select } from "../components/arena";
 import { TeamCard } from "../components/TeamCard";
 import { downloadTeamCard } from "../lib/exportCard";
-import { openedPacksCount, onPacksChanged } from "../lib/openedPacks";
+import { isPackOpened, openedPacksCount, onPacksChanged } from "../lib/openedPacks";
 import { Skeleton } from "../components/Skeleton";
 import { ScaleToFit } from "../components/ScaleToFit";
 
@@ -62,6 +62,14 @@ function CollectionCard({ team }) {
   const { t } = useI18n();
   const cardRef = useRef(null);
   const [saving, setSaving] = useState(false);
+  // TeamCard only mounts the DOM node downloadTeamCard needs once its own
+  // pack-opening animation reaches "opened" — for a still-closed pack this
+  // button had nothing to export and silently did nothing when clicked
+  // (cardRef.current.node stayed null; downloadTeamCard no-ops on that).
+  // Same isPackOpened/onPacksChanged pair the gallery's progress counter
+  // already uses, just scoped to this one team.
+  const [opened, setOpened] = useState(() => isPackOpened(team.id));
+  useEffect(() => onPacksChanged(() => setOpened(isPackOpened(team.id))), [team.id]);
 
   async function handleDownload() {
     setSaving(true);
@@ -78,9 +86,11 @@ function CollectionCard({ team }) {
       <ScaleToFit width={320}>
         <TeamCard ref={cardRef} team={team} />
       </ScaleToFit>
-      <Btn variant="primary" disabled={saving} onClick={handleDownload}>
-        {saving ? "…" : t("profile.card.download")}
-      </Btn>
+      {opened && (
+        <Btn variant="primary" disabled={saving} onClick={handleDownload}>
+          {saving ? "…" : t("profile.card.download")}
+        </Btn>
+      )}
     </Panel>
   );
 }

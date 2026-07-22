@@ -213,11 +213,24 @@ export const TeamCard = forwardRef(function TeamCard({ team }, ref) {
   // виклику (downloadTeamCard), щоб ім'я файлу відрізняло перед/зад,
   // інакше збереження заду перезаписувало б щойно збережений перед
   // (той самий teamName-card.png для обох).
+  // Getters, not a plain snapshot object — the factory only re-runs when
+  // `flipped` changes, but `flipped` stays false for the entire pack-opening
+  // animation (closed -> tearing -> flash -> opened -> revealed). A plain
+  // `{ node: frontRef.current }` snapshot captured on that first run froze
+  // whatever frontRef.current was at that instant — null, if CardFront
+  // hadn't mounted yet — and never updated again unless the card got
+  // flipped at least once, silently breaking the download button. Getters
+  // read the ref fresh on every access instead, at whatever moment the
+  // caller (downloadTeamCard) actually reads `.node`.
   useImperativeHandle(
     ref,
     () => ({
-      node: flipped ? backRef.current : frontRef.current,
-      face: flipped ? "back" : "front",
+      get node() {
+        return flipped ? backRef.current : frontRef.current;
+      },
+      get face() {
+        return flipped ? "back" : "front";
+      },
     }),
     [flipped]
   );

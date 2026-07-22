@@ -25,6 +25,7 @@ import { ScaleToFit } from "../components/ScaleToFit";
 import { TeamMatchHistory } from "../components/TeamMatchHistory";
 import { TeamAchievements } from "../components/TeamAchievements";
 import { isFavorite, toggleFavorite, onFavoritesChanged } from "../lib/favorites";
+import { isPackOpened, onPacksChanged } from "../lib/openedPacks";
 
 // Ranks (Valorant) don't have a natural "count up" — but avgRating already
 // resolves them to a numeric VALORANT_RANKS index under the hood, so the
@@ -58,6 +59,17 @@ export function Profile() {
   const [liveElo, setLiveElo] = useState({});
   const [cardSaving, setCardSaving] = useState(false);
   const cardRef = useRef(null);
+  // Same silent-no-op the Collection gallery had: TeamCard only mounts the
+  // node downloadTeamCard needs once its pack-opening animation reaches
+  // "opened", so the download button did nothing for a still-closed pack.
+  // `sel` (the raw :id param) doubles as the team id here without waiting
+  // on `team` below, which isn't resolved until after the list/detail
+  // branch — a hook can't live past that early return.
+  const [cardOpened, setCardOpened] = useState(() => (sel !== null ? isPackOpened(sel) : false));
+  useEffect(() => {
+    setCardOpened(sel !== null ? isPackOpened(sel) : false);
+    return onPacksChanged(() => setCardOpened(sel !== null ? isPackOpened(sel) : false));
+  }, [sel]);
   // Favorites live in localStorage (lib/favorites.js), outside React state —
   // this tick just forces a re-render/re-sort when they change, since
   // isFavorite() itself is read fresh on every render rather than cached.
@@ -355,14 +367,16 @@ export function Profile() {
             <ScaleToFit width={320}>
               <TeamCard ref={cardRef} team={team} />
             </ScaleToFit>
-            <Btn
-              variant="primary"
-              data-testid="team-card-download"
-              disabled={cardSaving}
-              onClick={() => downloadCard(team.name)}
-            >
-              {cardSaving ? "…" : t("profile.card.download")}
-            </Btn>
+            {cardOpened && (
+              <Btn
+                variant="primary"
+                data-testid="team-card-download"
+                disabled={cardSaving}
+                onClick={() => downloadCard(team.name)}
+              >
+                {cardSaving ? "…" : t("profile.card.download")}
+              </Btn>
+            )}
           </Panel>
         </div>
       </div>
