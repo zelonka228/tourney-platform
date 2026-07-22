@@ -101,7 +101,19 @@ function logout() {
   $("logoutBtn").style.display = "none";
 }
 
+// Backend already rejects every actual read/write here for role "user"
+// (requireAdmin/requireContentManager, checked fresh from the DB on every
+// request) — but login() and restoreSession() used to wave any successful
+// login straight through to the dashboard shell regardless of role, so a
+// plain user account could still get past the login screen and stare at a
+// UI full of silently-failing requests. This is the single place both
+// paths funnel through, so the gate goes here once instead of twice.
 function onLoggedIn() {
+  if (currentUser.role !== "admin" && currentUser.role !== "organizer") {
+    $("loginMsg").textContent = "Ця панель доступна лише для admin/organizer акаунтів.";
+    logout();
+    return;
+  }
   $("loginBox").style.display = "none";
   $("app").style.display = "block";
   $("whoBox").innerHTML = "";
