@@ -28,6 +28,16 @@ function checkNameLength(name) {
   }
 }
 
+// Tournaments can be scheduled for today or later, never backdated — the
+// date field drives the displayed schedule, and a past date would be
+// indistinguishable from a real historical record that never happened.
+// Server clock, not client-supplied "today", is the source of truth.
+function checkNotPastDate(date) {
+  if (typeof date === "string" && date !== "" && date < new Date().toISOString().slice(0, 10)) {
+    throw new HttpError(400, "Дата турніру не може бути в минулому.");
+  }
+}
+
 // Double elimination (v1) only supports power-of-two team counts of at
 // least 4 — see docs/03-double-elimination-spec.md for why (byes in the
 // losers bracket are a substantially harder problem, deliberately out of
@@ -104,19 +114,22 @@ router.post(
   "/",
   requireContentManager,
   asyncHandler(async (req, res) => {
-    const { name, discipline, bracketType, matchFormat, teamIds, generateBracket } = req.body ?? {};
+    const { name, discipline, bracketType, matchFormat, teamIds, generateBracket, date } =
+      req.body ?? {};
 
     requireFields(req.body, ["name", "discipline", "bracketType", "matchFormat"]);
     requireEnum("discipline", discipline, DISCIPLINE_VALUES);
     requireEnum("bracketType", bracketType, BRACKET_TYPES);
     requireEnum("matchFormat", Number(matchFormat), MATCH_FORMATS);
     checkNameLength(name);
+    checkNotPastDate(date);
 
     const hasTeams = Array.isArray(teamIds) && teamIds.length > 0;
     if (hasTeams) checkDoubleElimSupported(bracketType, teamIds.length);
     const shouldGenerate = hasTeams && generateBracket !== false;
 
     const data = { name, discipline, bracketType, matchFormat: Number(matchFormat) };
+    if (date !== undefined) data.date = date;
 
     if (hasTeams) {
       data.teams = {
@@ -253,6 +266,7 @@ router.put(
       if (name.trim() === "") throw new HttpError(400, "Назва не може бути порожньою.");
       checkNameLength(name);
     }
+    if (date !== undefined) checkNotPastDate(date);
 
     const existing = await prisma.tournament.findUnique({
       where: { id },

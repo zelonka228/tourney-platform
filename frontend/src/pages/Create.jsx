@@ -15,6 +15,10 @@ import {
 } from "../lib/demo";
 import { Btn, Field, Input, Overline, Panel, Select } from "../components/arena";
 
+function todayIso() {
+  return new Date().toISOString().slice(0, 10);
+}
+
 function shuffled(arr) {
   const a = [...arr];
   for (let i = a.length - 1; i > 0; i--) {
@@ -53,7 +57,7 @@ export function Create() {
   const [bracket, setBracket] = useState("single");
   const [bo, setBo] = useState(3);
   const [discipline, setDiscipline] = useState("CS2");
-  const [date, setDate] = useState("2026-07-12");
+  const [date, setDate] = useState(todayIso());
   const [seedType, setSeedType] = useState("rating");
   const [allTeams, setAllTeams] = useState([]);
   const [selectedIds, setSelectedIds] = useState([]);
@@ -83,7 +87,11 @@ export function Create() {
     (selectedIds.length < 4 || !isPowerOfTwo(selectedIds.length));
   const plan = bracketPlan(Math.max(selectedIds.length, 1));
   const canSubmit =
-    (!isDouble || !doubleBlocked) && selectedIds.length >= 2 && name.trim() !== "" && !submitting;
+    (!isDouble || !doubleBlocked) &&
+    selectedIds.length >= 2 &&
+    name.trim() !== "" &&
+    date >= todayIso() &&
+    !submitting;
 
   async function handleSubmit() {
     setSubmitting(true);
@@ -186,6 +194,7 @@ export function Create() {
               <Input
                 type="date"
                 value={date}
+                min={todayIso()}
                 data-testid="create-date-input"
                 onChange={(e) => setDate(e.target.value)}
               />

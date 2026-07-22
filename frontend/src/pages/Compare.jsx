@@ -21,10 +21,20 @@ export function Compare() {
   const teamA = teams?.find((tm) => String(tm.id) === idA) ?? null;
   const teamB = teams?.find((tm) => String(tm.id) === idB) ?? null;
 
+  // Two teams can only have a head-to-head record if they play the same
+  // discipline — clear the other side if its team no longer matches the
+  // discipline just picked here.
   function setSide(side, value) {
     const next = new URLSearchParams(params);
     if (value) next.set(side, value);
     else next.delete(side);
+
+    const otherSide = side === "a" ? "b" : "a";
+    const picked = teams?.find((tm) => String(tm.id) === value);
+    const other = teams?.find((tm) => String(tm.id) === next.get(otherSide));
+    if (picked && other && other.discipline !== picked.discipline) {
+      next.delete(otherSide);
+    }
     setParams(next, { replace: true });
   }
 
@@ -58,6 +68,7 @@ export function Compare() {
           teams={teams}
           value={idA}
           exclude={idB}
+          discipline={teamB?.discipline}
           onChange={(v) => setSide("a", v)}
         />
         <div className="hidden sm:block pb-3 text-center overline text-[#52525b]">vs</div>
@@ -66,6 +77,7 @@ export function Compare() {
           teams={teams}
           value={idB}
           exclude={idA}
+          discipline={teamA?.discipline}
           onChange={(v) => setSide("b", v)}
         />
       </div>
@@ -136,7 +148,7 @@ export function Compare() {
   );
 }
 
-function TeamPicker({ label, teams, value, exclude, onChange }) {
+function TeamPicker({ label, teams, value, exclude, discipline, onChange }) {
   return (
     <label className="block">
       <span className="overline block mb-2">{label}</span>
@@ -147,6 +159,7 @@ function TeamPicker({ label, teams, value, exclude, onChange }) {
           <option value="">—</option>
           {teams
             .filter((tm) => String(tm.id) !== exclude)
+            .filter((tm) => !discipline || tm.discipline === discipline)
             .map((tm) => (
               <option key={tm.id} value={tm.id}>
                 {tm.name} · {tm.discipline}
