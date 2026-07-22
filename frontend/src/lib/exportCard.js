@@ -46,30 +46,31 @@ export async function downloadTeamCard(cardHandle, teamName) {
   const prevTransform = el.style.transform;
   el.style.transform = "none";
   try {
-    // skipFonts: true — html-to-image otherwise tries to read cssRules off
-    // every loaded stylesheet to embed @font-face declarations, including
-    // the Google Fonts <link> in index.html. That stylesheet has no
-    // `crossorigin` attribute, so the browser blocks JS from reading its
-    // cssRules at all (SecurityError) — caught internally per-sheet, but it
-    // still aborts toPng() before it ever reaches a.click(), so the button
-    // silently did nothing. The fonts are already applied on-screen by the
-    // time this runs (this rasterizes the live, already-rendered DOM), so
-    // there's nothing this step needed to add for our case.
+    // html-to-image embeds @font-face rules by reading cssRules off every
+    // loaded stylesheet, including the Google Fonts <link> in index.html.
+    // That link now carries `crossorigin="anonymous"` (Google Fonts serves
+    // permissive CORS headers) specifically so this read succeeds — without
+    // it, the browser throws a SecurityError on that cross-origin sheet,
+    // which used to make toPng() abort before ever reaching a.click() (the
+    // button silently did nothing). Skipping font embedding entirely
+    // (skipFonts: true) used to be the workaround, but the exported PNG
+    // never carried any @font-face info that way — the display font
+    // (Unbounded) silently fell back to a generic system font in the
+    // downloaded image while matching fine on-screen, a real, user-visible
+    // bug reported after export (Red Phoenix card: "IMMORTAL" in a plain
+    // sans instead of the display font). Fixing the CORS attribute at the
+    // source lets font embedding actually work instead of needing to skip it.
     //
-    // Wrapped in a timeout too: even past the font issue above, toPng()
-    // measurably hangs for several seconds to indefinitely on this card —
-    // reproduced consistently, cause not fully pinned down (this card's
-    // node is a heavy one to serialize: an embedded raster background image
-    // plus a large dump of inline styles per element, going through
-    // html-to-image's canvas/Image.onload step). Whatever the exact
-    // mechanism, an unbounded hang here reads identically to "the button
-    // does nothing" from the user's side, so this at least guarantees the
-    // button recovers instead of spinning forever.
-    const dataUrl = await withTimeout(
-      toPng(el, { skipFonts: true }),
-      15000,
-      "Card export timed out"
-    );
+    // Wrapped in a timeout too: toPng() has measurably hung for several
+    // seconds to indefinitely on this card — reproduced consistently, cause
+    // not fully pinned down (this card's node is a heavy one to serialize:
+    // an embedded raster background image plus a large dump of inline
+    // styles per element, going through html-to-image's canvas/Image.onload
+    // step). Whatever the exact mechanism, an unbounded hang here reads
+    // identically to "the button does nothing" from the user's side, so
+    // this at least guarantees the button recovers instead of spinning
+    // forever.
+    const dataUrl = await withTimeout(toPng(el), 15000, "Card export timed out");
     const a = document.createElement("a");
     a.href = dataUrl;
     a.download = `${teamName}-card-${cardHandle.face}.png`;
