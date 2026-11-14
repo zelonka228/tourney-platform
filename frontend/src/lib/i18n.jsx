@@ -840,7 +840,8 @@ const DICT = {
 const I18nContext = createContext(null);
 
 export function I18nProvider({ children }) {
-  const [lang, setLang] = useState(() => localStorage.getItem("arena_lang") || "ru");
+  // Завжди стартуємо з російської, збережений у браузері вибір мови ігнорується.
+  const [lang, setLang] = useState("ru");
   const change = useCallback((l) => {
     setLang(l);
     localStorage.setItem("arena_lang", l);
