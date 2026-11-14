@@ -840,7 +840,7 @@ const DICT = {
 const I18nContext = createContext(null);
 
 export function I18nProvider({ children }) {
-  const [lang, setLang] = useState(() => localStorage.getItem("arena_lang") || "ua");
+  const [lang, setLang] = useState(() => localStorage.getItem("arena_lang") || "ru");
   const change = useCallback((l) => {
     setLang(l);
     localStorage.setItem("arena_lang", l);
