@@ -69,12 +69,6 @@ export function Login() {
               </p>
             )}
           </form>
-          <p className="text-[#a1a1aa] text-sm text-center mt-5">
-            {t("auth.haveNoAccount")}{" "}
-            <Link to="/register" className="text-cyan hover:underline">
-              {t("auth.register")}
-            </Link>
-          </p>
         </Panel>
       </div>
     </div>

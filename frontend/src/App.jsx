@@ -1,4 +1,4 @@
-import { BrowserRouter, NavLink, Route, Routes, useNavigate, useLocation } from "react-router-dom";
+import { BrowserRouter, Navigate, NavLink, Route, Routes, useNavigate, useLocation } from "react-router-dom";
 import { AnimatePresence, motion, MotionConfig, useReducedMotion } from "framer-motion";
 import { I18nProvider, useI18n } from "./lib/i18n";
 import { AuthProvider, useAuth } from "./lib/auth";
@@ -12,7 +12,6 @@ import { Collection } from "./pages/Collection";
 import { Hall } from "./pages/Hall";
 import { Tournament } from "./pages/Tournament";
 import { Login } from "./pages/Login";
-import { Register } from "./pages/Register";
 import { Account } from "./pages/Account";
 import { AdminUsers } from "./pages/AdminUsers";
 import { SignalGridBg, EmberDriftBg, StatBarsBg, ContourLinesBg } from "./components/PageBackgrounds";
@@ -192,7 +191,8 @@ const ROUTE_ELEMENTS = (
     <Route path="/hall" element={<Hall />} />
     <Route path="/compare" element={<Compare />} />
     <Route path="/login" element={<Login />} />
-    <Route path="/register" element={<Register />} />
+    {/* Реєстрація тимчасово вимкнена: повернути <Register /> замість редіректу */}
+    <Route path="/register" element={<Navigate to="/login" replace />} />
     <Route path="/account" element={<Account />} />
     <Route path="/admin/users" element={<AdminUsers />} />
   </>

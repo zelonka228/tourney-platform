@@ -58,6 +58,10 @@ router.post(
   "/register",
   registerLimiter,
   asyncHandler(async (req, res) => {
+    // Тимчасово вимкнено. Щоб знову дозволити: REGISTRATION_ENABLED=true у середовищі бекенду.
+    if (process.env.REGISTRATION_ENABLED !== "true") {
+      throw new HttpError(403, "Реєстрація тимчасово вимкнена.");
+    }
     requireFields(req.body, ["username", "password"]);
     const { username, password } = req.body;
 
