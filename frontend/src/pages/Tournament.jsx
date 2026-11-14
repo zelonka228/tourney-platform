@@ -153,7 +153,7 @@ function MatchCard({
           : undefined
       }
       className={`w-[220px] relative bg-surface border rounded-sm overflow-hidden transition-colors ${
-        todo
+        todo && canManageContent
           ? `border-cyan shadow-[0_0_0_1px_#00f0ff] ${clickable ? "cursor-pointer" : ""}`
           : "border-[#27272a]"
       } ${pending ? "opacity-45" : ""} ${clickable ? "focus-visible:outline focus-visible:outline-2 focus-visible:outline-cyan" : ""}`}
@@ -231,7 +231,7 @@ function MatchCard({
             </div>
           );
         })}
-        {todo && (
+        {todo && canManageContent && (
           <div className="text-center py-1.5 bg-cyan text-void text-[12px] font-mono uppercase tracking-widest">
             {enterScoreLabel}
           </div>
