@@ -151,3 +151,12 @@ input[type="date"]::-webkit-calendar-picker-indicator {
   filter: invert(0.7);
   cursor: pointer;
 }
+
+/* Ховає смугу прокрутки, лишаючи саму прокрутку (перетягування/колесо). */
+.no-scrollbar {
+  scrollbar-width: none;
+  -ms-overflow-style: none;
+}
+.no-scrollbar::-webkit-scrollbar {
+  display: none;
+}

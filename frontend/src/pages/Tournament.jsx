@@ -9,6 +9,7 @@ import {
   lazy,
   Suspense,
 } from "react";
+import { createPortal } from "react-dom";
 import { Link, useParams, useNavigate } from "react-router-dom";
 import { AnimatePresence, animate, motion } from "framer-motion";
 import { useI18n } from "../lib/i18n";
@@ -19,6 +20,7 @@ import {
   getTournament,
   getTournaments,
   submitMatchScore,
+  setMatchTeams,
   resetMatch,
   generateBracket,
   deleteTournament,
@@ -72,6 +74,30 @@ function BracketLabel({ children, className = "" }) {
   );
 }
 
+// Плаваюча підказка поруч із карточкою матчу (замість панелі внизу сторінки).
+// Рендериться в body (fixed, координати вікна); клік поза нею або Esc закриває.
+function Popover({ anchor, onClose, children }) {
+  const W = 320;
+  const vw = window.innerWidth;
+  const vh = window.innerHeight;
+  const a = anchor ?? { left: 40, right: 40, top: 120 };
+  const left = a.right + 12 + W > vw ? Math.max(8, a.left - W - 12) : a.right + 12;
+  const top = Math.min(Math.max(8, a.top), Math.max(8, vh - 320));
+  useEffect(() => {
+    const onKey = (e) => e.key === "Escape" && onClose();
+    window.addEventListener("keydown", onKey);
+    return () => window.removeEventListener("keydown", onKey);
+  }, [onClose]);
+  return createPortal(
+    <div className="fixed inset-0 z-50" onClick={onClose}>
+      <div className="absolute" style={{ left, top, width: W }} onClick={(e) => e.stopPropagation()}>
+        {children}
+      </div>
+    </div>,
+    document.body
+  );
+}
+
 function MatchCard({
   m,
   teamName,
@@ -113,7 +139,7 @@ function MatchCard({
     // box's layout rect constant throughout, so the wire never drifts.
     <div
       ref={cardRef}
-      onClick={clickable ? () => openEdit(m) : undefined}
+      onClick={clickable ? (e) => openEdit(m, undefined, e.currentTarget) : undefined}
       role={clickable ? "button" : undefined}
       tabIndex={clickable ? 0 : undefined}
       onKeyDown={
@@ -121,12 +147,12 @@ function MatchCard({
           ? (e) => {
               if (e.key === "Enter" || e.key === " ") {
                 e.preventDefault();
-                openEdit(m);
+                openEdit(m, undefined, e.currentTarget);
               }
             }
           : undefined
       }
-      className={`w-[220px] bg-surface border rounded-sm overflow-hidden transition-colors ${
+      className={`w-[220px] relative bg-surface border rounded-sm overflow-hidden transition-colors ${
         todo
           ? `border-cyan shadow-[0_0_0_1px_#00f0ff] ${clickable ? "cursor-pointer" : ""}`
           : "border-[#27272a]"
@@ -150,6 +176,22 @@ function MatchCard({
         }
         transition={{ duration: 0.5, ease: "easeOut" }}
       >
+        {canManageContent && m.status === "pending" && (
+          <button
+            type="button"
+            title="Змінити команди"
+            aria-label="Змінити команди"
+            data-testid={`edit-teams-${m.id}`}
+            onClick={(e) => {
+              e.stopPropagation();
+              openEdit(m, "teams", e.currentTarget.closest('[data-testid^="match-card-"]'));
+            }}
+            onKeyDown={(e) => e.stopPropagation()}
+            className="absolute top-1 right-1 z-10 w-6 h-6 text-[13px] leading-none text-[#a1a1aa] bg-void/80 border border-[#27272a] rounded-sm hover:text-cyan hover:border-cyan"
+          >
+            ✎
+          </button>
+        )}
         {[
           { id: m.teamAId, name: a, score: m.scoreA },
           { id: m.teamBId, name: b, score: m.scoreB },
@@ -370,7 +412,7 @@ const BracketRow = forwardRef(function BracketRow(
   return (
     <div
       ref={bracketRef}
-      className="relative flex gap-10 overflow-x-auto pb-4 cursor-grab active:cursor-grabbing"
+      className="relative flex gap-10 overflow-x-auto no-scrollbar pb-4 cursor-grab active:cursor-grabbing"
       data-testid={testId}
     >
       <svg
@@ -733,7 +775,7 @@ const DoubleEliminationBracket = forwardRef(function DoubleEliminationBracket(
   return (
     <div
       ref={bracketRef}
-      className="relative overflow-x-auto pb-4 cursor-grab active:cursor-grabbing"
+      className="relative overflow-x-auto no-scrollbar pb-4 cursor-grab active:cursor-grabbing"
       data-testid="bracket-double"
     >
       <svg
@@ -1104,13 +1146,22 @@ export function Tournament() {
     [matches, tournament]
   );
 
-  function openEdit(m) {
+  function openEdit(m, mode, el) {
     if (!canManageContent) return;
-    if (m.teamAId && m.teamBId && m.status === "pending") {
-      setEdit({ matchId: m.id, mode: "score", a: teamName(m.teamAId), b: teamName(m.teamBId) });
+    const r = el?.getBoundingClientRect();
+    const anchor = r ? { left: r.left, right: r.right, top: r.top } : null;
+    const open = (o) => {
+      setEdit({ ...o, anchor });
       setScoreError(null);
+    };
+    if (mode === "teams") {
+      open({ matchId: m.id, mode: "teams", teamAId: m.teamAId ?? "", teamBId: m.teamBId ?? "" });
+      return;
+    }
+    if (m.teamAId && m.teamBId && m.status === "pending") {
+      open({ matchId: m.id, mode: "score", a: teamName(m.teamAId), b: teamName(m.teamBId) });
     } else if (m.status === "done") {
-      setEdit({
+      open({
         matchId: m.id,
         mode: "reset",
         a: teamName(m.teamAId),
@@ -1118,7 +1169,17 @@ export function Tournament() {
         scoreA: m.scoreA,
         scoreB: m.scoreB,
       });
-      setScoreError(null);
+    }
+  }
+  async function saveTeams() {
+    try {
+      const res = await setMatchTeams(edit.matchId, edit.teamAId || null, edit.teamBId || null);
+      mergeMatches(res.match);
+      setEdit(null);
+      toast("Команди збережено", "success");
+    } catch (e) {
+      setScoreError(e.message);
+      toast(e.message, "error");
     }
   }
   async function saveScore(sa, sb) {
@@ -1480,10 +1541,12 @@ export function Tournament() {
             />
           )}
 
-          {edit?.mode === "score" && (
+          {edit && (
+            <Popover anchor={edit.anchor} onClose={() => setEdit(null)}>
+          {edit.mode === "score" && (
             <Panel
               clip
-              className="p-6 max-w-md mt-6"
+              className="p-4"
               data-testid="score-modal"
               role="dialog"
               aria-modal="true"
@@ -1514,10 +1577,45 @@ export function Tournament() {
             </Panel>
           )}
 
-          {edit?.mode === "reset" && (
+          {edit.mode === "teams" && (
+            <Panel clip className="p-4" data-testid="teams-modal" role="dialog" aria-modal="true">
+              <h2 className="font-display font-bold text-lg text-white">Команди матчу</h2>
+              {["teamAId", "teamBId"].map((key, i) => (
+                <label key={key} className="block mt-4 text-sm text-[#a1a1aa]">
+                  {i === 0 ? "Команда 1" : "Команда 2"}
+                  <select
+                    data-testid={`teams-select-${i}`}
+                    value={edit[key]}
+                    onChange={(e) =>
+                      setEdit((x) => ({ ...x, [key]: e.target.value === "" ? "" : Number(e.target.value) }))
+                    }
+                    className="block w-full mt-1 bg-surface border border-[#27272a] rounded-sm px-3 py-2 text-white"
+                  >
+                    <option value="">— порожньо —</option>
+                    {tournament.teams.map((tt) => (
+                      <option key={tt.teamId} value={tt.teamId}>
+                        {tt.team?.name}
+                      </option>
+                    ))}
+                  </select>
+                </label>
+              ))}
+              {scoreError && <p className="text-[#ff0055] text-sm mt-3">{scoreError}</p>}
+              <div className="flex gap-2 mt-4">
+                <Btn size="sm" data-testid="teams-save-btn" onClick={saveTeams}>
+                  Зберегти
+                </Btn>
+                <Btn size="sm" variant="ghost" onClick={() => setEdit(null)}>
+                  {t("tour.cancel")}
+                </Btn>
+              </div>
+            </Panel>
+          )}
+
+          {edit.mode === "reset" && (
             <Panel
               clip
-              className="p-6 max-w-md mt-6"
+              className="p-4"
               data-testid="reset-modal"
               role="dialog"
               aria-modal="true"
@@ -1550,6 +1648,8 @@ export function Tournament() {
                 </Btn>
               </div>
             </Panel>
+          )}
+            </Popover>
           )}
         </div>
       )}

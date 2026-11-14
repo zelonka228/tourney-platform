@@ -115,6 +115,61 @@ router.put(
   })
 );
 
+// PUT /api/matches/:id/teams → вручну поставити/замінити команди в матчі
+// (напр. розставити сітку невдах самостійно). Лише для ще не зіграних
+// матчів; команди мають бути зареєстровані в цьому турнірі. null/порожнє
+// значення очищає слот.
+router.put(
+  "/:id/teams",
+  requireContentManager,
+  asyncHandler(async (req, res) => {
+    const id = parseId(req.params.id);
+    const match = await prisma.match.findUnique({ where: { id } });
+    if (!match) throw new HttpError(404, "Матч не знайдено.");
+    if (match.status !== "pending") {
+      throw new HttpError(409, "Команди можна змінювати лише в ще не зіграному матчі.");
+    }
+
+    const body = req.body ?? {};
+    const norm = (v) => (v === undefined ? undefined : v === null || v === "" ? null : Number(v));
+    const teamAId = norm(body.teamAId);
+    const teamBId = norm(body.teamBId);
+    const nextA = teamAId === undefined ? match.teamAId : teamAId;
+    const nextB = teamBId === undefined ? match.teamBId : teamBId;
+    if (nextA != null && nextA === nextB) {
+      throw new HttpError(400, "Не можна поставити одну й ту саму команду з обох боків.");
+    }
+
+    const registered = await prisma.tournamentTeam.findMany({
+      where: { tournamentId: match.tournamentId },
+      select: { teamId: true },
+    });
+    const ids = new Set(registered.map((r) => r.teamId));
+    for (const tid of [nextA, nextB]) {
+      if (tid != null && !ids.has(tid)) {
+        throw new HttpError(400, "Команда не зареєстрована в цьому турнірі.");
+      }
+    }
+
+    const updated = await prisma.match.update({
+      where: { id },
+      data: { teamAId: nextA, teamBId: nextB },
+    });
+
+    const io = req.app.get("io");
+    if (io) {
+      io.to(`tournament:${match.tournamentId}`).emit("match:updated", {
+        tournamentId: match.tournamentId,
+        match: updated,
+        advanced: null,
+        advancedLoser: null,
+        champion: null,
+      });
+    }
+    res.json({ match: updated });
+  })
+);
+
 // POST /api/matches/:id/reset → undo a submitted result (misclick recovery).
 // Only allowed when the winner hasn't gone on to decide anything further —
 // in a single-elimination tournament that just means "the next round". In a

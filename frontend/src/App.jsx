@@ -245,11 +245,14 @@ function RouteBackground() {
 
 function Shell() {
   const { t } = useI18n();
+  const { pathname } = useLocation();
+  // Сторінка турніру — на всю ширину екрана, щоб вся сітка вміщалась без прокрутки.
+  const wide = pathname.startsWith("/tournament");
   return (
     <div className="grain min-h-screen relative">
       <RouteBackground />
       <Header />
-      <main className="max-w-6xl mx-auto px-5 relative z-10">
+      <main className={`${wide ? "max-w-none px-8" : "max-w-6xl px-5"} mx-auto relative z-10`}>
         <AnimatedRoutes />
         <footer className="py-12 text-center overline">
           {t("brand")} · esports tournament engine

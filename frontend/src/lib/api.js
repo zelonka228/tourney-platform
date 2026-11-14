@@ -197,6 +197,13 @@ export async function submitMatchScore(matchId, scoreA, scoreB) {
   });
 }
 
+export async function setMatchTeams(matchId, teamAId, teamBId) {
+  return request(`/api/matches/${matchId}/teams`, {
+    method: "PUT",
+    body: JSON.stringify({ teamAId, teamBId }),
+  });
+}
+
 export async function resetMatch(matchId) {
   return request(`/api/matches/${matchId}/reset`, { method: "POST" });
 }
